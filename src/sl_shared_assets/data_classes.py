@@ -85,7 +85,7 @@ def resolve_project(create: bool = False) -> Path:
     if not console.enabled:
         console.enable()
 
-    # Uses appdirs to locate the user data directory 
+    # Uses appdirs to locate the user data directory
     app_dir = Path(appdirs.user_data_dir(appname="sl_experiment", appauthor="sun_lab"))
     path_file = app_dir.joinpath("root_path.txt")
 
@@ -1148,3 +1148,17 @@ class SurgeryData(YamlConfig):
     """Stores the data for all cranial and transcranial implants introduced to the subject during the procedure."""
     injections: list[InjectionData]
     """Stores the data about all substances infused into the brain of the subject during the surgery."""
+
+
+@dataclass()
+class ServerCredentials(YamlConfig):
+    """This class stores the hostname and credentials used to log into the BioHPC cluster to run Sun lab processing
+    pipelines.
+    """
+
+    username: str = "YourNetID"
+    """The username to use for server authentication."""
+    password: str = "YourPassword"
+    """The password to use for server authentication."""
+    host: str = "cbsuwsun.biohpc.cornell.edu"
+    """The hostname or IP address of the server to connect to."""
