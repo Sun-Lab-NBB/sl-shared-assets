@@ -32,7 +32,7 @@ def replace_root_path(path: Path) -> None:
         path: The path to the new local root directory.
     """
     # Resolves the path to the static .txt file used to store the local path to the root directory
-    app_dir = Path(appdirs.user_data_dir(appname="sunlab_data", appauthor="sun_lab"))
+    app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
     path_file = app_dir.joinpath("root_path.txt")
 
     # In case this function is called before the app directory is created, ensures the app directory exists
@@ -46,97 +46,16 @@ def replace_root_path(path: Path) -> None:
         f.write(str(path))
 
 
-def create_project() -> None:
-    # Ensures console is enabled
-    if not console.enabled:
-        console.enable()
+def generate_server_credentials(
+    output_directory: Path, username: str, password: str, host: str = "cbsuwsun.biohpc.cornell.edu"
+) -> None:
+    """Generates a new server_credentials.yaml file under the specified directory, using input information.
 
-    # Uses appdirs to localize default user data directory. This serves as a static pointer to the storage directory
-    # where the path to the 'root' experiment directory can be safely stored between runtimes. This way, we can set
-    # the path once and reuse it for all future projects and runtimes.
-    app_dir = Path(appdirs.user_data_dir(appname="sl_experiment", appauthor="sun_lab"))
-    path_file = app_dir.joinpath("root_path.txt")
-
-    # If the .txt file that stores the local root path does not exist, prompts the user to provide the path to the
-    # local root directory and creates the root_path.txt file
-    if not path_file.exists():
-        # Gets the path to the local root directory from the user via command line input
-        message = (
-            "Unable to resolve the local root directory automatically. Provide the absolute path to the local "
-            "directory that stores all project-specific directories."
-        )
-        console.echo(message=message, level=LogLevel.WARNING)
-        root_path_str = input("Local root path: ")
-        root_path = Path(root_path_str)
-
-        # If necessary, generates the local root directory
-        ensure_directory_exists(root_path)
-
-        # Also ensures that the app directory exists, so that the path_file can be created below.
-        ensure_directory_exists(path_file)
-
-        # Saves the root path to the file
-        with open(path_file, "w") as f:
-            f.write(str(root_path))
-
-
-def resolve_project(create: bool = False) -> Path:
-    # Ensures console is enabled
-    if not console.enabled:
-        console.enable()
-
-    # Uses appdirs to locate the user data directory
-    app_dir = Path(appdirs.user_data_dir(appname="sl_experiment", appauthor="sun_lab"))
-    path_file = app_dir.joinpath("root_path.txt")
-
-    # If the .txt file that stores the local root path does not exist, prompts the user to provide the path to the
-    # local root directory and creates the root_path.txt file
-    if not path_file.exists():
-        # Gets the path to the local root directory from the user via command line input
-        message = (
-            "Unable to resolve the local root directory automatically. Provide the absolute path to the local "
-            "directory that stores all project-specific directories."
-        )
-        console.echo(message=message, level=LogLevel.WARNING)
-        root_path_str = input("Local root path: ")
-        root_path = Path(root_path_str)
-
-        # If necessary, generates the local root directory
-        ensure_directory_exists(root_path)
-
-        # Also ensures that the app directory exists, so that the path_file can be created below.
-        ensure_directory_exists(path_file)
-
-        # Saves the root path to the file
-        with open(path_file, "w") as f:
-            f.write(str(root_path))
-
-    # Otherwise, uses the root path and the project name to resolve the path to the project configuration directory
-    # and load the project configuration data.
-    else:
-        # Reads the root path from the file
-        with open(path_file, "r") as f:
-            root_path = Path(f.read().strip())
-
-    # Uses the root experiment directory path to generate the path to the target project's configuration file.
-    config_path = root_path.joinpath(project_name, "configuration", "project_configuration.yaml")
-    ensure_directory_exists(config_path)  # Ensures the directory tree for the config path exists.
-    if not config_path.exists():
-        message = (
-            f"Unable to load project configuration data from disk as no 'project_configuration.yaml' file found at "
-            f"the provided project path. Generating a precursor (default) configuration file at the "
-            f"specified path. Edit the file to specify project configuration before proceeding further to avoid "
-            f"runtime errors."
-        )
-        console.echo(message=message, level=LogLevel.WARNING)
-
-        # Generates the default configuration instance and dumps it as a .yaml file. Note, as part of this process,
-        # the class generates the correct 'local_root_path' based on the path provided by the user.
-        precursor = ProjectConfiguration(local_root_directory=root_path)
-        precursor._to_path(path=config_path)
-
-        # Waits for the user to manually configure the newly created file.
-        input(f"Enter anything to continue: ")
+    This function should be used as a convenience interface for generating new BioHPC server credential files.
+    """
+    ServerCredentials(username=username, password=password, host=host).to_yaml(
+        file_path=output_directory.joinpath("server_credentials.yaml")
+    )
 
 
 @dataclass()
@@ -235,7 +154,7 @@ class ProjectConfiguration(YamlConfig):
     """
 
     @classmethod
-    def load(cls, project_name: str) -> "ProjectConfiguration":
+    def load(cls, project_name: str, configuration_path: None | Path = None) -> "ProjectConfiguration":
         """Loads the project configuration parameters from a .yaml file and uses the loaded data to initialize a
         ProjectConfiguration instance.
 
@@ -250,25 +169,103 @@ class ProjectConfiguration(YamlConfig):
             default data directory, so that it can be reused for all future runtimes. Use 'replace_root_path' function
             to replace the path that is saved in this way.
 
+            Since this class is used during both data acquisition and processing on different machines, this method
+            supports multiple ways of initializing the class. Use the project_name on the VRPC (via the sl_experiment
+            library). Use the configuration path on the BioHPC server (via the sl_forgery library).
+
         Args:
-            project_name: the name of the project whose configuration file needs to be discovered and loaded.
+            project_name: The name of the project whose configuration file needs to be discovered and loaded. Note, this
+                way of resolving the project is the default way on the VRPC. When processing data on the server, the
+                pipeline preferentially uses the configuration_path.
+            configuration_path: The path to the project_configuration.yaml file from which to load the data. This is
+                an optional way of resolving the configuration data source that always takes precedence over the
+                project_name when both are provided.
 
         Returns:
             An initialized ProjectConfiguration instance.
         """
 
-        # Loads the data from the YAML file and initializes the class instance.
-        instance: ProjectConfiguration = cls.from_yaml(file_path=config_path)  # type: ignore
+        # Ensures console is enabled
+        if not console.enabled:
+            console.enable()
+
+        # If the configuration path is not provided, uses the 'default' resolution strategy that involves reading the
+        # user's data directory
+        if configuration_path is None:
+            # Uses appdirs to locate the user data directory and resolve the path to the storage file
+            app_dir = Path(appdirs.user_data_dir(appname="sl_assets", appauthor="sun_lab"))
+            path_file = app_dir.joinpath("root_path.txt")
+
+            # If the .txt file that stores the local root path does not exist, prompts the user to provide the path to
+            # the local root directory and creates the root_path.txt file
+            if not path_file.exists():
+                # Gets the path to the local root directory from the user via command line input
+                message = (
+                    "Unable to resolve the local root directory automatically. Provide the absolute path to the local "
+                    "directory that stores all project-specific directories. This is required when resolving project "
+                    "configuration based on project's name."
+                )
+                console.echo(message=message, level=LogLevel.WARNING)
+                root_path_str = input("Local root path: ")
+                root_path = Path(root_path_str)
+
+                # If necessary, generates the local root directory
+                ensure_directory_exists(root_path)
+
+                # Also ensures that the app directory exists, so that the path_file can be created below.
+                ensure_directory_exists(path_file)
+
+                # Saves the root path to the file
+                with open(path_file, "w") as f:
+                    f.write(str(root_path))
+
+            # Otherwise, uses the root path and the project name to resolve the path to the project configuration
+            # directory and load the project configuration data.
+            else:
+                # Reads the root path from the file
+                with open(path_file, "r") as f:
+                    root_path = Path(f.read().strip())
+
+            # Uses the root experiment directory path to generate the path to the target project's configuration file.
+            configuration_path = root_path.joinpath(project_name, "configuration", "project_configuration.yaml")
+            ensure_directory_exists(configuration_path)  # Ensures the directory tree for the config path exists.
+
+        # If the configuration file does not exist (this is the first time this class is initialized for a given
+        # project), generates a precursor (default) configuration file and prompts the user to update the configuration.
+        if not configuration_path.exists():
+            message = (
+                f"Unable to load project configuration data from disk as no 'project_configuration.yaml' file "
+                f"found at the provided project path. Generating a precursor (default) configuration file under "
+                f"{project_name}/configuration directory. Edit the file to specify project configuration before "
+                f"proceeding further to avoid runtime errors."
+            )
+            console.echo(message=message, level=LogLevel.WARNING)
+
+            # Generates the default project configuration instance and dumps it as a .yaml file. Note, as part of
+            # this process, the class generates the correct 'local_root_path' based on the path provided by the
+            # user.
+            precursor = ProjectConfiguration(local_root_directory=Path(str(configuration_path.parents[2])))
+            precursor._to_path(path=configuration_path)
+
+            # Waits for the user to manually configure the newly created file.
+            input(f"Enter anything to continue: ")
+
+        # Loads the data from the YAML file and initializes the class instance. This now uses either the automatically
+        # resolved configuration path or the manually provided path
+        instance: ProjectConfiguration = cls.from_yaml(file_path=configuration_path)  # type: ignore
 
         # Converts all paths loaded as strings to Path objects used inside the library
         instance.local_mesoscope_directory = Path(instance.local_mesoscope_directory)
         instance.local_nas_directory = Path(instance.local_nas_directory)
         instance.local_server_directory = Path(instance.local_server_directory)
+        instance.remote_storage_directory = Path(instance.remote_storage_directory)
+        instance.remote_working_directory = Path(instance.remote_working_directory)
         instance.google_credentials_path = Path(instance.google_credentials_path)
+        instance.server_credentials_path = Path(instance.server_credentials_path)
         instance.harvesters_cti_path = Path(instance.harvesters_cti_path)
 
-        # Local root path is always re-computed using the data stored in the user data directory.
-        instance.local_root_directory = root_path
+        # Local root path is always re-computed from the resolved configuration file's location
+        instance.local_root_directory = Path(str(configuration_path.parents[2]))
 
         # Converts valve_calibration data from dictionary to a tuple of tuples format
         if not isinstance(instance.valve_calibration_data, tuple):
@@ -297,7 +294,10 @@ class ProjectConfiguration(YamlConfig):
         self.local_mesoscope_directory = str(self.local_mesoscope_directory)
         self.local_nas_directory = str(self.local_nas_directory)
         self.local_server_directory = str(self.local_server_directory)
+        self.remote_storage_directory = str(self.remote_storage_directory)
+        self.remote_working_directory = str(self.remote_working_directory)
         self.google_credentials_path = str(self.google_credentials_path)
+        self.server_credentials_path = str(self.server_credentials_path)
         self.harvesters_cti_path = str(self.harvesters_cti_path)
 
         # Converts valve calibration data into dictionary format
@@ -320,8 +320,9 @@ class ProjectConfiguration(YamlConfig):
         runtime behavior of the library. This internal method is automatically called by the from_path() method.
 
         Notes:
-            The method does not verify all fields loaded from the configuration file and instead focuses on paths and
-            Google Sheet IDs. The binding classes verify uSB ports and camera indices during instantiation.
+            The method does not verify all fields loaded from the configuration file and instead focuses on fields that
+            do not have valid default values. Since these fields are expected to be frequently modified by users, they
+            are the ones that require additional validation.
 
         Raises:
             ValueError: If the loaded data does not match expected formats or values.
@@ -342,55 +343,6 @@ class ProjectConfiguration(YamlConfig):
                 f"Unable to verify the surgery_sheet_id field loaded from the 'project_configuration.yaml' file. "
                 f"Expected a string with 44 characters, using letters, numbers, hyphens, and underscores, but found: "
                 f"{self.water_log_sheet_id}."
-            )
-            console.error(message=message, error=ValueError)
-
-        # Verifies the path to the credentials' file and the path to the Harvesters CTI file:
-        if isinstance(self.google_credentials_path, Path) and (
-                not self.google_credentials_path.exists() or self.google_credentials_path.suffix != ".json"
-        ):
-            message = (
-                f"Unable to verify the credentials_path field loaded from the 'project_configuration.yaml' file. "
-                f"Expected a path to an existing .json file that stores the Google API service account credentials, "
-                f"but instead encountered the path to a non-json or non-existing file: {self.google_credentials_path}."
-            )
-            console.error(message=message, error=ValueError)
-        if isinstance(self.harvesters_cti_path, Path) and (
-            not self.harvesters_cti_path.exists() or self.harvesters_cti_path.suffix != ".cti"
-        ):
-            message = (
-                f"Unable to verify the harvesters_cti_path field loaded from the 'project_configuration.yaml' file. "
-                f"Expected a path to an existing .cti file that can be used to access a Genicam-compatible camera, "
-                f"but instead encountered the path to a non-cti or non-existing file: {self.harvesters_cti_path}."
-            )
-            console.error(message=message, error=ValueError)
-
-        # Verifies directory paths:
-        if isinstance(self.local_mesoscope_directory, Path) and (
-                not self.local_mesoscope_directory.is_dir() or not self.local_mesoscope_directory.exists()
-        ):
-            message = (
-                f"Unable to verify the mesoscope_root_directory field loaded from the 'project_configuration.yaml' "
-                f"file. Expected a path to an existing filesystem-mounted directory, but instead encountered the path "
-                f"to a non-directory or non-existing directory: {self.local_mesoscope_directory}."
-            )
-            console.error(message=message, error=ValueError)
-        if isinstance(self.local_nas_directory, Path) and (
-                not self.local_nas_directory.is_dir() or not self.local_nas_directory.exists()
-        ):
-            message = (
-                f"Unable to verify the nas_root_directory field loaded from the 'project_configuration.yaml' file. "
-                f"Expected a path to an existing filesystem-mounted directory, but instead encountered the path to a "
-                f"non-directory or non-existing directory: {self.local_nas_directory}."
-            )
-            console.error(message=message, error=ValueError)
-        if isinstance(self.local_server_directory, Path) and (
-                not self.local_server_directory.is_dir() or not self.local_server_directory.exists()
-        ):
-            message = (
-                f"Unable to verify the server_root_directory field loaded from the 'project_configuration.yaml' file. "
-                f"Expected a path to an existing filesystem-mounted directory, but instead encountered the path to a "
-                f"non-directory or non-existing directory: {self.local_server_directory}."
             )
             console.error(message=message, error=ValueError)
 
@@ -475,25 +427,43 @@ class HardwareConfiguration(YamlConfig):
     """
 
     cue_map: dict[int, float] | None = None
-    """MesoscopeExperiment instance property."""
+    """MesoscopeExperiment instance property. Stores a dictionary that maps the integer id-codes associated with each 
+    wall cue in the Virtual Reality task environment with distances in real-world centimeters animals should run on the 
+    wheel to fully traverse the cue region on a linearized track."""
     cm_per_pulse: float | None = None
-    """EncoderInterface instance property."""
+    """EncoderInterface instance property. Stores the conversion factor used to translate encoder pulses into 
+    real-world centimeters."""
     maximum_break_strength: float | None = None
-    """BreakInterface instance property."""
+    """BreakInterface instance property. Stores the breaking torque, in Newton centimeters, applied by the break to 
+    the edge of the running wheel when it is engaged at 100% strength."""
     minimum_break_strength: float | None = None
-    """BreakInterface instance property."""
+    """BreakInterface instance property. Stores the breaking torque, in Newton centimeters, applied by the break to 
+    the edge of the running wheel when it is engaged at 0% strength (completely disengaged)."""
     lick_threshold: int | None = None
-    """BreakInterface instance property."""
+    """LickInterface instance property. Determines the threshold, in 12-bit Analog to Digital Converter (ADC) units, 
+    above which an interaction value reported by the lick sensor is considered a lick (compared to noise or non-lick 
+    touch)."""
     valve_scale_coefficient: float | None = None
-    """ValveInterface instance property."""
+    """ValveInterface instance property. To dispense precise water volumes during runtime, ValveInterface uses power 
+    law equation applied to valve calibration data to determine how long to keep the valve open. This stores the 
+    scale_coefficient of the power law equation that describes the relationship between valve open time and dispensed 
+    water volume, derived from calibration data."""
     valve_nonlinearity_exponent: float | None = None
-    """ValveInterface instance property."""
+    """ValveInterface instance property. To dispense precise water volumes during runtime, ValveInterface uses power 
+    law equation applied to valve calibration data to determine how long to keep the valve open. This stores the 
+    nonlinearity_exponent of the power law equation that describes the relationship between valve open time and 
+    dispensed water volume, derived from calibration data."""
     torque_per_adc_unit: float | None = None
-    """TorqueInterface instance property."""
+    """TorqueInterface instance property. Stores the conversion factor used to translate torque values reported by the 
+    sensor as 12-bit Analog to Digital Converter (ADC) units, into real-world Newton centimeters (N·cm) of torque that 
+    had to be applied to the edge of the running wheel to produce the observed ADC value."""
     screens_initially_on: bool | None = None
-    """ScreenInterface instance property."""
+    """ScreenInterface instance property. Stores the initial state of the Virtual Reality screens at the beginning of 
+    the session runtime."""
     recorded_mesoscope_ttl: bool | None = None
-    """TTLInterface instance property."""
+    """TTLInterface instance property. A boolean flag that determines whether the processed session recorded brain 
+    activity data with the mesoscope. This is statically resolved to True for MesoscopeExperiment sessions and 
+    None for BehaviorTraining sessions."""
 
 
 @dataclass()
@@ -686,64 +656,84 @@ class MesoscopePositions(YamlConfig):
 
 @dataclass
 class SessionData(YamlConfig):
-    """Provides methods for managing the data acquired during one experiment or training session.
+    """Provides methods for managing the data of a single experiment or training session across all destinations.
 
     The primary purpose of this class is to maintain the session data structure across all supported destinations. It
-    generates the paths used by all other classes from this library to determine where to save and load various session
-    data during runtime.
+    generates the paths used by all other classes from this library and classes from sl-experiment and sl-forgery
+    libraries.
 
-    As part of its initialization, the class generates the session directory for the input animal and project
-    combination. Session directories use the current UTC timestamp, down to microseconds, as the directory name. This
+    If necessary, the class generates the session directory for the input animal and project combination as part of its
+    initialization. Session directories use the current UTC timestamp, down to microseconds, as the directory name. This
     ensures that each session name is unique and preserves the overall session order.
 
     Notes:
-        It is expected that the server, NAS, and mesoscope data directories are mounted on the host-machine via the
-        SMB or equivalent protocol. All manipulations with these destinations are carried out with the assumption that
-        the OS has full access to these directories and filesystems.
+        If this class is instantiated on the VRPC, it is expected that the BioHPC server, Synology NAS, and ScanImagePC
+        data directories are mounted on the local host-machine via the SMB or equivalent protocol. All manipulations
+        with these destinations are carried out with the assumption that the OS has full access to these directories
+        and filesystems.
 
-        This class is specifically designed for working with raw data from a single animal participating in a single
-        experimental project session. Processed data is managed by the processing library methods and classes.
+        If this class is instantiated on the BioHPC server, some methods from this class will not work as expected. It
+        is essential that this class is not used outside the default sl-experiment and sl-forgery library runtimes to
+        ensure it is sued safely.
+
+        This class is specifically designed for working with the data from a single session, performed by a single
+        animal under the specific experiment. The class is used to manage both raw and processed data. In other words,
+        it follows the data through acquisition, preprocessing and processing stages of the Sun lab data workflow.
     """
-
-    # Main attributes that are expected to be provided by the user during class initialization
     project_name: str
     """The name of the project for which the data is acquired."""
     animal_id: str
     """The ID code of the animal for which the data is acquired."""
     surgery_sheet_id: str
     """The ID for the Google Sheet file that stores surgery information for the animal whose data is managed by this 
-    instance."""
+    instance.  This field is only used during data preprocessing on the VRPC."""
     water_log_sheet_id: str
     """The ID for the Google Sheet file that stores water restriction information for the animal whose data is managed 
-    by this instance.
+    by this instance. This field is only used during data preprocessing on the VRPC.
     """
     session_type: str
     """Stores the type of the session. Primarily, this determines how to read the session_descriptor.yaml file. Has 
     to be set to one of the three supported types: 'Lick training', 'Run training' or 'Experiment'.
     """
-    credentials_path: str | Path
+    google_api_credentials_path: str | Path
     """
     The path to the locally stored .JSON file that stores the service account credentials used to read and write Google 
-    Sheet data. This is used to access and work with the surgery log and the water restriction log.
+    Sheet data. This is used to access and work with the surgery log and the water restriction log. This field is only
+    used during data preprocessing on the VRPC.
+    """
+    server_credentials_path: str | Path
+    """
+    The path to the locally stored .YAML file that stores the BioHPC authentication credentials. This is used to 
+    schedule session data processing as soon as the preprocessed session data is transferred to the BioHPC server. This 
+    field is only used during data preprocessing on the VRPC.
     """
     local_root_directory: str | Path
-    """The path to the root directory where all projects are stored on the host-machine (VRPC)."""
-    server_root_directory: str | Path
-    """The path to the root directory where all projects are stored on the BioHPC server machine."""
-    nas_root_directory: str | Path
-    """The path to the root directory where all projects are stored on the Synology NAS."""
-    mesoscope_root_directory: str | Path
-    """The path to the root directory used to store all mesoscope-acquired data on the ScanImagePC."""
+    """The absolute path to the root directory where all projects are stored on the local host-machine (VRPC). Note, 
+    overwriting the value of this field is pointless, as it is automatically set each time the class is instantiated."""
+    local_server_directory: str | Path
+    """The absolute path to the locally-mapped (via SMB protocol) root BioHPC server machine directory where to store 
+    all projects."""
+    local_nas_directory: str | Path
+    """The absolute path to the locally-mapped (via SMB protocol) root Synology NAS directory where to store all 
+    projects."""
+    local_mesoscope_directory: str | Path
+    """The absolute path to the locally-mapped (via SMB protocol) root mesoscope (ScanImagePC) directory where all 
+    mesoscope-acquired data is aggregated during runtime."""
     session_name: str = "None"
     """Stores the name of the session for which the data is acquired. This name is generated at class initialization 
     based on the current microsecond-accurate timestamp. Do NOT manually provide this name at class initialization.
     Use 'from_path' class method to initialize a SessionData instance for an already existing session data directory.
     """
     experiment_name: str | None = None
-    """Stores the name of the experiment configuration file. If the session_name attribute is 'experiment', this filed
-    is used to communicate the specific experiment configuration used by the session. During runtime, this is 
+    """Stores the name of the experiment configuration file. If the session_name attribute is 'experiment', this field
+    is used to communicate the specific experiment configuration used by the session. During runtime, this is
     used to load the experiment configuration (to run the experiment) and to save the experiment configuration to the
     session raw_data folder. If the session is not an experiment session, this is statically set to None."""
+    config_file_path: str | Path | None = None
+    """Stores the absolute path to the configuration file from which this class instance was created. This is only used 
+    when the class is instantiated from a YAML configuration file (via the 'from_path' class method). Primarily, this is
+    used when the class is loaded on the BioHPC server to automatically adjust all managed paths to use server 
+    root directory, rather than VRPCs root directory."""
 
     def __post_init__(self) -> None:
         """Generates the session name and creates the session directory structure on all involved PCs."""
@@ -753,15 +743,25 @@ class SessionData(YamlConfig):
         # runtime-independent data preprocessing.
         if "None" not in self.session_name:
             return
+        else:
+            self._create_local_tree()
 
+    def _create_remote_tree(self):
+        persistent_path = Path(self.local_root_directory).joinpath(self.project_name, self.animal_id, "persistent_data")
+
+        if persistent_path.exists():
+            return
+
+    def _create_local_tree(self):
+        """Creates the session directory structure on the VRPC. """
         # Acquires the UTC timestamp to use as the session name
         self.session_name = str(get_timestamp(time_separator="-"))
 
         # Ensures all root directory paths are stored as Path objects.
         self.local_root_directory = Path(self.local_root_directory)
-        self.server_root_directory = Path(self.server_root_directory)
-        self.nas_root_directory = Path(self.nas_root_directory)
-        self.mesoscope_root_directory = Path(self.mesoscope_root_directory)
+        self.local_server_directory = Path(self.local_server_directory)
+        self.local_nas_directory = Path(self.local_nas_directory)
+        self.local_mesoscope_directory = Path(self.local_mesoscope_directory)
 
         # Constructs the session directory path and generates the directory
         raw_session_path = self.local_root_directory.joinpath(self.project_name, self.animal_id, self.session_name)
@@ -810,16 +810,16 @@ class SessionData(YamlConfig):
         ensure_directory_exists(
             self.local_root_directory.joinpath(self.project_name, self.animal_id, "persistent_data")
         )
-        ensure_directory_exists(self.nas_root_directory.joinpath(self.project_name, self.animal_id, self.session_name))
+        ensure_directory_exists(self.local_nas_directory.joinpath(self.project_name, self.animal_id, self.session_name))
         ensure_directory_exists(
-            self.server_root_directory.joinpath(self.project_name, self.animal_id, self.session_name)
+            self.local_server_directory.joinpath(self.project_name, self.animal_id, self.session_name)
         )
         ensure_directory_exists(self.local_root_directory.joinpath(self.project_name, self.animal_id, "metadata"))
-        ensure_directory_exists(self.server_root_directory.joinpath(self.project_name, self.animal_id, "metadata"))
-        ensure_directory_exists(self.nas_root_directory.joinpath(self.project_name, self.animal_id, "metadata"))
-        ensure_directory_exists(self.mesoscope_root_directory.joinpath("mesoscope_frames"))
+        ensure_directory_exists(self.local_server_directory.joinpath(self.project_name, self.animal_id, "metadata"))
+        ensure_directory_exists(self.local_nas_directory.joinpath(self.project_name, self.animal_id, "metadata"))
+        ensure_directory_exists(self.local_mesoscope_directory.joinpath("mesoscope_frames"))
         ensure_directory_exists(
-            self.mesoscope_root_directory.joinpath("persistent_data", self.project_name, self.animal_id)
+            self.local_mesoscope_directory.joinpath("persistent_data", self.project_name, self.animal_id)
         )
 
     @classmethod
@@ -854,10 +854,10 @@ class SessionData(YamlConfig):
 
         # Ensures all loaded paths are stored as Path objects.
         instance.local_root_directory = Path(instance.local_root_directory)
-        instance.mesoscope_root_directory = Path(instance.mesoscope_root_directory)
-        instance.nas_root_directory = Path(instance.nas_root_directory)
-        instance.server_root_directory = Path(instance.server_root_directory)
-        instance.credentials_path = Path(instance.credentials_path)
+        instance.local_mesoscope_directory = Path(instance.local_mesoscope_directory)
+        instance.local_nas_directory = Path(instance.local_nas_directory)
+        instance.local_server_directory = Path(instance.local_server_directory)
+        instance.google_api_credentials_path = Path(instance.google_api_credentials_path)
 
         # Returns the instance to caller
         return instance
@@ -873,10 +873,10 @@ class SessionData(YamlConfig):
 
         # Converts all Paths objects to strings before dumping the data to YAML.
         self.local_root_directory = str(self.local_root_directory)
-        self.mesoscope_root_directory = str(self.mesoscope_root_directory)
-        self.nas_root_directory = str(self.nas_root_directory)
-        self.server_root_directory = str(self.server_root_directory)
-        self.credentials_path = str(self.credentials_path)
+        self.local_mesoscope_directory = str(self.local_mesoscope_directory)
+        self.local_nas_directory = str(self.local_nas_directory)
+        self.local_server_directory = str(self.local_server_directory)
+        self.google_api_credentials_path = str(self.google_api_credentials_path)
 
         self.to_yaml(file_path=self.raw_data_path.joinpath("session_data.yaml"))
 
@@ -940,19 +940,19 @@ class SessionData(YamlConfig):
         """Returns the path to the root directory of the Mesoscope pc (ScanImagePC) used to store all
         mesoscope-acquired data.
         """
-        return Path(self.mesoscope_root_directory)
+        return Path(self.local_mesoscope_directory)
 
     @property
     def nas_root_path(self) -> Path:
         """Returns the path to the root directory of the Synology NAS (Network Attached Storage) used to store all
         training and experiment data after preprocessing (backup cold long-term storage)."""
-        return Path(self.nas_root_directory)
+        return Path(self.local_nas_directory)
 
     @property
     def server_root_path(self) -> Path:
         """Returns the path to the root directory of the BioHPC server used to process and store all training and e
         experiment data (main long-term storage)."""
-        return Path(self.server_root_directory)
+        return Path(self.local_server_directory)
 
     @property
     def mesoscope_persistent_path(self) -> Path:
@@ -1154,6 +1154,9 @@ class SurgeryData(YamlConfig):
 class ServerCredentials(YamlConfig):
     """This class stores the hostname and credentials used to log into the BioHPC cluster to run Sun lab processing
     pipelines.
+
+    Primarily, this is used during runtime to start data processing once it is transferred to the BioHPC server during
+    preprocessing.
     """
 
     username: str = "YourNetID"

@@ -43,6 +43,8 @@ dependencies = [
     "ataraxis-base-utilities>=3,<4",
     "ataraxis-data-structures>=3.1.1,<4",
     "appdirs>=1,<2",
+    "tqdm>=4,<5",
+    "xxhash>=3,<4",
 ]
 
 [project.urls]
@@ -58,6 +60,7 @@ Documentation = "https://sl-shared-assets-api-docs.netlify.app/"
 # project dependencies with conda over pip as possible.
 condarun = [
     "appdirs>=1,<2",
+    "tqdm>=4,<5",
 ]
 
 # Dependencies known to be installable with conda for all development platforms (OSX ARM64, WIN AMD64, LIN AMD64).
@@ -82,6 +85,7 @@ conda = [
 
     # Types:
     "types-appdirs>=1,<2",
+    "types-tqdm>=4,<5",
 ]
 
 # Dependencies known to not be installable with conda for at least one supported development platform
