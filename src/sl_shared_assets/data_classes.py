@@ -34,13 +34,13 @@ class ProjectConfiguration(YamlConfig):
     """Stores the descriptive name of the project. This name is used to create the root directory for the project and 
     to discover and load project's data during runtime."""
     surgery_sheet_id: str = ""
-    """The ID for the Google Sheet file that stores surgery information for the animal whose data is managed by this 
+    """The ID of the Google Sheet file that stores surgery information for the animal whose data is managed by this 
     instance. This is used to parse and write the surgery data for each managed animal into its 'metadata' folder, so 
     that the surgery data is always kept together with the rest of the training and experiment data."""
     water_log_sheet_id: str = ""
-    """The ID for the Google Sheet file that stores water restriction information for the animal whose data is managed 
+    """The ID of the Google Sheet file that stores water restriction information for the animal whose data is managed 
     by this instance. This is used to synchronize the information inside the water restriction log with the state of 
-    the animal at the end of each training or experiment runtime.
+    the animal at the end of each training or experiment session.
     """
     google_credentials_path: str | Path = Path("/media/Data/Experiments/sl-surgery-log-0f651e492767.json")
     """
@@ -52,7 +52,7 @@ class ProjectConfiguration(YamlConfig):
     """
     The path to the locally stored .YAML file that contains the credentials for accessing the BioHPC server machine. 
     While the storage (filesystem) of the server machine should already be mounted to the local PC via SMB, this data
-    is sued to establish SSH connection to the machine and start data processing after it is transferred to the server.
+    is used to establish SSH connection to the machine and start data processing after it is transferred to the server.
     This way, our data acquisition, preprocessing, and processing are controlled by the same runtime.
     """
     local_root_directory: str | Path = Path("/media/Data/Experiments")
@@ -69,7 +69,7 @@ class ProjectConfiguration(YamlConfig):
     mesoscope-acquired data is aggregated during runtime."""
     remote_storage_directory: str | Path = Path("/storage/sun_data")
     """The absolute path, relative to the BioHPC server root, to the directory where all projects are stored on the 
-    slow (HDD) volume of the server. This path is used when running remote (server-side) jobs and, therefore, has to
+    slow (SSD) volume of the server. This path is used when running remote (server-side) jobs and, therefore, has to
     be relative to the server root."""
     remote_working_directory: str | Path = Path("/workdir/sun_data")
     """The absolute path, relative to the BioHPC server root, to the directory where all projects are stored on the 
@@ -113,19 +113,18 @@ class ProjectConfiguration(YamlConfig):
 
     @classmethod
     def load(cls, project_name: str, configuration_path: None | Path = None) -> "ProjectConfiguration":
-        """Loads the project configuration parameters from a .yaml file and uses the loaded data to initialize a
-        ProjectConfiguration instance.
+        """Loads the project configuration parameters from a project_configuration.yaml file and uses the loaded data
+        to initialize the ProjectConfiguration instance.
 
-        This method is called for each runtime to reuse the configuration parameters generated at project creation. When
-        it is called for the first time (during new project creation), the method generates a default
+        This method is called for each session runtime to reuse the configuration parameters generated at project
+        creation. When it is called for the first time (during new project creation), the method generates the default
         configuration file and prompts the user to update the configuration before proceeding with the runtime.
 
         Notes:
             As part of its runtime, the method may prompt the user to provide the path to the local root directory.
             This directory stores all project subdirectories and acts as the top level of the local data hierarchy.
-            The path to the directory will be saved in the static library-specific configuration file inside user's
-            default data directory, so that it can be reused for all future runtimes. Use 'replace_root_path' function
-            to replace the path that is saved in this way.
+            The path to the directory will be saved inside user's default data directory, so that it can be reused for
+            all future projects. Use sl-replace_root_path CLI to replace the path that is saved in this way.
 
             Since this class is used during both data acquisition and processing on different machines, this method
             supports multiple ways of initializing the class. Use the project_name on the VRPC (via the sl_experiment
@@ -195,7 +194,8 @@ class ProjectConfiguration(YamlConfig):
                 f"Unable to load project configuration data from disk as no 'project_configuration.yaml' file "
                 f"found at the provided project path. Generating a precursor (default) configuration file under "
                 f"{project_name}/configuration directory. Edit the file to specify project configuration before "
-                f"proceeding further to avoid runtime errors."
+                f"proceeding further to avoid runtime errors. Also, edit other configuration precursors saved to the "
+                f"same directory to control other aspects of data acquisition and processing."
             )
             console.echo(message=message, level=LogLevel.WARNING)
 
@@ -237,10 +237,15 @@ class ProjectConfiguration(YamlConfig):
         return instance
 
     def _to_path(self, path: Path) -> None:
-        """Saves the instance data to disk as a .yaml file.
+        """Saves the instance data to disk as a project_configuration.yaml file.
 
-        This method is automatically called when the project is created. All future runtimes use the from_path() method
-        to load and reuse the configuration data saved to the .yaml file.
+        This method is automatically called when the project is created. All future runtimes should use the load()
+        method to load and reuse the configuration data saved to the .yaml file.
+
+        Notes:
+            This method also generates and dumps multiple other 'precursor' configuration files into the folder. This
+            includes the example 'default' experiment configuration and the DeepLabCut and Suite2P configuration files
+            used during data processing.
 
         Args:
             path: The path to the .yaml file to save the data to.
@@ -265,17 +270,16 @@ class ProjectConfiguration(YamlConfig):
         # Saves the data to the YAML file
         self.to_yaml(file_path=path)
 
-        # As part of this runtime, also generates and dumps the 'default' experiment configuration. The user can then
-        # use the default file as an example to write their own experiment configurations.
+        # As part of this runtime, also generates and dumps other 'precursor' configuration files.
         example_experiment = ExperimentConfiguration()
         example_experiment.to_yaml(path.parent.joinpath("default_experiment.yaml"))
 
     def _verify_data(self) -> None:
-        """Verifies the data loaded from a .yaml file to ensure its validity.
+        """Verifies the data loaded from the project_configuration.yaml file to ensure its validity.
 
         Since this class is explicitly designed to be modified by the user, this verification step is carried out to
         ensure that the loaded data matches expectations. This reduces the potential for user errors to impact the
-        runtime behavior of the library. This internal method is automatically called by the from_path() method.
+        runtime behavior of the library. This internal method is automatically called by the load() method.
 
         Notes:
             The method does not verify all fields loaded from the configuration file and instead focuses on fields that
@@ -354,7 +358,7 @@ class RawData:
     """Stores the path to the project_configuration.yaml file. This file contains the snapshot of the configuration 
     parameters for the session's project."""
     session_data_path: str | Path
-    """Stores the path to the session_data.yaml file. This path is sued b y the SessionData instance to save itself to 
+    """Stores the path to the session_data.yaml file. This path is used b y the SessionData instance to save itself to 
     disk as a .yaml file. The file contains all paths used during data acquisition and processing on both the VRPC and 
     the BioHPC server."""
     experiment_configuration_path: str | Path
@@ -747,10 +751,13 @@ class SessionData(YamlConfig):
             session_type: The type of the session. Primarily, this determines how to read the session_descriptor.yaml
                 file. Valid options are 'Lick training', 'Run training', or 'Experiment'.
             experiment_name: The name of the experiment to be executed as part of this session. This option is only used
-                for 'Experiment' session types. It is sued to find the target experiment configuration .YAML file and
+                for 'Experiment' session types. It is used to find the target experiment configuration .YAML file and
                 copy it into the session's raw_data directory.
             project_configuration: The initialized ProjectConfiguration instance that stores the data for the session's
                 project. This is used to determine the root directory paths for all PCs used in the data workflow.
+
+        Returns:
+            An initialized SessionData instance for the newly created session.
         """
 
         # Acquires the UTC timestamp to use as the session name
@@ -983,21 +990,12 @@ class SessionData(YamlConfig):
 
 @dataclass()
 class ExperimentState:
-    """Encapsulates the information used to set and maintain the desired Mesoscope-VR and experiment state.
+    """Encapsulates the information used to set and maintain the desired experiment and Mesoscope-VR system state.
 
-    Primarily, experiment runtime logic (experiment task logic) is resolved by the Unity game engine. However, the
-    Mesoscope-VR system configuration may also need to change throughout the experiment to optimize the runtime by
-    disabling or reconfiguring specific hardware modules. For example, some experiment stages may require the running
-    wheel to be locked to prevent the animal from running, but others may require it to be unlocked, to facilitate
-    running behavior.
-
-    Overall, the Mesoscope-VR system functions like a state-machine, with multiple statically configured states that
-    can be activated and maintained throughout the experiment. During runtime, the runtime control function expects a
-    sequence of ExperimentState instances that will be traversed, start-to-end, to determine the flow of the experiment
-    runtime.
-
-    Notes:
-        Do not instantiate this class directly. It is managed by the ExperimentConfiguration wrapper class.
+    Primarily, experiment runtime logic (task logic) is resolved by the Unity game engine. However, the Mesoscope-VR
+    system configuration may also need to change throughout the experiment to optimize the runtime by disabling or
+    reconfiguring specific hardware modules. For example, some experiment stages may require the running wheel to be
+    locked to prevent the animal from running, and other may require the VR screens to be turned off.
     """
 
     experiment_state_code: int
@@ -1018,14 +1016,15 @@ class ExperimentState:
 class ExperimentConfiguration(YamlConfig):
     """Stores the configuration of a single experiment runtime.
 
-    Primarily, this includes the sequence of experiment and Virtual Reality (Mesoscope-VR) states that define the flow
-    of the experiment runtime. During runtime, the main control function traverses the sequence of states stored in
-    this class instance start-to-end in the exact order specified by the user. Together with custom Unity projects, this
-    class allows flexibly implementing a wide range of experiments.
+    Primarily, this includes the sequence of experiment and Virtual Reality (Mesoscope-VR) states that defines the flow
+    of the experiment runtime. During runtime, the main runtime control function traverses the sequence of states
+    stored in this class instance start-to-end in the exact order specified by the user. Together with custom Unity
+    projects that define the task logic (how the system responds to animal interactions with the VR system) this class
+    allows flexibly implementing a wide range of experiments.
 
     Each project should define one or more experiment configurations and save them as .yaml files inside the project
     'configuration' folder. The name for each configuration file is defined by the user and is used to identify and load
-    the experiment configuration when 'sl-run-experiment' CLI command is executed.
+    the experiment configuration when 'sl-run-experiment' CLI command exposed by the sl-experiment library is executed.
     """
 
     cue_map: dict[int, float] = field(default_factory=lambda: {0: 30.0, 1: 30.0, 2: 30.0, 3: 30.0, 4: 30.0})
@@ -1056,12 +1055,12 @@ class HardwareConfiguration(YamlConfig):
         any field in this dataclass to None also functions as a flag for whether to parse the log associated with the
         module that provides this field's information.
 
-        This class is automatically configured by MesoscopeExperiment and BehaviorTraining classes to facilitate log
-        parsing.
+        This class is automatically configured by MesoscopeExperiment and BehaviorTraining classes from sl-experiment
+        library to facilitate log parsing.
     """
 
     cue_map: dict[int, float] | None = None
-    """MesoscopeExperiment instance property. Stores a dictionary that maps the integer id-codes associated with each 
+    """MesoscopeExperiment instance property. Stores the dictionary that maps the integer id-codes associated with each 
     wall cue in the Virtual Reality task environment with distances in real-world centimeters animals should run on the 
     wheel to fully traverse the cue region on a linearized track."""
     cm_per_pulse: float | None = None
@@ -1096,8 +1095,7 @@ class HardwareConfiguration(YamlConfig):
     the session runtime."""
     recorded_mesoscope_ttl: bool | None = None
     """TTLInterface instance property. A boolean flag that determines whether the processed session recorded brain 
-    activity data with the mesoscope. This is statically resolved to True for MesoscopeExperiment sessions and 
-    None for BehaviorTraining sessions."""
+    activity data with the mesoscope."""
 
 
 @dataclass()
@@ -1159,9 +1157,9 @@ class RunTrainingDescriptor(YamlConfig):
     initial_run_speed_threshold_cm_s: float
     """Stores the initial running speed threshold, in centimeters per second, used during training."""
     initial_run_duration_threshold_s: float
-    """Stores the initial above-threshold running duration, in seconds, used during training."""
+    """Stores the initial running duration threshold, in seconds, used during training."""
     increase_threshold_ml: float
-    """Stores the volume of water delivered to the animal, in milliliters, that triggerred the increase in the running 
+    """Stores the volume of water delivered to the animal, in milliliters, that triggers the increase in the running 
     speed and duration thresholds."""
     run_speed_increase_step_cm_s: float
     """Stores the value, in centimeters per second, used by the system to increment the running speed threshold each 
@@ -1170,7 +1168,7 @@ class RunTrainingDescriptor(YamlConfig):
     """Stores the value, in seconds, used by the system to increment the duration threshold each time the animal 
     receives 'increase_threshold' volume of water."""
     maximum_water_volume_ml: float
-    """Stores the maximum volume of water the system is allowed to dispensed during training."""
+    """Stores the maximum volume of water the system is allowed to dispense during training."""
     maximum_training_time_m: int
     """Stores the maximum time, in minutes, the system is allowed to run the training for."""
     experimenter_notes: str = "Replace this with your notes."
@@ -1191,12 +1189,6 @@ class MesoscopeExperimentDescriptor(YamlConfig):
 
     The fully filled instance data is also used during preprocessing to write the water restriction log entry for the
     animal participating in the experiment runtime.
-
-    Notes:
-        Critically, this class is used to save the mesoscope objective coordinates in the 'persistent' directory of an
-        animal after each experiment session. This information is used during the following experiment runtimes to help
-        the experimenter to restore the Mesoscope to the same position used during the previous session. This has to be
-        done manually, as ThorLabs does not provide an API to work with the Mesoscope motors directly at this time.
     """
 
     experimenter: str
@@ -1247,10 +1239,16 @@ class ZaberPositions(YamlConfig):
 
 @dataclass()
 class MesoscopePositions(YamlConfig):
-    """This class is used to save the Mesoscope position as a .yaml file to reuse it between experiment sessions.
+    """This class is used to save the real and virtual Mesoscope objective positions as a .yaml file to reuse it
+    between experiment sessions.
 
     Primarily, the class is used to help the experimenter to position the Mesoscope at the same position across
-    multiple imaging sessions.
+    multiple imaging sessions. It stores both the physical (real) position of the objective along the motorized
+    X, Y, Z, and Roll axes and the virtual (ScanImage software) tip, tilt, and fastZ focus axes.
+
+    Notes:
+        Since the API to read and write these positions automatically is currently not available, this class relies on
+        the experimenter manually entering all positions and setting the mesoscope to these positions when necessary.
     """
 
     mesoscope_x_position: float = 0.0
@@ -1271,11 +1269,11 @@ class MesoscopePositions(YamlConfig):
 
 @dataclass()
 class SubjectData:
-    """Stores the surgical procedure subject (mouse) ID information."""
+    """Stores the ID information of the surgical intervention's subject (animal)."""
 
     id: int
-    """Stores the unique ID (name) of the subject. Assumes all mice are given a numeric ID, rather than a string name.
-    """
+    """Stores the unique ID (name) of the subject. Assumes all animals are given a numeric ID, rather than a string 
+    name."""
     ear_punch: str
     """Stores the ear tag location of the subject."""
     sex: str
@@ -1287,23 +1285,23 @@ class SubjectData:
     weight_g: float
     """Stores the weight of the subject pre-surgery, in grams."""
     cage: int
-    """Stores the number of the latest cage used to house the subject."""
+    """Stores the number of the cage used to house the subject after surgery."""
     location_housed: str
-    """Stores the latest location used to house the subject after the surgery."""
+    """Stores the location used to house the subject after the surgery."""
     status: str
-    """Stores the latest status of the subject (alive / deceased)."""
+    """Stores the current status of the subject (alive / deceased)."""
 
 
 @dataclass()
 class ProcedureData:
-    """Stores the general information about the surgical procedure."""
+    """Stores the general information about the surgical intervention."""
 
     surgery_start_us: int
-    """Stores the date and time when the surgery was started as microseconds elapsed since UTC epoch onset."""
+    """Stores the date and time when the surgery has started as microseconds elapsed since UTC epoch onset."""
     surgery_end_us: int
     """Stores the date and time when the surgery has ended as microseconds elapsed since UTC epoch onset."""
     surgeon: str
-    """Stores the name or ID of the surgeon. If the intervention was carrie out by multiple surgeon, all participating
+    """Stores the name or ID of the surgeon. If the intervention was carried out by multiple surgeons, all participating
     surgeon names and IDs are stored as part of the same string."""
     protocol: str
     """Stores the experiment protocol number (ID) used during the surgery."""
@@ -1315,7 +1313,7 @@ class ProcedureData:
 
 @dataclass
 class ImplantData:
-    """Stores the information about a single implantation performed during surgery.
+    """Stores the information about a single implantation performed during the surgical intervention.
 
     Multiple ImplantData instances are used at the same time if the surgery involved multiple implants.
     """
@@ -1337,7 +1335,7 @@ class ImplantData:
 
 @dataclass
 class InjectionData:
-    """Stores the information about a single injection performed during surgery.
+    """Stores the information about a single injection performed during surgical intervention.
 
     Multiple InjectionData instances are used at the same time if the surgery involved multiple injections.
     """
@@ -1362,7 +1360,7 @@ class InjectionData:
 @dataclass
 class DrugData:
     """Stores the information about all drugs administered to the subject before, during, and immediately after the
-    surgical procedure.
+    surgical intervention.
     """
 
     lactated_ringers_solution_volume_ml: float
@@ -1371,17 +1369,17 @@ class DrugData:
     """Stores the manufacturer code or internal reference code for Lactated Ringer's Solution (LRS). This code is used 
     to identify the LRS batch in additional datasheets and lab ordering documents."""
     ketoprofen_volume_ml: float
-    """Stores the volume of ketoprofen administered during surgery, in ml."""
+    """Stores the volume of ketoprofen diluted with saline administered during surgery, in ml."""
     ketoprofen_code: int
     """Stores the manufacturer code or internal reference code for ketoprofen. This code is used to identify the 
     ketoprofen batch in additional datasheets and lab ordering documents."""
     buprenorphine_volume_ml: float
-    """Stores the volume of buprenorphine administered during surgery, in ml."""
+    """Stores the volume of buprenorphine diluted with saline administered during surgery, in ml."""
     buprenorphine_code: int
     """Stores the manufacturer code or internal reference code for buprenorphine. This code is used to identify the 
     buprenorphine batch in additional datasheets and lab ordering documents."""
     dexamethasone_volume_ml: float
-    """Stores the volume of dexamethasone administered during surgery, in ml."""
+    """Stores the volume of dexamethasone diluted with saline administered during surgery, in ml."""
     dexamethasone_code: int
     """Stores the manufacturer code or internal reference code for dexamethasone. This code is used to identify the 
     dexamethasone batch in additional datasheets and lab ordering documents."""
@@ -1389,22 +1387,23 @@ class DrugData:
 
 @dataclass
 class SurgeryData(YamlConfig):
-    """Aggregates all data for a single mouse surgery procedure.
+    """Stores the data about a single mouse surgical intervention.
 
     This class aggregates other dataclass instances that store specific data about the surgical procedure. Primarily, it
-    is used to save the data as a .yaml file to the metadata directory of each animal used in every lab project.
-    This way, the surgery data is always stored alongside the behavior and brain activity data collected during training
-    and experiment runtimes.
+    is used to save the data as a .yaml file to every session's raw_data directory of each animal used in every lab
+    project. This way, the surgery data is always stored alongside the behavior and brain activity data collected
+    during the session.
     """
 
     subject: SubjectData
     """Stores the ID information about the subject (mouse)."""
     procedure: ProcedureData
-    """Stores general data about the surgical procedure."""
+    """Stores general data about the surgical intervention."""
     drugs: DrugData
     """Stores the data about the substances subcutaneously injected into the subject before, during and immediately 
     after the surgical intervention."""
     implants: list[ImplantData]
-    """Stores the data for all cranial and transcranial implants introduced to the subject during the procedure."""
+    """Stores the data for all cranial and transcranial implants introduced to the subject during the surgical 
+    intervention."""
     injections: list[InjectionData]
-    """Stores the data about all substances infused into the brain of the subject during the surgery."""
+    """Stores the data about all substances infused into the brain of the subject during the surgical intervention."""
