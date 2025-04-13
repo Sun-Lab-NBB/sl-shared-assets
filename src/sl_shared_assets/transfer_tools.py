@@ -1,6 +1,6 @@
-"""This module provides methods for moving data between the local machine, the ScanImage (Mesoscope) PC, the Synology
-NAS drive, and the lab BioHPC cluster. All methods in this module expect that the destinations and sources are mounted
-on the host file-system and use the os tools for moving the data.
+"""This module provides methods for moving session runtime data between the local machine, the ScanImage (Mesoscope) PC,
+the Synology NAS drive, and the lab BioHPC server. All methods in this module expect that the destinations and sources
+are mounted on the host file-system via the SMB or an equivalent protocol.
 """
 
 import shutil
@@ -13,7 +13,7 @@ from ataraxis_base_utilities import console, ensure_directory_exists
 from .packaging_tools import calculate_directory_checksum
 
 
-def _transfer_file(src_file: Path, source_directory: Path, dest_directory: Path) -> None:
+def _transfer_file(source_file: Path, source_directory: Path, destination_directory: Path) -> None:
     """Copies the input file from the source directory to the destination directory while preserving the file metadata.
 
     This is a worker method used by the transfer_directory() method to move multiple files in parallel.
@@ -23,29 +23,29 @@ def _transfer_file(src_file: Path, source_directory: Path, dest_directory: Path)
         be preserved in the destination directory.
 
     Args:
-        src_file: The file to be copied.
+        source_file: The file to be copied.
         source_directory: The root directory where the file is located.
-        dest_directory: The destination directory where to move the file.
+        destination_directory: The destination directory where to move the file.
     """
-    relative = src_file.relative_to(source_directory)
-    dest_file = dest_directory / relative
-    shutil.copy2(src_file, dest_file)
+    relative = source_file.relative_to(source_directory)
+    dest_file = destination_directory / relative
+    shutil.copy2(source_file, dest_file)
 
 
 def transfer_directory(source: Path, destination: Path, num_threads: int = 1, verify_integrity: bool = True) -> None:
     """Copies the contents of the input directory tree from source to destination while preserving the folder
     structure.
 
-    This function is used to assemble the experimental data from all remote machines used in the acquisition process.
-    It is also used to transfer the preprocessed raw data from the local machine to the NAS and the Sun lab BioHPC
-    cluster.
+    This function is used to assemble the experimental data from all remote machines used in the acquisition process on
+    the VRPC before the data is preprocessed. It is also used to transfer the preprocessed data from the VRPC to the
+    SynologyNAS and the Sun lab BioHPC server.
 
     Notes:
         This method recreates the moved directory hierarchy on the destination if the hierarchy does not exist. This is
         done before copying the files.
 
         The method executes a multithreading copy operation. It does not clean up the source files. That job is handed
-        to the SessionData class, which also executes the copy operation simultaneously for multiple destinations.
+        to the specific preprocessing function from the sl_experiment or sl-forgery libraries that calls this function.
 
         If the method is configured to verify transferred file integrity, it reruns the xxHash3-128 checksum calculation
         and compares the returned checksum to the one stored in the source directory. The method assumes that all input

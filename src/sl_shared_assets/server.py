@@ -22,8 +22,8 @@ class ServerCredentials(YamlConfig):
     """This class stores the hostname and credentials used to log into the BioHPC cluster to run Sun lab processing
     pipelines.
 
-    Primarily, this is used during runtime to start data processing once it is transferred to the BioHPC server during
-    preprocessing.
+    Primarily, this is used as part of the sl-experiment library runtime to start data processing once it is
+    transferred to the BioHPC server during preprocessing.
     """
 
     username: str = "YourNetID"

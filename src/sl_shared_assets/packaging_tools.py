@@ -19,12 +19,13 @@ def _calculate_file_checksum(base_directory: Path, file_path: Path) -> tuple[str
     target file, which includes both the contents of the file and its path relative to the base directory.
 
     Args:
-        base_directory: The path to the base (root) directory for which.
-        file_path: Absolute path to the target file.
+        base_directory: The path to the base (root) directory which is being checksummed by the main
+            'calculate_directory_checksum' function.
+        file_path: The absolute path to the target file.
 
     Returns:
         A tuple with two elements. The first element is the path to the file relative to the base directory. The second
-        element is the xxhash3-128 checksum that covers the relative path and the contents of the file.
+        element is the xxHash3-128 checksum that covers the relative path and the contents of the file.
     """
     # Initializes the hashsum object.
     checksum = xxhash.xxh3_128()
@@ -52,16 +53,13 @@ def calculate_directory_checksum(
     """Calculates xxHash3-128 checksum for the input directory, which includes the data of all contained files and
     the directory structure information.
 
-    This function is used to generate a checksum for each experimental session directory. Checksums are used to
-    verify the session data integrity during transmission between the PC that acquired the data and longer term storage
-    locations, such as the NAS or the lab processing server. The function can be configured to write the generated
-    checksum as a hexadecimal string to the ax_checksum.txt file stored at the highest level of the input directory.
+    This function is used to generate a checksum for the raw_data directory of each experiment or training session.
+    Checksums are used to verify the session data integrity during transmission between the PC that acquired the data
+    and long-term storage locations, such as the Synology NAS or the BioHPC server. The function can be configured to
+    write the generated checksum as a hexadecimal string to the ax_checksum.txt file stored at the highest level of the
+    input directory.
 
     Note:
-        All data transfer methods from this library automatically verify data integrity when it is uploaded to or
-        downloaded from long-term storage. We assume that long-term storage comes with the necessary parity and data
-        integrity verification methods to minimize data corruption risks.
-
         This method uses multiprocessing to efficiently parallelize checksum calculation for multiple files. In
         combination with xxHash3, this achieves a significant speedup over more common checksums, such as MD5 and
         SHA256. Note that xxHash3 is not suitable for security purposes and is only used to ensure data integrity.
