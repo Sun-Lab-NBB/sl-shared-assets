@@ -1,6 +1,7 @@
-from dataclasses import dataclass
-from ataraxis_data_structures import YamlConfig
 from pathlib import Path
+from dataclasses import dataclass
+
+from ataraxis_data_structures import YamlConfig
 
 
 def generate_server_credentials(
