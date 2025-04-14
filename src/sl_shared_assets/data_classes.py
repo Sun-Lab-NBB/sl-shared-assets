@@ -965,7 +965,7 @@ class SessionData(YamlConfig):
         """Saves the instance data to the 'raw_data' directory of the managed session as a 'session_data.yaml' file.
 
         This is used to save the data stored in the instance to disk, so that it can be reused during preprocessing or
-        data processing. The method is intended to only be used by the SessionData instance itself during its'
+        data processing. The method is intended to only be used by the SessionData instance itself during its
         create_session() method runtime.
         """
 

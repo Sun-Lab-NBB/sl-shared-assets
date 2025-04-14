@@ -45,6 +45,8 @@ dependencies = [
     "appdirs>=1,<2",
     "tqdm>=4,<5",
     "xxhash>=3,<4",
+    "paramiko>=3.5.1, <4",
+    "simple-slurm>=0,<1",
 ]
 
 [project.urls]
@@ -61,6 +63,7 @@ Documentation = "https://sl-shared-assets-api-docs.netlify.app/"
 condarun = [
     "appdirs>=1,<2",
     "tqdm>=4,<5",
+    "paramiko>=3.5.1,<4",
 ]
 
 # Dependencies known to be installable with conda for all development platforms (OSX ARM64, WIN AMD64, LIN AMD64).
