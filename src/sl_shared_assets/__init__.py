@@ -1,3 +1,10 @@
+"""A Python library that stores assets shared between multiple Sun (NeuroAI) lab data pipelines.
+
+See https://github.com/Sun-Lab-NBB/sl-shared-assets for more details.
+API documentation: https://sl-shared-assets-api-docs.netlify.app/
+Authors: Ivan Kondratyev (Inkaros), Kushaan Gupta, Yuantao Deng
+"""
+
 from .server import Server, ServerCredentials
 from .suite2p import (
     Main,

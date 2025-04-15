@@ -8,13 +8,14 @@ build-backend = "hatchling.build"
 # Project metdata section. Provides the genral ID information about the project.
 [project]
 name = "sl-shared-assets"
-version = "1.0.0"
-description = "Stores assets shared between multiple Sun (NeuroAI) lab data acquisition and processing repositories."
+version = "1.0.0rc1"
+description = "Stores assets shared between multiple Sun (NeuroAI) lab data pipelines."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
 authors = [
     { name = "Ivan Kondratyev", email = "ik278@cornell.edu" },
+    { name = "Kushaan Gupta", email = "kg574@cornell.edu" },
     { name = "Yuantao Deng"},
 ]
 maintainers = [
