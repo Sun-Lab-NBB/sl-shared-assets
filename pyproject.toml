@@ -89,6 +89,7 @@ conda = [
     # Types:
     "types-appdirs>=1,<2",
     "types-tqdm>=4,<5",
+    "types-paramiko>=3,<4"
 ]
 
 # Dependencies known to not be installable with conda for at least one supported development platform

@@ -4,6 +4,7 @@ multiday registration processing."""
 
 from typing import Any
 from dataclasses import field, asdict, dataclass
+
 from ataraxis_data_structures import YamlConfig
 
 
@@ -242,7 +243,7 @@ class NonRigid:
 
     snr_thresh: float = 1.2
     """The signal-to-noise ratio threshold. The phase correlation peak must be this many times higher than the 
-    noise level for the algorithm to accept the block shift and apply it to the outptu dataset."""
+    noise level for the algorithm to accept the block shift and apply it to the output dataset."""
 
     maxregshiftNR: float = 5.0
     """The maximum allowed shift, in pixels, for each block relative to the rigid registration shift."""
@@ -402,7 +403,7 @@ class Channel2:
 
 @dataclass
 class Suite2PConfiguration(YamlConfig):
-    """ Stores the user-addressable suite2p configuration parameters, organized into subsections.
+    """Stores the user-addressable suite2p configuration parameters, organized into subsections.
 
     This class is used during processing to instruct suite2p on how to process the data. Specifically, it provides a
     user-friendly way of specifying all user-addressable parameters through a .YAML file. The sl-forgery library then
@@ -439,7 +440,8 @@ class Suite2PConfiguration(YamlConfig):
         combined_ops = {}
 
         # Iterates through all dataclass fields
-        for section_name, section in asdict(self).items():  # type: ignore
+        # noinspection PyTypeChecker
+        for section_name, section in asdict(self).items():
             # Adds all keys and values from each section to the combined dictionary
             if isinstance(section, dict):
                 combined_ops.update(section)

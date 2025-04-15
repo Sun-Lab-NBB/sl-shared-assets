@@ -1,4 +1,6 @@
-"""This module provides classes used to store various data used by the sl-experiment and the sl-forgery libraries."""
+"""This module provides classes used to store various data used by the sl-experiment and the sl-forgery libraries.
+This includes classes used to store the data generated during acquisition and preprocessing and classes used to manage
+the runtime of other libraries (configuration data classes)."""
 
 import re
 import copy
@@ -11,6 +13,33 @@ import appdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
+
+
+def replace_root_path(path: Path) -> None:
+    """Replaces the path to the local root directory used to store all Sun lab projects with the provided path.
+
+    When ProjectConfiguration class is instantiated for the first time on a new machine, it asks the user to provide
+    the path to the local directory where to save all Sun lab projects. This path is then stored inside the default
+    user data directory as a .yaml file to be reused for all future projects. To support replacing this path without
+    searching for the user data directory, which is usually hidden, this function finds and updates the contents of the
+    file that stores the local root path.
+
+    Args:
+        path: The path to the new local root directory.
+    """
+    # Resolves the path to the static .txt file used to store the local path to the root directory
+    app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
+    path_file = app_dir.joinpath("root_path.txt")
+
+    # In case this function is called before the app directory is created, ensures the app directory exists
+    ensure_directory_exists(path_file)
+
+    # Ensures that the input root directory exists
+    ensure_directory_exists(path)
+
+    # Replaces the contents of the root_path.txt file with the provided path
+    with open(path_file, "w") as f:
+        f.write(str(path))
 
 
 @dataclass()
@@ -270,7 +299,7 @@ class ProjectConfiguration(YamlConfig):
         # Saves the data to the YAML file
         self.to_yaml(file_path=path)
 
-        # As part of this runtime, also generates and dumps other 'precursor' configuration files.
+        # As part of this runtime, also generates and dumps the 'precursor' experiment configuration file.
         example_experiment = ExperimentConfiguration()
         example_experiment.to_yaml(path.parent.joinpath("default_experiment.yaml"))
 
@@ -375,13 +404,6 @@ class RawData:
     cranial window and the red-dot alignment windows. This is used to generate a visual snapshot of the cranial window
     alignment and appearance for each experiment session. This file is only created for experiment sessions that use 
     the mesoscope, it is omitted for behavior training sessions."""
-    suite2p_configuration_path: str | Path
-    """Stores the path to the suite2p_configuration.yaml file. This configuration file is developed in the 
-    lab to provide a more convenient interface for specifying suite2p processing parameters. This is used during 
-    the cell registration (single-day) processing pipeline."""
-    deeplabcut_configuration_path: str | Path
-    """Stores the path to the deeplabcut_configuration.yaml file. This configuration file is created by DeepLabCut 
-    (as config.yaml before it is renamed) and is used during DeepLabCut video tracking processing pipeline."""
 
     def __post_init__(self) -> None:
         """This method is automatically called after class instantiation and ensures that all path fields of the class
@@ -401,8 +423,6 @@ class RawData:
         self.experiment_configuration_path = Path(self.experiment_configuration_path)
         self.mesoscope_positions_path = Path(self.mesoscope_positions_path)
         self.window_screenshot_path = Path(self.window_screenshot_path)
-        self.suite2p_configuration_path = Path(self.suite2p_configuration_path)
-        self.deeplabcut_configuration_path = Path(self.deeplabcut_configuration_path)
 
     def make_string(self) -> None:
         """Converts all Path objects stored inside the class to strings.
@@ -423,20 +443,18 @@ class RawData:
         self.experiment_configuration_path = str(self.experiment_configuration_path)
         self.mesoscope_positions_path = str(self.mesoscope_positions_path)
         self.window_screenshot_path = str(self.window_screenshot_path)
-        self.suite2p_configuration_path = str(self.suite2p_configuration_path)
-        self.deeplabcut_configuration_path = str(self.deeplabcut_configuration_path)
 
     def make_dirs(self) -> None:
         """Ensures that all major subdirectories and the root raw_data directory exist.
 
         This method is used by the VRPC to generate the raw_data directory when it creates a new session.
         """
-        ensure_directory_exists(self.raw_data_path)
-        ensure_directory_exists(self.camera_data_path)
-        ensure_directory_exists(self.mesoscope_data_path)
-        ensure_directory_exists(self.behavior_data_path)
+        ensure_directory_exists(Path(self.raw_data_path))
+        ensure_directory_exists(Path(self.camera_data_path))
+        ensure_directory_exists(Path(self.mesoscope_data_path))
+        ensure_directory_exists(Path(self.behavior_data_path))
 
-    def switch_root(self, new_root: Path) -> None:  # type: ignore
+    def switch_root(self, new_root: Path) -> None:
         """Changes the root of the managed raw_data directory to the provided root path.
 
         This service method is used by the SessionData class to convert all paths in this class to be relative to the
@@ -449,24 +467,26 @@ class RawData:
                 root session directory: pc_root/project/animal/session.
         """
         # Gets current root from the raw_data_path.
-        old_root = self.raw_data_path.parents[2]
+        old_root = Path(self.raw_data_path).parents[2]
 
         # Updates all paths by replacing old_root with new_root
-        self.raw_data_path = new_root.joinpath(self.raw_data_path.relative_to(old_root))
-        self.camera_data_path = new_root.joinpath(self.camera_data_path.relative_to(old_root))
-        self.mesoscope_data_path = new_root.joinpath(self.mesoscope_data_path.relative_to(old_root))
-        self.behavior_data_path = new_root.joinpath(self.behavior_data_path.relative_to(old_root))
-        self.zaber_positions_path = new_root.joinpath(self.zaber_positions_path.relative_to(old_root))
-        self.session_descriptor_path = new_root.joinpath(self.session_descriptor_path.relative_to(old_root))
-        self.hardware_configuration_path = new_root.joinpath(self.hardware_configuration_path.relative_to(old_root))
-        self.surgery_metadata_path = new_root.joinpath(self.surgery_metadata_path.relative_to(old_root))
-        self.project_configuration_path = new_root.joinpath(self.project_configuration_path.relative_to(old_root))
-        self.session_data_path = new_root.joinpath(self.session_data_path.relative_to(old_root))
-        self.experiment_configuration_path = new_root.joinpath(self.experiment_configuration_path.relative_to(old_root))
-        self.mesoscope_positions_path = new_root.joinpath(self.mesoscope_positions_path.relative_to(old_root))
-        self.window_screenshot_path = new_root.joinpath(self.window_screenshot_path.relative_to(old_root))
-        self.suite2p_configuration_path = new_root.joinpath(self.suite2p_configuration_path.relative_to(old_root))
-        self.deeplabcut_configuration_path = new_root.joinpath(self.deeplabcut_configuration_path.relative_to(old_root))
+        self.raw_data_path = new_root.joinpath(Path(self.raw_data_path).relative_to(old_root))
+        self.camera_data_path = new_root.joinpath(Path(self.camera_data_path).relative_to(old_root))
+        self.mesoscope_data_path = new_root.joinpath(Path(self.mesoscope_data_path).relative_to(old_root))
+        self.behavior_data_path = new_root.joinpath(Path(self.behavior_data_path).relative_to(old_root))
+        self.zaber_positions_path = new_root.joinpath(Path(self.zaber_positions_path).relative_to(old_root))
+        self.session_descriptor_path = new_root.joinpath(Path(self.session_descriptor_path).relative_to(old_root))
+        self.hardware_configuration_path = new_root.joinpath(
+            Path(self.hardware_configuration_path).relative_to(old_root)
+        )
+        self.surgery_metadata_path = new_root.joinpath(Path(self.surgery_metadata_path).relative_to(old_root))
+        self.project_configuration_path = new_root.joinpath(Path(self.project_configuration_path).relative_to(old_root))
+        self.session_data_path = new_root.joinpath(Path(self.session_data_path).relative_to(old_root))
+        self.experiment_configuration_path = new_root.joinpath(
+            Path(self.experiment_configuration_path).relative_to(old_root)
+        )
+        self.mesoscope_positions_path = new_root.joinpath(Path(self.mesoscope_positions_path).relative_to(old_root))
+        self.window_screenshot_path = new_root.joinpath(Path(self.window_screenshot_path).relative_to(old_root))
 
 
 @dataclass()
@@ -477,10 +497,6 @@ class ProcessedData:
     pipelines on the BioHPC server. These pipelines use raw data to generate processed data, and the processed data is
     usually only stored on the BioHPC server. Processed data represents an intermediate step between raw data and the
     dataset used in the data analysis.
-
-    Notes:
-        All paths from this subclass represent directory paths. This is because data processing pipelines (suite2p,
-        DeepLabCut, etc.) instantiate their own subtrees under the 'root' directories stored in this class.
     """
 
     processed_data_path: str | Path
@@ -493,6 +509,14 @@ class ProcessedData:
     """Stores the output of the suite2p cell registration pipeline."""
     behavior_data_path: str | Path
     """Stores the output of the Sun lab behavior data extraction pipeline."""
+    deeplabcut_root_path: str | Path
+    """Stores the path to the root DeepLabCut project directory. Since DeepLabCut adopts a project-based directory 
+    management hierarchy, it is easier to have a single DLC folder shared by all animals and sessions of a given 
+    project. This root folder is typically stored under the main project directory on the fast BioHPC server volume."""
+    suite2p_configuration_path: str | Path
+    """Stores the path to the suite2p_configuration.yaml file stored inside the project's 'configuration' directory on
+    the fast BioHPC server volume. Since all sessions share the same suite2p configuration file, it is stored in a 
+    general configuration directory, similar to how project configuration is stored on the VRPC."""
 
     def __post_init__(self) -> None:
         """This method is automatically called after class instantiation and ensures that all path fields of the class
@@ -503,6 +527,8 @@ class ProcessedData:
         self.camera_data_path = Path(self.camera_data_path)
         self.mesoscope_data_path = Path(self.mesoscope_data_path)
         self.behavior_data_path = Path(self.behavior_data_path)
+        self.deeplabcut_root_path = Path(self.deeplabcut_root_path)
+        self.suite2p_configuration_path = Path(self.suite2p_configuration_path)
 
     def make_string(self) -> None:
         """Converts all Path objects stored inside the class to strings.
@@ -514,6 +540,8 @@ class ProcessedData:
         self.camera_data_path = str(self.camera_data_path)
         self.mesoscope_data_path = str(self.mesoscope_data_path)
         self.behavior_data_path = str(self.behavior_data_path)
+        self.deeplabcut_root_path = str(self.deeplabcut_root_path)
+        self.suite2p_configuration_path = str(self.suite2p_configuration_path)
 
     def make_dirs(self) -> None:
         """Ensures that all major subdirectories of the processed_data directory exist.
@@ -521,10 +549,12 @@ class ProcessedData:
         This method is used by the BioHPC server to generate the processed_data directory as part of the sl-forgery
         library runtime.
         """
-        ensure_directory_exists(self.processed_data_path)
-        ensure_directory_exists(self.camera_data_path)
-        ensure_directory_exists(self.mesoscope_data_path)
-        ensure_directory_exists(self.behavior_data_path)
+        ensure_directory_exists(Path(self.processed_data_path))
+        ensure_directory_exists(Path(self.camera_data_path))
+        ensure_directory_exists(Path(self.mesoscope_data_path))
+        ensure_directory_exists(Path(self.behavior_data_path))
+        ensure_directory_exists(Path(self.deeplabcut_root_path))
+        ensure_directory_exists(Path(self.suite2p_configuration_path))
 
 
 @dataclass()
@@ -576,8 +606,8 @@ class PersistentData:
         """Ensures that the VRPC and the ScanImagePC persistent_data directories exist."""
 
         # We need to call ensure_directory_exists one for each unique directory tree
-        ensure_directory_exists(self.zaber_positions_path)  # vrpc_root/project/animal/persistent_data
-        ensure_directory_exists(self.motion_estimator_path)  # scanimagepc_root/project/animal/persistent_data
+        ensure_directory_exists(Path(self.zaber_positions_path))  # vrpc_root/project/animal/persistent_data
+        ensure_directory_exists(Path(self.motion_estimator_path))  # scanimagepc_root/project/animal/persistent_data
 
 
 @dataclass()
@@ -629,7 +659,7 @@ class MesoscopeData:
         # is generated during runtime by renaming the 'general' mesoscope_data directory. The 'general' directory is
         # then recreated from scratch. This ensures that the general directory is empty (ready for the next session)
         # with minimal I/O overhead.
-        ensure_directory_exists(self.mesoscope_data_path)
+        ensure_directory_exists(Path(self.mesoscope_data_path))
 
 
 @dataclass()
@@ -665,8 +695,8 @@ class Destinations:
 
     def make_dirs(self) -> None:
         """Ensures that all destination directories exist."""
-        ensure_directory_exists(self.nas_raw_data_path)
-        ensure_directory_exists(self.server_raw_data_path)
+        ensure_directory_exists(Path(self.nas_raw_data_path))
+        ensure_directory_exists(Path(self.server_raw_data_path))
 
 
 @dataclass
@@ -697,6 +727,8 @@ class SessionData(YamlConfig):
         data through acquisition, preprocessing and processing stages of the Sun lab data workflow.
     """
 
+    animal_id: str
+    """Stores the unique identifier of the animal that participates in the managed session."""
     session_type: str
     """Stores the type of the session. Primarily, this determines how to read the session_descriptor.yaml file. Has 
     to be set to one of the three supported types: 'Lick training', 'Run training' or 'Experiment'.
@@ -779,6 +811,7 @@ class SessionData(YamlConfig):
 
         # Constructs the session directory path and generates the directory
         session_path = vrpc_root.joinpath(project_name, animal_id, session_name)
+        remote_session_path = biohpc_workdir.joinpath(project_name, animal_id, session_name)
 
         # Handles potential session name conflicts
         counter = 0
@@ -786,6 +819,7 @@ class SessionData(YamlConfig):
             counter += 1
             new_session_name = f"{session_name}_{counter}"
             session_path = vrpc_root.joinpath(project_name, animal_id, new_session_name)
+            remote_session_path = biohpc_workdir.joinpath(project_name, animal_id, new_session_name)
 
         # If a conflict is detected and resolved, warns the user about the resolved conflict.
         if counter > 0:
@@ -812,16 +846,18 @@ class SessionData(YamlConfig):
             session_data_path=session_path.joinpath("raw_data", "session_data.yaml"),
             experiment_configuration_path=session_path.joinpath("raw_data", "experiment_configuration.yaml"),
             window_screenshot_path=session_path.joinpath("raw_data", "window_screenshot.png"),
-            suite2p_configuration_path=session_path.joinpath("raw_data", "suite2p_configuration.yaml"),
-            deeplabcut_configuration_path=session_path.joinpath("raw_data", "deeplabcut_configuration.yaml"),
         )
         raw_data.make_dirs()  # Generates the local directory tree
 
         processed_data = ProcessedData(
-            processed_data_path=biohpc_workdir.joinpath("processed_data"),
-            camera_data_path=session_path.joinpath("processed_data", "camera_data"),
-            mesoscope_data_path=session_path.joinpath("processed_data", "mesoscope_data"),
-            behavior_data_path=session_path.joinpath("processed_data", "behavior_data"),
+            processed_data_path=remote_session_path.joinpath("processed_data"),
+            camera_data_path=remote_session_path.joinpath("processed_data", "camera_data"),
+            mesoscope_data_path=remote_session_path.joinpath("processed_data", "mesoscope_data"),
+            behavior_data_path=remote_session_path.joinpath("processed_data", "behavior_data"),
+            deeplabcut_root_path=biohpc_workdir.joinpath(project_name, "deeplabcut"),
+            suite2p_configuration_path=biohpc_workdir.joinpath(
+                project_name, "configuration", "suite2p_configuration.yaml"
+            ),
         )
 
         vrpc_persistent_path = vrpc_root.joinpath(project_name, animal_id, "persistent_data")
@@ -848,6 +884,7 @@ class SessionData(YamlConfig):
 
         # Packages the sections generated above into a SessionData instance
         instance = SessionData(
+            animal_id=animal_id,
             session_type=session_type,
             raw_data=raw_data,
             processed_data=processed_data,
@@ -876,24 +913,13 @@ class SessionData(YamlConfig):
         # Project Configuration
         sh.copy2(
             src=vrpc_configuration_path.joinpath("project_configuration.yaml"),
-            dst=instance.raw_data.project_configuration_path,
+            dst=instance.raw_data.project_configuration_path,  # type: ignore
         )
-        # Suite2p Configuration
-        sh.copy2(
-            src=vrpc_configuration_path.joinpath("suite2p_configuration.yaml"),
-            dst=instance.raw_data.suite2p_configuration_path,
-        )
-        # DeepLabCut Configuration
-        sh.copy2(
-            src=vrpc_configuration_path.joinpath("deeplabcut_configuration.yaml"),
-            dst=instance.raw_data.deeplabcut_configuration_path,
-        )
-
         # Experiment Configuration, if the session type is Experiment.
         if experiment_name is not None:
             sh.copy2(
                 src=vrpc_configuration_path.joinpath(f"{experiment_name}.yaml"),
-                dst=instance.raw_data.experiment_configuration_path,
+                dst=instance.raw_data.experiment_configuration_path,  # type: ignore
             )
 
         # Returns the initialized SessionData instance to caller
@@ -938,7 +964,7 @@ class SessionData(YamlConfig):
             console.error(message=message, error=FileNotFoundError)
 
         # Loads class data from .yaml
-        instance: SessionData = cls.from_yaml(file_path=session_path)
+        instance: SessionData = cls.from_yaml(file_path=session_path)  # type: ignore
 
         # Depending on whether the class is initialized on the VRPC or BioHPC server, resolves the local (raw_data)
         # directory path. With the way this class is used, if on_server is False, the class is already
@@ -952,11 +978,11 @@ class SessionData(YamlConfig):
             instance.destinations = None
 
             # Reconfigures the raw_data section to use the root provided as part of the session_path.
-            instance.raw_data.switch_root(new_root=session_path)
+            instance.raw_data.switch_root(new_root=session_path)  # type: ignore
 
             # Processed Data section is always configured to use the BioHPC server root. Calls its' make_dirs() method
             # to setup directories
-            instance.processed_data.make_dirs()
+            instance.processed_data.make_dirs()  # type: ignore
 
         # Returns the initialized SessionData instance to caller
         return instance
@@ -970,7 +996,7 @@ class SessionData(YamlConfig):
         """
 
         # Extracts the target file path before it is converted to a string.
-        file_path = copy.copy(self.raw_data.session_data_path)
+        file_path: Path = copy.copy(self.raw_data.session_data_path)  # type: ignore
 
         # Converts all Paths objects to strings before dumping the data to YAML.
         if self.raw_data is not None:
