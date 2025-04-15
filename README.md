@@ -37,8 +37,6 @@ acquisition and processing and provides the API for accessing the lab’s main c
 - [Acknowledgements](#Acknowledgments)
 ___
 
----
-
 ## Dependencies
 
 All software library dependencies are installed automatically as part of library installation.
@@ -58,7 +56,7 @@ Note, installation from source is ***highly discouraged*** for everyone who is n
    wheel into the active python environment.
 
 ### pip
-Use the following command to install the library using pip: ```pip install sl-experiment```.
+Use the following command to install the library using pip: ```pip install sl-shared-assets```.
 
 ---
 
@@ -87,6 +85,7 @@ ___
 ## License
 
 This project is licensed under the GPL3 License: see the [LICENSE](LICENSE) file for details.
+
 ___
 
 ## Acknowledgments
