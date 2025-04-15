@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 
 # Project metdata section. Provides the genral ID information about the project.
 [project]
-name = "sl-experiment"
+name = "sl-shared-assets"
 version = "1.0.0"
 description = "Stores assets shared between multiple Sun (NeuroAI) lab data acquisition and processing repositories."
 readme = "README.md"
@@ -15,6 +15,7 @@ license = { file = "LICENSE" }
 requires-python = ">=3.11"
 authors = [
     { name = "Ivan Kondratyev", email = "ik278@cornell.edu" },
+    { name = "Yuantao Deng"},
 ]
 maintainers = [
     { name = "Ivan Kondratyev", email = "ik278@cornell.edu" },
@@ -47,6 +48,7 @@ dependencies = [
     "xxhash>=3,<4",
     "paramiko>=3.5.1, <4",
     "simple-slurm>=0,<1",
+    "click>=8,<9",
 ]
 
 [project.urls]
@@ -64,6 +66,7 @@ condarun = [
     "appdirs>=1,<2",
     "tqdm>=4,<5",
     "paramiko>=3.5.1,<4",
+    "click>=8,<9",
 ]
 
 # Dependencies known to be installable with conda for all development platforms (OSX ARM64, WIN AMD64, LIN AMD64).
@@ -120,7 +123,8 @@ dev = [
 
 # Exports CLIs upon library installation into an environment
 [project.scripts]
-sl-replace-root = "sl_shared_assets.shared_assets:replace_root_path"
+sl-replace-root = "sl_shared_assets.cli:replace_local_root_directory"
+sl-generate-credentials = "sl_shared_assets.cli:generate_server_credentials_file"
 
 # Specifies files that should not be included in the source-code distribution but are also not part of gitignore.
 [tool.hatch.build.targets.sdist]
