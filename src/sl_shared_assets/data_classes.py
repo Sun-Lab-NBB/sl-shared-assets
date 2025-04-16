@@ -760,7 +760,7 @@ class SessionData(YamlConfig):
     """Stores the name (timestamp-based ID) of the managed session."""
     session_type: str
     """Stores the type of the session. Primarily, this determines how to read the session_descriptor.yaml file. Has 
-    to be set to one of the three supported types: 'Lick training', 'Run training' or 'Experiment'.
+    to be set to one of the four supported types: 'Lick training', 'Run training', 'Window Checking' or 'Experiment'.
     """
     experiment_name: str | None
     """Stores the name of the experiment configuration file. If the session_type field is set to 'Experiment', this 
@@ -879,9 +879,7 @@ class SessionData(YamlConfig):
             mesoscope_data_path=session_path.joinpath("processed_data", "mesoscope_data"),
             behavior_data_path=session_path.joinpath("processed_data", "behavior_data"),
             deeplabcut_root_path=vrpc_root.joinpath(project_name, "deeplabcut"),
-            suite2p_configuration_path=vrpc_root.joinpath(
-                project_name, "configuration", "suite2p_configuration.yaml"
-            ),
+            suite2p_configuration_path=vrpc_root.joinpath(project_name, "configuration", "suite2p_configuration.yaml"),
         )
 
         vrpc_persistent_path = vrpc_root.joinpath(project_name, animal_id, "persistent_data")
