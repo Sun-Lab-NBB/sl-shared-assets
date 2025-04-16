@@ -604,6 +604,7 @@ class ProcedureData:
     protocol: str
     surgery_notes: str
     post_op_notes: str
+    surgery_quality: int = ...
 
 @dataclass
 class ImplantData:

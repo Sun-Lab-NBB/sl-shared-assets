@@ -1364,6 +1364,10 @@ class ProcedureData:
     """Stores surgeon's notes taken during the surgery."""
     post_op_notes: str
     """Stores surgeon's notes taken during the post-surgery recovery period."""
+    surgery_quality: int = 0
+    """Stores the quality of the surgical intervention as a numeric level. 0 indicates unusable (bad) result, 1 
+    indicates usable result that is not good enough to be included in a publication, 2 indicates publication-grade 
+    result."""
 
 
 @dataclass
