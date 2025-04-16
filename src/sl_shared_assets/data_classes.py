@@ -727,6 +727,8 @@ class SessionData(YamlConfig):
         data through acquisition, preprocessing and processing stages of the Sun lab data workflow.
     """
 
+    project_name: str
+    """Stores the name of the managed session's project."""
     animal_id: str
     """Stores the unique identifier of the animal that participates in the managed session."""
     session_name: str
