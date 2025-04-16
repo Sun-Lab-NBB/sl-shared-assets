@@ -742,20 +742,20 @@ class SessionData(YamlConfig):
     field is used to communicate the specific experiment configuration used by the session. During runtime, this is
     used to load the experiment configuration (to run the experiment) and to save the experiment configuration to the
     session raw_data folder. If the session is not an experiment session, this is statically set to None."""
-    raw_data: RawData | None
+    raw_data: RawData
     """Stores the paths to various directories and files used to store raw and preprocessed session data. Depending on 
     class initialization location (VRPC or BioHPC server), the class automatically resolves the root directory path to 
     either the VRPC project directory or the BioHPC cluster storage volume."""
-    processed_data: ProcessedData | None
+    processed_data: ProcessedData
     """Stores the paths to various directories used to store processed session data. This is automatically 
     resolved to the fast BioHPC volume (workdir) in all cases, as processed data should only exist on the server."""
-    persistent_data: PersistentData | None
+    persistent_data: PersistentData
     """Stores the paths to various files and directories kept on VRPC and ScanImagePC after the session data is 
     transferred to long-term storage destinations."""
-    mesoscope_data: MesoscopeData | None
+    mesoscope_data: MesoscopeData
     """Stores the paths to various directories used by the ScanImagePC to store mesoscope-acquired session data, 
     before it is moved to the VRPC during preprocessing."""
-    destinations: Destinations | None
+    destinations: Destinations
     """Stores the paths to the destination directories on the BioHPC server and Synology NAS, to which the data is 
     copied as part of preprocessing. Both of these directories should be accessible for the VRPC's filesystem via an 
     SMB or equivalent protocol."""
@@ -888,6 +888,7 @@ class SessionData(YamlConfig):
 
         # Packages the sections generated above into a SessionData instance
         instance = SessionData(
+            project_name=project_configuration.project_name,
             animal_id=animal_id,
             session_name=session_name,
             session_type=session_type,
@@ -903,10 +904,6 @@ class SessionData(YamlConfig):
         # preprocessing
         instance._to_path()
 
-        # Removes the processed_data section, as it is not used on the VRPC. This makes it impossible to accidentally
-        # interact with this section without errors.
-        instance.processed_data = None
-
         # Extracts and saves the necessary configuration classes to the session raw_data folder. Note, this list of
         # classes is not exhaustive. More classes are saved as part of the session runtime management class start() and
         # __init__() method runtimes:
@@ -918,13 +915,13 @@ class SessionData(YamlConfig):
         # Project Configuration
         sh.copy2(
             src=vrpc_configuration_path.joinpath("project_configuration.yaml"),
-            dst=instance.raw_data.project_configuration_path,  # type: ignore
+            dst=instance.raw_data.project_configuration_path,
         )
         # Experiment Configuration, if the session type is Experiment.
         if experiment_name is not None:
             sh.copy2(
                 src=vrpc_configuration_path.joinpath(f"{experiment_name}.yaml"),
-                dst=instance.raw_data.experiment_configuration_path,  # type: ignore
+                dst=instance.raw_data.experiment_configuration_path,
             )
 
         # Returns the initialized SessionData instance to caller
@@ -976,18 +973,12 @@ class SessionData(YamlConfig):
         # well-configured. This is because the class is always created on the VRPC and, when it leaves VRPC, it is
         # never used on VRPC again. Therefore, additional processing is ONLY done when on_server is True.
         if on_server:
-            # Disables VRPC-only sections. This makes it impossible to call these sections on BioHPC server without
-            # runtime interruption.
-            instance.mesoscope_data = None
-            instance.persistent_data = None
-            instance.destinations = None
-
             # Reconfigures the raw_data section to use the root provided as part of the session_path.
-            instance.raw_data.switch_root(new_root=session_path)  # type: ignore
+            instance.raw_data.switch_root(new_root=session_path)
 
             # Processed Data section is always configured to use the BioHPC server root. Calls its' make_dirs() method
             # to setup directories
-            instance.processed_data.make_dirs()  # type: ignore
+            instance.processed_data.make_dirs()
 
         # Returns the initialized SessionData instance to caller
         return instance
