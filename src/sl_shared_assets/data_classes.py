@@ -729,12 +729,14 @@ class SessionData(YamlConfig):
 
     animal_id: str
     """Stores the unique identifier of the animal that participates in the managed session."""
+    session_name: str
+    """Stores the name (timestamp-based ID) of the managed session."""
     session_type: str
     """Stores the type of the session. Primarily, this determines how to read the session_descriptor.yaml file. Has 
     to be set to one of the three supported types: 'Lick training', 'Run training' or 'Experiment'.
     """
     experiment_name: str | None
-    """Stores the name of the experiment configuration file. If the session_name field is set to 'Experiment', this 
+    """Stores the name of the experiment configuration file. If the session_type field is set to 'Experiment', this 
     field is used to communicate the specific experiment configuration used by the session. During runtime, this is
     used to load the experiment configuration (to run the experiment) and to save the experiment configuration to the
     session raw_data folder. If the session is not an experiment session, this is statically set to None."""
@@ -885,6 +887,7 @@ class SessionData(YamlConfig):
         # Packages the sections generated above into a SessionData instance
         instance = SessionData(
             animal_id=animal_id,
+            session_name=session_name,
             session_type=session_type,
             raw_data=raw_data,
             processed_data=processed_data,
