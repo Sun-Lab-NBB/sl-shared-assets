@@ -760,7 +760,7 @@ class SessionData(YamlConfig):
     """Stores the name (timestamp-based ID) of the managed session."""
     session_type: str
     """Stores the type of the session. Primarily, this determines how to read the session_descriptor.yaml file. Has 
-    to be set to one of the four supported types: 'Lick training', 'Run training', 'Window Checking' or 'Experiment'.
+    to be set to one of the four supported types: 'Lick training', 'Run training', 'Window checking' or 'Experiment'.
     """
     experiment_name: str | None
     """Stores the name of the experiment configuration file. If the session_type field is set to 'Experiment', this 
