@@ -13,6 +13,7 @@ import appdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
+import copy
 
 
 def replace_root_path(path: Path) -> None:
@@ -277,24 +278,27 @@ class ProjectConfiguration(YamlConfig):
             path: The path to the .yaml file to save the data to.
         """
 
+        # Copies instance data to prevent it from being modified by reference when executing the steps below
+        original = copy.deepcopy(self)
+
         # Converts all Path objects to strings before dumping the data, as .yaml encoder does not properly recognize
         # Path objects
-        self.local_root_directory = str(self.local_root_directory)
-        self.local_mesoscope_directory = str(self.local_mesoscope_directory)
-        self.local_nas_directory = str(self.local_nas_directory)
-        self.local_server_directory = str(self.local_server_directory)
-        self.remote_storage_directory = str(self.remote_storage_directory)
-        self.remote_working_directory = str(self.remote_working_directory)
-        self.google_credentials_path = str(self.google_credentials_path)
-        self.server_credentials_path = str(self.server_credentials_path)
-        self.harvesters_cti_path = str(self.harvesters_cti_path)
+        original.local_root_directory = str(original.local_root_directory)
+        original.local_mesoscope_directory = str(original.local_mesoscope_directory)
+        original.local_nas_directory = str(original.local_nas_directory)
+        original.local_server_directory = str(original.local_server_directory)
+        original.remote_storage_directory = str(original.remote_storage_directory)
+        original.remote_working_directory = str(original.remote_working_directory)
+        original.google_credentials_path = str(original.google_credentials_path)
+        original.server_credentials_path = str(original.server_credentials_path)
+        original.harvesters_cti_path = str(original.harvesters_cti_path)
 
         # Converts valve calibration data into dictionary format
-        if isinstance(self.valve_calibration_data, tuple):
-            self.valve_calibration_data = {k: v for k, v in self.valve_calibration_data}
+        if isinstance(original.valve_calibration_data, tuple):
+            original.valve_calibration_data = {k: v for k, v in original.valve_calibration_data}
 
         # Saves the data to the YAML file
-        self.to_yaml(file_path=path)
+        original.to_yaml(file_path=path)
 
         # As part of this runtime, also generates and dumps the 'precursor' experiment configuration file.
         example_experiment = ExperimentConfiguration()
@@ -1024,23 +1028,21 @@ class SessionData(YamlConfig):
         create_session() method runtime.
         """
 
+        # Copies instance data to prevent it from being modified by reference when executing the steps below
+        original = copy.deepcopy(self)
+
         # Extracts the target file path before it is converted to a string.
         file_path: Path = copy.copy(self.raw_data.session_data_path)  # type: ignore
 
         # Converts all Paths objects to strings before dumping the data to YAML.
-        if self.raw_data is not None:
-            self.raw_data.make_string()
-        if self.processed_data is not None:
-            self.processed_data.make_string()
-        if self.persistent_data is not None:
-            self.persistent_data.make_string()
-        if self.mesoscope_data is not None:
-            self.mesoscope_data.make_string()
-        if self.destinations is not None:
-            self.destinations.make_string()
+        original.raw_data.make_string()
+        original.processed_data.make_string()
+        original.persistent_data.make_string()
+        original.mesoscope_data.make_string()
+        original.destinations.make_string()
 
         # Saves instance data as a .YAML file
-        self.to_yaml(file_path=file_path)
+        original.to_yaml(file_path=file_path)
 
 
 @dataclass()
