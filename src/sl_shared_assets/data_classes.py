@@ -13,7 +13,6 @@ import appdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
-import copy
 
 
 def replace_root_path(path: Path) -> None:
@@ -230,7 +229,8 @@ class ProjectConfiguration(YamlConfig):
             # this process, the class generates the correct 'local_root_path' based on the path provided by the
             # user.
             precursor = ProjectConfiguration(local_root_directory=Path(str(configuration_path.parents[2])))
-            precursor._to_path(path=configuration_path)
+            precursor.project_name = project_name
+            precursor.to_path(path=configuration_path)
 
             # Waits for the user to manually configure the newly created file.
             input(f"Enter anything to continue: ")
@@ -263,7 +263,7 @@ class ProjectConfiguration(YamlConfig):
         # Returns the initialized class instance to caller
         return instance
 
-    def _to_path(self, path: Path) -> None:
+    def to_path(self, path: Path) -> None:
         """Saves the instance data to disk as a project_configuration.yaml file.
 
         This method is automatically called when the project is created. All future runtimes should use the load()
@@ -797,6 +797,7 @@ class SessionData(YamlConfig):
         session_type: str,
         project_configuration: ProjectConfiguration,
         experiment_name: str | None = None,
+        session_name: str | None = None,
     ) -> "SessionData":
         """Creates a new SessionData object and uses it to generate the session's data structure.
 
@@ -821,13 +822,17 @@ class SessionData(YamlConfig):
                 copy it into the session's raw_data directory.
             project_configuration: The initialized ProjectConfiguration instance that stores the data for the session's
                 project. This is used to determine the root directory paths for all PCs used in the data workflow.
+            session_name: An optional session_name override. Generally, this argument should not be provided for most
+                use cases. When provided, the method uses this name instead of generating a new timestamp-based name.
+                This is only used when reformatting other data structures to follow Sun lab structure.
 
         Returns:
             An initialized SessionData instance for the newly created session.
         """
 
         # Acquires the UTC timestamp to use as the session name
-        session_name = str(get_timestamp(time_separator="-"))
+        if session_name is None:
+            session_name = str(get_timestamp(time_separator="-"))
 
         # Extracts the root directory paths stored inside the project configuration file. All roots are expected to be
         # mounted on the local (VRPC) via SMB or equivalent protocol and be relative to the VRPC root.
