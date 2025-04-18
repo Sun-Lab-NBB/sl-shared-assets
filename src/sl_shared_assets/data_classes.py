@@ -482,10 +482,10 @@ class RawData:
 
         Args:
             new_root: The new root directory to use for all paths inside the instance. This has to be the path to the
-                root session directory: pc_root/project/animal/session.
+                directory that stores all Sun lab projects on the target machine.
         """
         # Gets current root from the raw_data_path.
-        old_root = Path(self.raw_data_path).parents[2]
+        old_root = Path(self.raw_data_path).parents[3]
 
         # Updates all paths by replacing old_root with new_root
         self.raw_data_path = new_root.joinpath(Path(self.raw_data_path).relative_to(old_root))
@@ -589,10 +589,10 @@ class ProcessedData:
 
         Args:
             new_root: The new root directory to use for all paths inside the instance. This has to be the path to the
-                root session directory: pc_root/project/animal/session.
+                directory that stores all Sun lab projects on the target machine.
         """
         # Gets current root from the processed_data_path.
-        old_root = Path(self.processed_data_path).parents[2]
+        old_root = Path(self.processed_data_path).parents[3]
 
         # Updates all paths by replacing old_root with new_root
         self.processed_data_path = new_root.joinpath(Path(self.processed_data_path).relative_to(old_root))
@@ -1022,13 +1022,13 @@ class SessionData(YamlConfig):
             console.error(message=message, error=FileNotFoundError)
 
         # Loads class data from .yaml
-        instance: SessionData = cls.from_yaml(file_path=session_path)  # type: ignore
+        instance: SessionData = cls.from_yaml(file_path=session_data_path)  # type: ignore
 
         # The method assumes that the 'donor' .yaml file is always stored inside the raw_data directory of the session
         # to be processed. Since the directory itself might have moved (between or even within the same PC) relative to
         # where it was when the SessionData snapshot was generated, reconfigures the paths to all raw_data files using
         # the root from above.
-        instance.raw_data.switch_root(new_root=session_path)
+        instance.raw_data.switch_root(new_root=session_path.parents[2])
 
         # Resolves the paths to the processed_data directories. The resolution strategy depends on whether the method is
         # called on the VRPC (locally) or the BioHPC server (remotely).
@@ -1036,7 +1036,7 @@ class SessionData(YamlConfig):
             # Local runtimes use the same root session directory for both raw_data and processed_data. This stems from
             # the assumption that most local machines in the lab only use NVME (fast) volumes and, therefore, do not
             # need to separate 'storage' and 'working' data.
-            instance.processed_data.switch_root(new_root=session_path)
+            instance.processed_data.switch_root(new_root=session_path.parents[2])
 
         else:
             # The BioHPC server stores raw_data on slow volume and processed_data on fast (NVME) volume. Therefore, to
