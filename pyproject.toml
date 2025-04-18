@@ -126,6 +126,7 @@ dev = [
 [project.scripts]
 sl-replace-root = "sl_shared_assets.cli:replace_local_root_directory"
 sl-generate-credentials = "sl_shared_assets.cli:generate_server_credentials_file"
+sl-ascend = "sl_shared_assets.cli:ascend_tyche_directory"
 
 # Specifies files that should not be included in the source-code distribution but are also not part of gitignore.
 [tool.hatch.build.targets.sdist]

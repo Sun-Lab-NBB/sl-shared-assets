@@ -7,33 +7,16 @@ Authors: Ivan Kondratyev (Inkaros), Kushaan Gupta, Yuantao Deng
 
 from .server import Server, ServerCredentials
 from .suite2p import (
-    Main,
-    FileIO,
-    Output,
-    Channel2,
-    NonRigid,
-    ROIDetection,
-    Registration,
-    Classification,
-    OnePRegistration,
-    SignalExtraction,
-    CellposeDetection,
-    SpikeDeconvolution,
     Suite2PConfiguration,
 )
 from .data_classes import (
-    RawData,
     DrugData,
     ImplantData,
     SessionData,
     SubjectData,
     SurgeryData,
-    Destinations,
     InjectionData,
-    MesoscopeData,
     ProcedureData,
-    ProcessedData,
-    PersistentData,
     ZaberPositions,
     ExperimentState,
     MesoscopePositions,
@@ -43,7 +26,6 @@ from .data_classes import (
     LickTrainingDescriptor,
     ExperimentConfiguration,
     MesoscopeExperimentDescriptor,
-    replace_root_path,
 )
 from .transfer_tools import transfer_directory
 from .packaging_tools import calculate_directory_checksum
@@ -53,32 +35,15 @@ __all__ = [
     "Server",
     "ServerCredentials",
     # Suite2p module
-    "Main",
-    "FileIO",
-    "Output",
-    "Channel2",
-    "NonRigid",
-    "ROIDetection",
-    "Registration",
-    "Classification",
-    "OnePRegistration",
-    "SignalExtraction",
-    "CellposeDetection",
-    "SpikeDeconvolution",
     "Suite2PConfiguration",
     # Data classes module
-    "RawData",
     "DrugData",
     "ImplantData",
     "SessionData",
     "SubjectData",
     "SurgeryData",
-    "Destinations",
     "InjectionData",
-    "MesoscopeData",
     "ProcedureData",
-    "ProcessedData",
-    "PersistentData",
     "ZaberPositions",
     "ExperimentState",
     "MesoscopePositions",
@@ -88,7 +53,6 @@ __all__ = [
     "LickTrainingDescriptor",
     "ExperimentConfiguration",
     "MesoscopeExperimentDescriptor",
-    "replace_root_path",
     # Transfer tools module
     "transfer_directory",
     # Packaging tools module

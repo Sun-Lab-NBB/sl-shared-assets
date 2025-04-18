@@ -1,5 +1,6 @@
-"""This module provides tools for working with old (legacy) data and data formats. Primarily, they are used to reformat
-old Tyche project data to make it compatible with modern Sun lab pipelines."""
+"""This module provides tools for translating ('ascending') old Tyche data to use the modern data structure used in the
+Sun lab. The tools from this module will not work for any other data and also assume that the Tyche data has been
+preprocessed with an early version of the Sun lab mesoscope processing pipeline."""
 
 from pathlib import Path
 import datetime
@@ -10,22 +11,27 @@ from ataraxis_base_utilities import LogLevel, console
 from ataraxis_time.time_helpers import extract_timestamp_from_bytes
 
 from .data_classes import SessionData, ProjectConfiguration
+from .transfer_tools import transfer_directory
 from .packaging_tools import calculate_directory_checksum
+
+# Ensures the console is enabled when this file is imported
+if not console.enabled:
+    console.enable()
 
 
 def _generate_session_name(acquisition_path: Path) -> str:
     """Generates a session name using the last modification time of a zstack.mat or MotionEstimator.me file.
 
-    This worker function uses one of the motion estimation files stored in each 'acquisition' subfolder of the original
-    Tyche session data structure to generate a compatible timestamp-based session name. This is used to translate the
-    original Tyche data hierarchy into the hierarchy used by all modern Sun lab projects and pipelines.
+    This worker function uses one of the motion estimation files stored in each Tyche 'acquisition' subfolder to
+    generate a modern Sun lab timestamp-based session name. This is used to translate the original Tyche session naming
+    pattern into the pattern used by all modern Sun lab projects and pipelines.
 
     Args:
         acquisition_path: The absolute path to the target acquisition folder. These folders are found under the 'day'
             folders for each animal, e.g.: Tyche-A7/2022_01_03/1.
 
     Returns:
-        The generated session name for that acquisition.
+        The modernized session name.
     """
 
     # All well-formed sessions are expected to contain both the zstack.mat and the MotionEstimator.me file.
@@ -60,21 +66,21 @@ def _generate_session_name(acquisition_path: Path) -> str:
 
 
 def _reorganize_data(session_data: SessionData, source_root: Path) -> bool:
-    """Reorganizes and moves the session data from the source acquisition folder to the newly generated session
-    hierarchy.
+    """Reorganizes and moves the session's data from the source folder in the old Tyche data hierarchy to the raw_data
+    folder in the newly created modern hierarchy.
 
-    This worker function is used to physically rearrange the data from the original Tyche acquisition folder to the
-    newly created session hierarchy. It both moves the existing files to their new destinations and renames certain
-    files to match the latest naming convention used in the Sun lab.
+    This worker function is used to physically rearrange the data from the original Tyche data structure to the
+    new data structure. It both moves the existing files to their new destinations and renames certain files to match
+    the modern naming convention used in the Sun lab.
 
     Args:
-        session_data: The initialized SessionData instance managing the newly created session data hierarchy.
-        source_root: The absolute path to the source Tyche acquisition folder.
+        session_data: The initialized SessionData instance managing the 'ascended' (modernized) session data hierarchy.
+        source_root: The absolute path to the old Tyche data hierarchy folder that stores session's data.
 
     Returns:
-        True if all expected data was found and moved. False, if any expected file was not found inside the folder, or
-        the reorganization process otherwise behaved unexpectedly. If this function returns False, the folder is
-        statically flagged for manual user intervention to investigate the issue.
+        True if the ascension process was successfully completed. False if the process encountered missing data or
+        otherwise did not go as expected. When the method returns False, the runtime function requests user intervention
+        to finalize the process manually.
     """
 
     # Resolves expected data targets:
@@ -168,10 +174,10 @@ def _reorganize_data(session_data: SessionData, source_root: Path) -> bool:
 
 
 def ascend_tyche_data(root_directory: Path, output_root_directory: Path, server_root_directory: Path) -> None:
-    """Converts raw data from the Tyche project to use the modern Sun lab layout.
+    """Reformats the old Tyche data to use the modern Sun lab layout and metadata files.
 
-    This function is used to convert old data to the modern data management standard. In turn, this allows using all
-    modern data processing pipelines on this data.
+    This function is used to convert old Tyche data to the modern data management standard. This is used to make the
+    data compatible with the modern Sun lab data workflows.
 
     Notes:
         This function is statically written to work with the raw Tyche dataset featured in the OSM manuscript:
@@ -179,15 +185,19 @@ def ascend_tyche_data(root_directory: Path, output_root_directory: Path, server_
         preprocessed with the early Sun lab mesoscope compression pipeline. The function will not work for any other
         project or data hierarchy.
 
-        This function does not automatically transfer the data to the Server. It only creates the necessary root
-        hierarchy on the server and writes the necessary configuration to process the data on the Server, once it is
-        manually transferred.
+        As part of its runtime, the function automatically transfers the ascended session data to the BioHPC server.
+        Since transferring the data over the network is the bottleneck of this pipeline, it runs in a single-threaded
+        mode and is constrained by the communication channel between the local machine and the BioHPC server. Calling
+        this function for a large number of sessions will result in a long processing time due to the network data
+        transfer.
 
     Args:
-        root_directory: The root 'project' directory that stores individual Tyche animal folders to process.
-        output_root_directory: The path to the root directory where to generate the converted Tyche project hierarchy.
-        server_root_directory: The path to the SMB-mounted BioHPC server storage root directory. The Tyche project
-            hierarchy is generated both locally and on the Server.
+        root_directory: The directory that stores one or more Tyche animal folders. This can be conceptualized as the
+            root directory for the Tyche project.
+        output_root_directory: The path to the local directory where to generate the converted Tyche project hierarchy.
+            Typically, this is the 'root' directory where all other Sun lab projects are stored.
+        server_root_directory: The path to the local filesystem-mounted BioHPC server storage directory. Note, this
+            directory hs to be mapped to the local filesystem via the SMB or equivalent protocol.
     """
     # Generates a (shared) project configuration file.
     project_configuration = ProjectConfiguration()
@@ -212,7 +222,7 @@ def ascend_tyche_data(root_directory: Path, output_root_directory: Path, server_
 
     # Dumps project configuration into the 'configuration' subfolder of the Tyche project.
     configuration_path = output_root_directory.joinpath("Tyche", "configuration", "project_configuration.yaml")
-    project_configuration.to_path(path=configuration_path)
+    project_configuration.save(path=configuration_path)
 
     # Assumes that root directory stores all animal folders to be processed
     for animal_folder in root_directory.iterdir():
@@ -232,7 +242,7 @@ def ascend_tyche_data(root_directory: Path, output_root_directory: Path, server_
                 # Uses derived session name and the statically created project configuration file to create the
                 # session data hierarchy using the output root. This generates a 'standard' Sun lab directory structure
                 # for the Tyche data.
-                session_data = SessionData.create_session(
+                session_data = SessionData.create(
                     session_name=session_name,
                     animal_id=animal_name,
                     project_configuration=project_configuration,
@@ -249,11 +259,18 @@ def ascend_tyche_data(root_directory: Path, output_root_directory: Path, server_
                         f"Encountered issues when reorganizing {animal_name} session {session_name}. "
                         f"User intervention is required to finish data reorganization process for this session."
                     )
+                    # noinspection PyTypeChecker
                     console.echo(message=message, level=LogLevel.WARNING)
                 else:
-                    # If the transfer process was successful, generates a new checksum for the moved data and removes
-                    # the now-empty acquisition folder.
+                    # If the transfer process was successful, generates a new checksum for the moved data
                     calculate_directory_checksum(directory=Path(session_data.raw_data.raw_data_path))
+                    # Next, copies the data to the BioHPC server for further processing
+                    transfer_directory(
+                        source=Path(session_data.raw_data.raw_data_path),
+                        destination=Path(session_data.destinations.server_raw_data_path),
+                        verify_integrity=False,
+                    )
+                    # Finally, removes the now-empty old session data directory.
                     acquisition_folder.rmdir()
 
             # If the loop above removed all acquisition folders, all data for that day has been successfully converted

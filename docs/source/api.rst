@@ -17,6 +17,10 @@ Command Line Interfaces
    :prog: sl-generate-credentials
    :nested: full
 
+.. click:: sl_shared_assets.cli:ascend_tyche_directory
+   :prog: sl-ascend
+   :nested: full
+
 Packaging Tools
 ===============
 .. automodule:: sl_shared_assets.packaging_tools
@@ -48,6 +52,13 @@ General Configuration and Data Storage Classes
 Compute Server Tools
 ====================
 .. automodule:: sl_shared_assets.server
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Ascension Tools
+===============
+.. automodule:: sl_shared_assets.ascension_tools
    :members:
    :undoc-members:
    :show-inheritance:

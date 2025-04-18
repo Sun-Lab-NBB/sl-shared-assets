@@ -101,6 +101,7 @@ def calculate_directory_checksum(
         process_file = partial(_calculate_file_checksum, directory)
 
         # Submits all tasks to be executed in parallel
+        # noinspection PyTypeChecker
         future_to_path = {executor.submit(process_file, file): file for file in files}
 
         # Collects results as they complete

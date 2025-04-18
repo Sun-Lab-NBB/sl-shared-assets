@@ -1,6 +1,4 @@
-"""This module stores the Command-Line Interfaces (CLIs) exposes by the library as part of the installation process.
-Primarily, these CLIs are used when setting up or reconfiguring the VRPC and other machines in the lab to work with
-sl-experiment and sl-forgery libraries."""
+"""This module stores the Command-Line Interfaces (CLIs) exposes by the library as part of the installation process."""
 
 from pathlib import Path
 
@@ -8,7 +6,7 @@ import click
 
 from .server import generate_server_credentials
 from .data_classes import replace_root_path
-from .legacy_tools import ascend_tyche_data
+from .ascension_tools import ascend_tyche_data
 
 
 @click.command()
@@ -79,34 +77,33 @@ def generate_server_credentials_file(output_directory: str, host: str, username:
     "--path",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    prompt="Enter the absolute path to the root directory storing Tyche animal folders to ascend (modernize): ",
-    help="The path to the root directory storing Tyche animal folders to ascend (modernize).",
+    prompt="Enter the absolute path to the directory that stores original Tyche animal folders: ",
+    help="The absolute path to the directory that stores original Tyche animal folders.",
 )
 @click.option(
     "-o",
     "--output_directory",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    prompt="Enter the path to the local directory where to create the ascended Tyche project hierarchy: ",
-    help="The path to the local directory where to create the ascended Tyche project hierarchy.",
+    prompt="Enter the absolute path to the local directory where to create the ascended Tyche project hierarchy: ",
+    help="The absolute path to the local directory where to create the ascended Tyche project hierarchy.",
 )
 @click.option(
     "-s",
     "--server_directory",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    prompt="Enter the path to the SMB-mounted BioHPC server directory that will be used to store the ascended data: ",
-    help="The path to the SMB-mounted BioHPC server directory that will be used to store the ascended data.",
+    prompt=(
+        "Enter the path to the SMB-mounted BioHPC server directory where to create the ascended Tyche project "
+        "hierarchy: "
+    ),
+    help="The path to the SMB-mounted BioHPC server directory where to create the ascended Tyche project hierarchy.",
 )
 def ascend_tyche_directory(path: str, output_directory: str, server_directory: str) -> None:
-    """Restructures all original Tyche folders to use the modern Sun lab data structure.
+    """Restructures old Tyche project data to use the modern Sun lab data structure.
 
-    This CLI is used to convert the old Tyche data to make it compatible with modern Sun lab processing pipelines and
-    data management workflows. This process is commonly referred to as 'ascension' amongst lab engineers. After
+    This CLI is used to convert ('ascend') the old Tyche project data to the modern Sun lab structure. After
     ascension, the data can be processed and analyzed using all modern Sun lab (sl-) tools and libraries.
-
-    Note! This CLi does NOT move the data to the BioHPC server. The data has to be manually transferred to the server
-    before it can be processed using our server-side pipelines.
     """
     ascend_tyche_data(
         root_directory=Path(path),

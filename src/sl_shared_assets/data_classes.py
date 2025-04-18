@@ -1,6 +1,7 @@
-"""This module provides classes used to store various data used by the sl-experiment and the sl-forgery libraries.
-This includes classes used to store the data generated during acquisition and preprocessing and classes used to manage
-the runtime of other libraries (configuration data classes)."""
+"""This module provides classes used to store various data used by other Sun lab data acquisition and processing
+libraries.This includes classes used to store the data generated during acquisition and preprocessing and classes used
+to manage the runtime of other libraries (configuration data classes). Most classes from these modules are used by the
+major libraries 'sl-experiment' and 'sl-forgery'."""
 
 import re
 import copy
@@ -14,15 +15,19 @@ from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
 
+# Ensures console is enabled when this file is imported
+if not console.enabled:
+    console.enable()
+
 
 def replace_root_path(path: Path) -> None:
     """Replaces the path to the local root directory used to store all Sun lab projects with the provided path.
 
-    When ProjectConfiguration class is instantiated for the first time on a new machine, it asks the user to provide
-    the path to the local directory where to save all Sun lab projects. This path is then stored inside the default
-    user data directory as a .yaml file to be reused for all future projects. To support replacing this path without
-    searching for the user data directory, which is usually hidden, this function finds and updates the contents of the
-    file that stores the local root path.
+    The first time ProjectConfiguration class is instantiated to create a new project on a new machine,
+    it asks the user to provide the path to the local directory where to save all Sun lab projects. This path is then
+    stored inside the default user data directory as a .yaml file to be reused for all future projects. To support
+    replacing this path without searching for the user data directory, which is usually hidden, this function finds and
+    updates the contents of the file that stores the local root path.
 
     Args:
         path: The path to the new local root directory.
@@ -49,53 +54,65 @@ class ProjectConfiguration(YamlConfig):
 
     An instance of this class is generated and saved as a .yaml file in the 'configuration' directory of each project
     when it is created. After that, the stored data is reused for every runtime (training or experiment session) carried
-    out for each animal of the project.
+    out for each animal of the project. Additionally, a copy of the most actual configuration file is saved inside each
+    runtime session's 'raw_data' folder, providing seamless integration between the managed data and various Sun lab
+    (sl-) libraries.
 
     Notes:
-        This class allows flexibly configuring sl_experiment and sl_forgery libraries for different projects in the
-        Sun lab. This allows hiding most inner workings of all libraries from the end-users, while providing a robust,
-        machine-independent way to interface with all data acquisition and processing libraries.
+        Together with SessionData, this class forms the entry point for all interactions with the data acquired in the
+        Sun lab. The fields of this class are used to flexibly configure the runtime behavior of major data acquisition
+        (sl-experiment) and processing (sl-forgery) libraries, adapting them for any project in the lab.
 
-        Most lab projects only need to adjust the "surgery_sheet_id" and "water_log_sheet_id" fields of the class.
+        Most lab projects only need to adjust the "surgery_sheet_id" and "water_log_sheet_id" fields of the class. Most
+        fields in this class are used by the sl-experiment library to generate the SessionData class instance for each
+        session and during experiment data acquisition and preprocessing. Data processing pipelines use specialized
+        configuration files stored in other modules of this library.
+
+        Although all path fields use str | Path datatype, they are always stored as Path objects. These fields are
+        converted to strings only when the data is dumped as a .yaml file.
     """
 
     project_name: str = ""
     """Stores the descriptive name of the project. This name is used to create the root directory for the project and 
     to discover and load project's data during runtime."""
     surgery_sheet_id: str = ""
-    """The ID of the Google Sheet file that stores surgery information for the animal whose data is managed by this 
-    instance. This is used to parse and write the surgery data for each managed animal into its 'metadata' folder, so 
-    that the surgery data is always kept together with the rest of the training and experiment data."""
+    """The ID of the Google Sheet file that stores information about surgical interventions performed on all animals 
+    participating in the managed project. This log sheet is used to parse and write the surgical intervention data for 
+    each animal into every runtime session raw_data folder, so that the surgery data is always kept together with the 
+    rest of the training and experiment data."""
     water_log_sheet_id: str = ""
-    """The ID of the Google Sheet file that stores water restriction information for the animal whose data is managed 
-    by this instance. This is used to synchronize the information inside the water restriction log with the state of 
-    the animal at the end of each training or experiment session.
+    """The ID of the Google Sheet file that stores information about water restriction (and behavior tracker) 
+    information for all animals participating in the managed project. This is used to synchronize the information 
+    inside the water restriction log with the state of the animal at the end of each training or experiment session.
     """
     google_credentials_path: str | Path = Path("/media/Data/Experiments/sl-surgery-log-0f651e492767.json")
     """
     The path to the locally stored .JSON file that contains the service account credentials used to read and write 
-    Google Sheet data. This is used to access and work with the surgery log and the water restriction log. Usually, the 
-    same service account is used across all projects.
+    Google Sheet data. This is used to access and work with the surgery log and the water restriction log files. 
+    Usually, the same service account is used across all projects.
     """
     server_credentials_path: str | Path = Path("/media/Data/Experiments/server_credentials.yaml")
     """
     The path to the locally stored .YAML file that contains the credentials for accessing the BioHPC server machine. 
-    While the storage (filesystem) of the server machine should already be mounted to the local PC via SMB, this data
-    is used to establish SSH connection to the machine and start data processing after it is transferred to the server.
-    This way, our data acquisition, preprocessing, and processing are controlled by the same runtime.
+    While the filesystem of the server machine should already be mounted to the local machine via SMB or equivalent 
+    protocol, this data is used to establish SSH connection to the server and start newly acquired data processing 
+    after it is transferred to the server. This allows data acquisition, preprocessing, and processing to be controlled 
+    by the same runtime and prevents unprocessed data from piling up on the server.
     """
     local_root_directory: str | Path = Path("/media/Data/Experiments")
-    """The absolute path to the root directory where all projects are stored on the local host-machine (VRPC). Note, 
-    overwriting the value of this field is pointless, as it is automatically set each time the class is instantiated."""
+    """The absolute path to the directory where all projects are stored on the local host-machine (VRPC). Note, 
+    this field is configured automatically each time the class is instantiated through any method, so overwriting it 
+    manually will not be respected."""
     local_server_directory: str | Path = Path("/home/cybermouse/server/storage/sun_data")
-    """The absolute path to the locally-mapped (via SMB protocol) root BioHPC server machine directory where to store 
-    all projects."""
+    """The absolute path to the directory where all projects are stored on the BioHPC server. This directory should be 
+    locally accessible (mounted) using a network sharing protocol, such as SMB."""
     local_nas_directory: str | Path = Path("/home/cybermouse/nas/rawdata")
-    """The absolute path to the locally-mapped (via SMB protocol) root Synology NAS directory where to store all 
-    projects."""
+    """The absolute path to the directory where all projects are stored on the Synology NAS. This directory should be 
+    locally accessible (mounted) using a network sharing protocol, such as SMB."""
     local_mesoscope_directory: str | Path = Path("/home/cybermouse/scanimage/mesodata")
-    """The absolute path to the locally-mapped (via SMB protocol) root mesoscope (ScanImagePC) directory where all 
-    mesoscope-acquired data is aggregated during runtime."""
+    """The absolute path to the root mesoscope (ScanImagePC) directory where all mesoscope-acquired data is aggregated 
+    during acquisition runtime. This directory should be locally accessible (mounted) using a network sharing 
+    protocol, such as SMB."""
     remote_storage_directory: str | Path = Path("/storage/sun_data")
     """The absolute path, relative to the BioHPC server root, to the directory where all projects are stored on the 
     slow (SSD) volume of the server. This path is used when running remote (server-side) jobs and, therefore, has to
@@ -111,8 +128,7 @@ class ProjectConfiguration(YamlConfig):
     right_camera_index: int = 2
     """The index of the right body camera in the list of all available OpenCV-managed cameras."""
     harvesters_cti_path: str | Path = Path("/opt/mvIMPACT_Acquire/lib/x86_64/mvGenTLProducer.cti")
-    """The path to the GeniCam CTI file used to connect to Harvesters-managed cameras. Currently, this is only used by 
-    the face camera."""
+    """The path to the GeniCam CTI file used to connect to Harvesters-managed cameras."""
     actor_port: str = "/dev/ttyACM0"
     """The USB port used by the Actor Microcontroller."""
     sensor_port: str = "/dev/ttyACM1"
@@ -124,10 +140,10 @@ class ProjectConfiguration(YamlConfig):
     lickport_port: str = "/dev/ttyUSB1"
     """The USB port used by the LickPort Zaber motor controllers (devices)."""
     unity_ip: str = "127.0.0.1"
-    """The IP address of the MQTT broker used to communicate with the Unity game engine. Note, this is only used during 
+    """The IP address of the MQTT broker used to communicate with the Unity game engine. This is only used during 
     experiment runtimes. Training runtimes ignore this parameter."""
     unity_port: int = 1883
-    """The port number of the MQTT broker used to communicate with the Unity game engine. Note, this is only used during
+    """The port number of the MQTT broker used to communicate with the Unity game engine. This is only used during
     experiment runtimes. Training runtimes ignore this parameter."""
     valve_calibration_data: dict[int | float, int | float] | tuple[tuple[int | float, int | float], ...] = (
         (15000, 1.8556),
@@ -135,45 +151,41 @@ class ProjectConfiguration(YamlConfig):
         (45000, 7.1846),
         (60000, 10.0854),
     )
-    """A dictionary or tuple of tuples that maps valve open times, in microseconds, to the dispensed volume of water, 
-    in microliters. During runtime, this data is used by the ValveModule to translate the requested reward volumes into
-    times the valve needs to be open to deliver the desired volume.
+    """A tuple of tuples that maps water delivery solenoid valve open times, in microseconds, to the dispensed volume 
+    of water, in microliters. During training and experiment runtimes, this data is used by the ValveModule to translate
+    the requested reward volumes into times the valve needs to be open to deliver the desired volume of water.
     """
 
     @classmethod
     def load(cls, project_name: str, configuration_path: None | Path = None) -> "ProjectConfiguration":
-        """Loads the project configuration parameters from a project_configuration.yaml file and uses the loaded data
-        to initialize the ProjectConfiguration instance.
+        """Loads the project configuration parameters from a project_configuration.yaml file.
 
-        This method is called for each session runtime to reuse the configuration parameters generated at project
-        creation. When it is called for the first time (during new project creation), the method generates the default
-        configuration file and prompts the user to update the configuration before proceeding with the runtime.
+        This method is called during each interaction with any runtime session's data, including the creation of a new
+        session. When this method is called for a non-existent (new) project name, it generates the default
+        configuration file and prompts the user to update the configuration before proceeding with the runtime. All
+        future interactions with the sessions from this project reuse the existing configuration file.
 
         Notes:
             As part of its runtime, the method may prompt the user to provide the path to the local root directory.
-            This directory stores all project subdirectories and acts as the top level of the local data hierarchy.
-            The path to the directory will be saved inside user's default data directory, so that it can be reused for
-            all future projects. Use sl-replace_root_path CLI to replace the path that is saved in this way.
+            This directory stores all project subdirectories and acts as the top level of the Sun lab data hierarchy.
+            The path to the directory is then saved inside user's default data directory, so that it can be reused for
+            all future projects. Use sl-replace-root CLI to replace the saved root directory path.
 
-            Since this class is used during both data acquisition and processing on different machines, this method
-            supports multiple ways of initializing the class. Use the project_name on the VRPC (via the sl_experiment
-            library). Use the configuration path on the BioHPC server (via the sl_forgery library).
+            Since this class is used for all Sun lab data structure interactions, this method supports multiple ways of
+            loading class data. If this method is called as part of the sl-experiment new session creation pipeline, use
+            'project_name' argument. If this method is called as part of the sl-forgery data processing pipeline(s), use
+            'configuration_path' argument.
 
         Args:
-            project_name: The name of the project whose configuration file needs to be discovered and loaded. Note, this
-                way of resolving the project is the default way on the VRPC. When processing data on the server, the
-                pipeline preferentially uses the configuration_path.
-            configuration_path: The path to the project_configuration.yaml file from which to load the data. This is
-                an optional way of resolving the configuration data source that always takes precedence over the
-                project_name when both are provided.
+            project_name: The name of the project whose configuration file needs to be discovered and loaded or, if the
+                project does not exist, created.
+            configuration_path: Optional. The path to the project_configuration.yaml file from which to load the data.
+                This way of resolving the configuration data source always takes precedence over the project_name when
+                both are provided.
 
         Returns:
-            An initialized ProjectConfiguration instance.
+            The initialized ProjectConfiguration instance that stores the configuration data for the target project.
         """
-
-        # Ensures console is enabled
-        if not console.enabled:
-            console.enable()
 
         # If the configuration path is not provided, uses the 'default' resolution strategy that involves reading the
         # user's data directory
@@ -191,6 +203,7 @@ class ProjectConfiguration(YamlConfig):
                     "directory that stores all project-specific directories. This is required when resolving project "
                     "configuration based on project's name."
                 )
+                # noinspection PyTypeChecker
                 console.echo(message=message, level=LogLevel.WARNING)
                 root_path_str = input("Local root path: ")
                 root_path = Path(root_path_str)
@@ -223,6 +236,7 @@ class ProjectConfiguration(YamlConfig):
                 f"proceeding further to avoid runtime errors. Also, edit other configuration precursors saved to the "
                 f"same directory to control other aspects of data acquisition and processing."
             )
+            # noinspection PyTypeChecker
             console.echo(message=message, level=LogLevel.WARNING)
 
             # Generates the default project configuration instance and dumps it as a .yaml file. Note, as part of
@@ -230,7 +244,7 @@ class ProjectConfiguration(YamlConfig):
             # user.
             precursor = ProjectConfiguration(local_root_directory=Path(str(configuration_path.parents[2])))
             precursor.project_name = project_name
-            precursor.to_path(path=configuration_path)
+            precursor.save(path=configuration_path)
 
             # Waits for the user to manually configure the newly created file.
             input(f"Enter anything to continue: ")
@@ -263,16 +277,16 @@ class ProjectConfiguration(YamlConfig):
         # Returns the initialized class instance to caller
         return instance
 
-    def to_path(self, path: Path) -> None:
-        """Saves the instance data to disk as a project_configuration.yaml file.
+    def save(self, path: Path) -> None:
+        """Saves class instance data to disk as a project_configuration.yaml file.
 
-        This method is automatically called when the project is created. All future runtimes should use the load()
-        method to load and reuse the configuration data saved to the .yaml file.
+        This method is automatically called when a new project is created. After this method's runtime, all future
+        calls to the load() method will reuse the configuration data saved to the .yaml file.
 
         Notes:
-            This method also generates and dumps multiple other 'precursor' configuration files into the folder. This
-            includes the example 'default' experiment configuration and the DeepLabCut and Suite2P configuration files
-            used during data processing.
+            When this method is used to generate the configuration .yaml file for a new project, it also generates the
+            example 'default_experiment.yaml'. This file is designed to showcase how to write ExperimentConfiguration
+            data files that are used to control Mesoscope-VR system states during experiment session runtimes.
 
         Args:
             path: The path to the .yaml file to save the data to.
@@ -301,15 +315,18 @@ class ProjectConfiguration(YamlConfig):
         original.to_yaml(file_path=path)
 
         # As part of this runtime, also generates and dumps the 'precursor' experiment configuration file.
-        example_experiment = ExperimentConfiguration()
-        example_experiment.to_yaml(path.parent.joinpath("default_experiment.yaml"))
+        experiment_configuration_path = path.parent.joinpath("default_experiment.yaml")
+        if not experiment_configuration_path.exists():
+            example_experiment = ExperimentConfiguration()
+            example_experiment.to_yaml(experiment_configuration_path)
 
     def _verify_data(self) -> None:
-        """Verifies the data loaded from the project_configuration.yaml file to ensure its validity.
+        """Verifies the user-modified data loaded from the project_configuration.yaml file.
 
         Since this class is explicitly designed to be modified by the user, this verification step is carried out to
         ensure that the loaded data matches expectations. This reduces the potential for user errors to impact the
-        runtime behavior of the library. This internal method is automatically called by the load() method.
+        runtime behavior of the libraries using this class. This internal method is automatically called by the load()
+        method.
 
         Notes:
             The method does not verify all fields loaded from the configuration file and instead focuses on fields that
@@ -362,7 +379,7 @@ class RawData:
     includes .mp4 video files from each recorded camera."""
     mesoscope_data_path: str | Path
     """Stores the path to the directory that contains all Mesoscope data acquired during the session. Primarily, this 
-    includes the mesoscope-acquired .tif files (brain activity data) and the motion estimation data."""
+    includes the mesoscope-acquired .tiff files (brain activity data) and the motion estimation data."""
     behavior_data_path: str | Path
     """Stores the path to the directory that contains all behavior data acquired during the session. Primarily, this 
     includes the .npz log files used by data-acquisition libraries to store all acquired data. The data stored in this 
@@ -494,9 +511,9 @@ class RawData:
 class ProcessedData:
     """Stores the paths to the directories and files that make up the 'processed_data' session directory.
 
-    The processed_data directory stores the processed session data, which is generated by running various processing
-    pipelines. These pipelines use raw data to generate processed data, which represents an intermediate step between
-    raw data and the dataset used in the data analysis.
+    The processed_data directory stores the data generated by various processing pipelines from the raw data. Processed
+    data represents an intermediate step between raw data and the dataset used in the data analysis, but is not itself
+    designed to be analyzed.
 
     Notes:
         The paths from this section are typically used only on the BioHPC server. This is because most data processing
@@ -730,30 +747,30 @@ class Destinations:
 
 @dataclass
 class SessionData(YamlConfig):
-    """Provides methods for managing the data of a single experiment or training session across all destinations.
+    """Stores and manages the data layout of a single training or experiment session acquired using the Sun lab
+    Mesoscope-VR system.
 
-    The primary purpose of this class is to maintain the session data structure across all supported destinations. It
-    generates the paths used by all other classes from this library and classes from sl-experiment and sl-forgery
-    libraries.
+    The primary purpose of this class is to maintain the session data structure across all supported destinations and
+    during all processing stages. It generates the paths used by all other classes from all Sun lab libraries that
+    interact with the session's data from the point of its creation and until the data is integrated into an
+    analysis dataset.
 
-    If necessary, the class can be used to either generate a new session or to load an already existing session's data.
-    When the class is used to create a new session, it automatically resolves the new session's name using the current
-    UTC timestamp, down to microseconds. This ensures that each session name is unique and preserves the overall
+    When necessary, the class can be used to either generate a new session or load the layout of an already existing
+    session. When the class is used to create a new session, it generates the new session's name using the current
+    UTC timestamp, accurate to microseconds. This ensures that each session name is unique and preserves the overall
     session order.
 
     Notes:
         If this class is instantiated on the VRPC, it is expected that the BioHPC server, Synology NAS, and ScanImagePC
-        data directories are mounted on the local host-machine via the SMB or equivalent protocol. All manipulations
-        with these destinations are carried out with the assumption that the OS has full access to these directories
-        and filesystems.
-
-        If this class is instantiated on the BioHPC server, some methods from this class will not work as expected. It
-        is essential that this class is not used outside the default sl-experiment and sl-forgery library runtimes to
-        ensure it is used safely.
+        data directories are mounted on the local filesystem via the SMB or equivalent protocol. All manipulations
+        with these destinations are carried out with the assumption that the local OS has full access to these
+        directories and filesystems.
 
         This class is specifically designed for working with the data from a single session, performed by a single
         animal under the specific experiment. The class is used to manage both raw and processed data. It follows the
-        data through acquisition, preprocessing and processing stages of the Sun lab data workflow.
+        data through acquisition, preprocessing and processing stages of the Sun lab data workflow. Together with
+        ProjectConfiguration class, this class serves as an entry point for all interactions with the managed session's
+        data.
     """
 
     project_name: str
@@ -767,31 +784,39 @@ class SessionData(YamlConfig):
     to be set to one of the four supported types: 'Lick training', 'Run training', 'Window checking' or 'Experiment'.
     """
     experiment_name: str | None
-    """Stores the name of the experiment configuration file. If the session_type field is set to 'Experiment', this 
-    field is used to communicate the specific experiment configuration used by the session. During runtime, this is
-    used to load the experiment configuration (to run the experiment) and to save the experiment configuration to the
-    session raw_data folder. If the session is not an experiment session, this is statically set to None."""
+    """Stores the name of the experiment configuration file. If the session_type field is set to 'Experiment' and this 
+    field is not None (null), it communicates the specific experiment configuration used by the session. During runtime,
+    the name stored here is used to load the specific experiment configuration data stored in a .yaml file with the 
+    same name. If the session is not an experiment session, this field is ignored."""
     raw_data: RawData
-    """Stores the paths to various directories and files used to store raw and preprocessed session data. Depending on 
-    class initialization location (VRPC or BioHPC server), the class automatically resolves the root directory path to 
-    either the VRPC project directory or the BioHPC cluster storage volume."""
+    """This section stores the paths to various directories and files that make up the raw_data subfolder. This 
+    subfolder stores all data acquired during training or experiment runtimes before and after preprocessing. Note, the 
+    preprocessing does not change the raw data in any way other than lossless compression and minor format 
+    reorganization. Therefore, the data is considered 'raw' both before and after preprocessing."""
     processed_data: ProcessedData
-    """Stores the paths to various directories used to store processed session data. Note, when this section is 
-    resolved for VRPC, it uses the same local session directory as the raw_data folder. When this is resolved for the 
-    BioHPC server, it uses the 'fast' volume path."""
+    """This section stores the paths to various directories used to store processed session data. Processed data is 
+    generated from raw data by running various processing pipelines, such as suite2p, DeepLabCut and Sun lab's behavior 
+    parsing pipelines. Typically, all data is processed on the BioHPC server and may be stored on a filesystem volume 
+    different from the one that stores the raw data."""
     persistent_data: PersistentData
-    """Stores the paths to various files and directories kept on VRPC and ScanImagePC after the session data is 
-    transferred to long-term storage destinations."""
+    """This section stores the paths to various files and directories that are held back on the VRPC and ScanImagePC 
+    after the session data is transferred to long-term storage destinations as part of preprocessing. Typically, this 
+    data is reused during the acquisition of future runtime session data. This section is not used during data 
+    processing."""
     mesoscope_data: MesoscopeData
-    """Stores the paths to various directories used by the ScanImagePC to store mesoscope-acquired session data, 
-    before it is moved to the VRPC during preprocessing."""
+    """This section stores the paths to various directories used by the ScanImagePC when acquiring mesoscope-related 
+    data. During runtime, the VRPC (behavior data and experiment control) and the ScanImagePC (brain activity data and 
+    Mesoscope control) operate mostly independently of each-other. During preprocessing, the VRPC pulls the data from 
+    the ScanImagePC, using the paths in this section to find the data to be transferred. This section is not used 
+    during data processing."""
     destinations: Destinations
-    """Stores the paths to the destination directories on the BioHPC server and Synology NAS, to which the data is 
-    copied as part of preprocessing. Both of these directories should be accessible for the VRPC's filesystem via an 
-    SMB or equivalent protocol."""
+    """This section stores the paths to the destination directories on the BioHPC server and Synology NAS, to which the 
+    data is copied as part of preprocessing for long-term storage and further processing. Both of these directories 
+    should be mapped (mounted) to the VRPC's filesystem via the SMB or equivalent protocol. This section is not used 
+    during data processing."""
 
     @classmethod
-    def create_session(
+    def create(
         cls,
         animal_id: str,
         session_type: str,
@@ -799,35 +824,38 @@ class SessionData(YamlConfig):
         experiment_name: str | None = None,
         session_name: str | None = None,
     ) -> "SessionData":
-        """Creates a new SessionData object and uses it to generate the session's data structure.
+        """Creates a new SessionData object and generates the new session's data structure.
 
-        This method is used to initialize new session runtimes. It always assumes it is called on the VRPC and, as part
-        of its runtime, resolves and generates the necessary local and ScanImagePC directories to support acquiring and
-        preprocessing session's data.
+        This method is called by sl-experiment runtimes that create new training or experiment sessions to generate the
+        session data directory tree. It always assumes it is called on the VRPC and, as part of its runtime, resolves
+        and generates the necessary local and ScanImagePC directories to support acquiring and preprocessing session's
+        data.
 
         Notes:
-            To load an already existing session data structure, use the load_session() method instead.
+            To load an already existing session data structure, use the load() method instead.
 
             This method automatically dumps the data of the created SessionData instance into the session_data.yaml file
             inside the root raw_data directory of the created hierarchy. It also finds and dumps other configuration
-            files, such as project_configuration.yaml, suite2p_configuration.yaml, and experiment_configuration.yaml.
-            This way, if the session's runtime is interrupted unexpectedly, it can still be processed.
+            files, such as project_configuration.yaml and experiment_configuration.yaml, into the same raw_data
+            directory. This ensures that if the session's runtime is interrupted unexpectedly, the acquired data can
+            still be processed.
 
         Args:
             animal_id: The ID code of the animal for which the data is acquired.
             session_type: The type of the session. Primarily, this determines how to read the session_descriptor.yaml
-                file. Valid options are 'Lick training', 'Run training', or 'Experiment'.
-            experiment_name: The name of the experiment to be executed as part of this session. This option is only used
-                for 'Experiment' session types. It is used to find the target experiment configuration .YAML file and
-                copy it into the session's raw_data directory.
-            project_configuration: The initialized ProjectConfiguration instance that stores the data for the session's
-                project. This is used to determine the root directory paths for all PCs used in the data workflow.
+                file. Valid options are 'Lick training', 'Run training', 'Window checking', or 'Experiment'.
+            experiment_name: The name of the experiment executed during managed session. This optional argument is only
+                used for 'Experiment' session types. It is used to find the experiment configuration .YAML file.
+            project_configuration: The initialized ProjectConfiguration instance that stores the session's project
+                configuration data. This is used to determine the root directory paths for all lab machines used during
+                data acquisition and processing.
             session_name: An optional session_name override. Generally, this argument should not be provided for most
-                use cases. When provided, the method uses this name instead of generating a new timestamp-based name.
-                This is only used when reformatting other data structures to follow Sun lab structure.
+                sessions. When provided, the method uses this name instead of generating a new timestamp-based name.
+                This is only used during the 'ascension' runtime to convert old data structures to the modern
+                lab standards.
 
         Returns:
-            An initialized SessionData instance for the newly created session.
+            An initialized SessionData instance that stores the layout of the newly created session's data.
         """
 
         # Acquires the UTC timestamp to use as the session name
@@ -929,7 +957,7 @@ class SessionData(YamlConfig):
 
         # Saves the configured instance data to the session's folder, so that it can be reused during processing or
         # preprocessing
-        instance._to_path()
+        instance._save()
 
         # Extracts and saves the necessary configuration classes to the session raw_data folder. Note, this list of
         # classes is not exhaustive. More classes are saved as part of the session runtime management class start() and
@@ -955,30 +983,31 @@ class SessionData(YamlConfig):
         return instance
 
     @classmethod
-    def load_session(
+    def load(
         cls,
         session_path: Path,
         on_server: bool,
     ) -> "SessionData":
-        """Loads the SessionData instance from the session_data.yaml file of the target session.
+        """Loads the SessionData instance from the target session's session_data.yaml file.
 
-        This method is used to load the data for an already existing session. This is used to call preprocessing
-        or processing runtime(s) for the target session. Depending on the call location, the method automatically
-        resolves all necessary paths and creates the necessary directories.
+        This method is used to load the data layout information of an already existing session. Primarily, this is used
+        when preprocessing or processing session data. Depending on the call location (machine), the method
+        automatically resolves all necessary paths and creates the necessary directories.
 
         Notes:
-            To create a new session, use the create_session() method instead.
+            To create a new session, use the create() method instead.
 
         Args:
             session_path: The path to the root directory of an existing session, e.g.: vrpc_root/project/animal/session.
             on_server: Determines whether the method is used to initialize an existing session on the VRPC or the
-                BioHPC server.
+                BioHPC server. Note, VRPC runtimes use the same 'root' directory to store raw_data and processed_data
+                subfolders. BioHPC server runtimes use different volumes (drives) to store these subfolders.
 
         Returns:
             An initialized SessionData instance for the session whose data is stored at the provided path.
 
         Raises:
-            FileNotFoundError: If the 'session_data.yaml' file is not found after resolving the provided path.
+            FileNotFoundError: If the 'session_data.yaml' file is not found under the session_path/raw_data/ subfolder.
         """
         # To properly initialize the SessionData instance, the provided path should contain the raw_data directory
         # with session_data.yaml file.
@@ -1025,12 +1054,12 @@ class SessionData(YamlConfig):
         # Returns the initialized SessionData instance to caller
         return instance
 
-    def _to_path(self) -> None:
+    def _save(self) -> None:
         """Saves the instance data to the 'raw_data' directory of the managed session as a 'session_data.yaml' file.
 
         This is used to save the data stored in the instance to disk, so that it can be reused during preprocessing or
         data processing. The method is intended to only be used by the SessionData instance itself during its
-        create_session() method runtime.
+        create() method runtime.
         """
 
         # Copies instance data to prevent it from being modified by reference when executing the steps below
