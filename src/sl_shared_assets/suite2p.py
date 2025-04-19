@@ -52,10 +52,10 @@ class Main:
     """Determines the number of frames to process, if greater than zero. If negative (-1), the suite2p is configured
      to process all available frames."""
 
-    multiplane_parallel: bool = False
-    """Determines whether to parallelize plane processing for multiplane data. This requires a properly configured 
-    server to parallelize the computations and will not work on the local machine. Due to how suite2p is used in the 
-    lab, this has to always be set to False."""
+    multiplane_parallel: bool = True
+    """Determines whether to parallelize plane processing for multiplane data. Assuming that this configuration class is
+    used together with Sun lab optimized suite2p, it is always recommended to have this set to True for most runtimes.
+    """
 
     ignore_flyback: list[int] = field(default_factory=list)
     """The list of plane indices to ignore as flyback planes that typically contain no valid imaging data."""
@@ -162,9 +162,11 @@ class Registration:
     nimg_init: int = 500
     """The number of frames to use to compute the reference image for registration."""
 
-    batch_size: int = 1000
-    """The number of frames to register simultaneously in each batch. This depends on memory constraints. It is faster 
-    to run the registration if the batch is larger, but it requires more RAM."""
+    batch_size: int = 100
+    """The number of frames to register simultaneously in each batch. When processing data on fast (NVME) drives, 
+    increasing this parameter has minimal benefits and results in undue RAM use overhead. Therefore, on fast drives, 
+    keep this number low. On slow drives, increasing this number may result in faster runtime, at the expense of 
+    increased RAM use."""
 
     maxregshift: float = 0.1
     """The maximum allowed shift during registration, given as a fraction of the frame size, in pixels
@@ -444,6 +446,14 @@ class Suite2PConfiguration(YamlConfig):
         for section_name, section in asdict(self).items():
             # Adds all keys and values from each section to the combined dictionary
             if isinstance(section, dict):
+
+                # Since some keys in the original suite2p configuration file use 'unconventional' names, we opted to use
+                # conventional names in our configuration file. To make the 'ops' version of this file fully compatible
+                # with suite2p, we need to translate all such modified keys back to values expected by suite2p.
+                if "one_p_reg" in section.keys():
+                    section["1Preg"] = section.pop("one_p_reg")
                 combined_ops.update(section)
+
+
 
         return combined_ops
