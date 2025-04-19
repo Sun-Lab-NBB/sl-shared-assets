@@ -446,14 +446,11 @@ class Suite2PConfiguration(YamlConfig):
         for section_name, section in asdict(self).items():
             # Adds all keys and values from each section to the combined dictionary
             if isinstance(section, dict):
-
                 # Since some keys in the original suite2p configuration file use 'unconventional' names, we opted to use
                 # conventional names in our configuration file. To make the 'ops' version of this file fully compatible
                 # with suite2p, we need to translate all such modified keys back to values expected by suite2p.
                 if "one_p_reg" in section.keys():
                     section["1Preg"] = section.pop("one_p_reg")
                 combined_ops.update(section)
-
-
 
         return combined_ops
