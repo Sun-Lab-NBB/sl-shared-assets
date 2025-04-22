@@ -19,6 +19,7 @@ from .data_classes import (
     ProcedureData,
     ZaberPositions,
     ExperimentState,
+    ProcessingTracker,
     MesoscopePositions,
     ProjectConfiguration,
     HardwareConfiguration,
@@ -53,6 +54,7 @@ __all__ = [
     "LickTrainingDescriptor",
     "ExperimentConfiguration",
     "MesoscopeExperimentDescriptor",
+    "ProcessingTracker"
     # Transfer tools module
     "transfer_directory",
     # Packaging tools module
