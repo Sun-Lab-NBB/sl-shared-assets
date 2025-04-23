@@ -22,9 +22,9 @@ def replace_local_root_directory(path: str) -> None:
     """Replaces the root directory used to store all lab projects on the local PC with the specified directory.
 
     To ensure all projects are saved in the same location, this library resolves and saves the absolute path to the
-    project directory when it is used for the first time. All future projects reuse the same 'root' path. Since this
-    information is stored in a typically hidden user directory, this CLI can be used to replace the local directory
-    path, if necessary.
+    project directory the first time ProjectConfiguration class instance is created on a new PC. All future projects
+    automatically reuse the same 'root' directory path. Since this information is stored in a typically hidden user
+    directory, this CLI can be used to replace the local directory path, if necessary.
     """
     replace_root_path(path=Path(path))
 
@@ -35,8 +35,7 @@ def replace_local_root_directory(path: str) -> None:
     "--output_directory",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    prompt="Enter the path to the directory where to create the credentials file: ",
-    help="The path to the directory where to create the credentials file.",
+    help="The absolute path to the directory where to create the credentials file.",
 )
 @click.option(
     "-h",
@@ -64,7 +63,8 @@ def replace_local_root_directory(path: str) -> None:
 def generate_server_credentials_file(output_directory: str, host: str, username: str, password: str) -> None:
     """Generates a new server_credentials.yaml file under the specified directory, using input information.
 
-    This CLI is used during the initial PC setup (typically, VRPC) to allow it to access the lab BioHPC server.
+    This CLI is used to set up new PCs to work with the lab BioHPC server. While this is primarily intended for the
+    VRPC, any machined that interacts with BioHPC server can use this CLI to build the access credentials file.
     """
     generate_server_credentials(
         output_directory=Path(output_directory), username=username, password=password, host=host
@@ -77,7 +77,6 @@ def generate_server_credentials_file(output_directory: str, host: str, username:
     "--path",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    prompt="Enter the absolute path to the directory that stores original Tyche animal folders: ",
     help="The absolute path to the directory that stores original Tyche animal folders.",
 )
 @click.option(
@@ -85,7 +84,6 @@ def generate_server_credentials_file(output_directory: str, host: str, username:
     "--output_directory",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    prompt="Enter the absolute path to the local directory where to create the ascended Tyche project hierarchy: ",
     help="The absolute path to the local directory where to create the ascended Tyche project hierarchy.",
 )
 @click.option(
@@ -93,17 +91,18 @@ def generate_server_credentials_file(output_directory: str, host: str, username:
     "--server_directory",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    prompt=(
-        "Enter the path to the SMB-mounted BioHPC server directory where to create the ascended Tyche project "
-        "hierarchy: "
+    help=(
+        "The path to the SMB-mounted BioHPC server directory where to transfer the ascended Tyche project "
+        "hierarchy after it is created."
     ),
-    help="The path to the SMB-mounted BioHPC server directory where to create the ascended Tyche project hierarchy.",
 )
 def ascend_tyche_directory(path: str, output_directory: str, server_directory: str) -> None:
     """Restructures old Tyche project data to use the modern Sun lab data structure.
 
     This CLI is used to convert ('ascend') the old Tyche project data to the modern Sun lab structure. After
-    ascension, the data can be processed and analyzed using all modern Sun lab (sl-) tools and libraries.
+    ascension, the data can be processed and analyzed using all modern Sun lab (sl-) tools and libraries. Note, this
+    process expects the input data to be preprocessed using an old Sun lab mesoscope data preprocessing pipeline. It
+    will not work for any other project or data.
     """
     ascend_tyche_data(
         root_directory=Path(path),

@@ -11,6 +11,8 @@ import datetime
 from dataclasses import dataclass
 
 import paramiko
+
+# noinspection PyProtectedMember
 from simple_slurm import Slurm  # type: ignore
 from paramiko.client import SSHClient
 from ataraxis_base_utilities import LogLevel, console
@@ -36,7 +38,8 @@ class ServerCredentials(YamlConfig):
     pipelines.
 
     Primarily, this is used as part of the sl-experiment library runtime to start data processing once it is
-    transferred to the BioHPC server during preprocessing.
+    transferred to the BioHPC server during preprocessing. However, the same file can be used together with the Server
+    class API to run any computation jobs on the lab's BioHPC server.
     """
 
     username: str = "YourNetID"
@@ -50,16 +53,20 @@ class ServerCredentials(YamlConfig):
 class Server:
     """Encapsulates access to the Sun lab BioHPC processing server.
 
-    This class provides the API that allows accessing the BioHPC server and creating and submitting various
-    SLURM-managed jobs to the server. It functions as the central interface used by all processing pipelines in the
-    lab to execute costly data processing on the server.
+    This class provides the API that allows accessing the BioHPC server to create and submit various SLURM-managed jobs
+    to the server. It functions as the central interface used by all processing pipelines in the lab to execute costly
+    data processing on the server.
 
     Notes:
         All lab processing pipelines expect the data to be stored on the server and all processing logic to be packaged
         and installed into dedicated conda environments on the server.
 
+        This class assumes that the target server has SLURM job manager installed and accessible to the user whose
+        credentials are used to connect to the server as part of this class instantiation.
+
     Args:
-        credentials_path: The path to the.yaml file containing the server hostname and access credentials.
+        credentials_path: The path to the locally stored .yaml file that contains the server hostname and access
+            credentials.
 
         Attributes:
             _open: Tracks whether the connection to the server is open or not.
@@ -186,7 +193,7 @@ class Server:
                 f"generate_slurm_header() Server class method."
             )
             console.error(message, RuntimeError)
-            raise RuntimeError(message)  # This is a fallback to appease mypy, it should not be reachable.
+            raise RuntimeError(message)  # This is a fallback to appease mypy. It should not be reachable.
         job_name = match.group(1)
 
         # Resolves the paths to the local and remote (server-side) .sh script files.

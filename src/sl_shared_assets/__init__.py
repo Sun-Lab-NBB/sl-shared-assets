@@ -5,6 +5,8 @@ API documentation: https://sl-shared-assets-api-docs.netlify.app/
 Authors: Ivan Kondratyev (Inkaros), Kushaan Gupta, Yuantao Deng
 """
 
+from ataraxis_base_utilities import console
+
 from .server import Server, ServerCredentials
 from .suite2p import (
     Suite2PConfiguration,
@@ -30,7 +32,6 @@ from .data_classes import (
 )
 from .transfer_tools import transfer_directory
 from .packaging_tools import calculate_directory_checksum
-from ataraxis_base_utilities import console
 
 # Ensures console is enabled when this library is imported
 if not console.enabled:
@@ -59,7 +60,7 @@ __all__ = [
     "LickTrainingDescriptor",
     "ExperimentConfiguration",
     "MesoscopeExperimentDescriptor",
-    "ProcessingTracker"
+    "ProcessingTracker",
     # Transfer tools module
     "transfer_directory",
     # Packaging tools module

@@ -14,10 +14,6 @@ from .data_classes import SessionData, ProjectConfiguration
 from .transfer_tools import transfer_directory
 from .packaging_tools import calculate_directory_checksum
 
-# Ensures the console is enabled when this file is imported
-if not console.enabled:
-    console.enable()
-
 
 def _generate_session_name(acquisition_path: Path) -> str:
     """Generates a session name using the last modification time of a zstack.mat or MotionEstimator.me file.
