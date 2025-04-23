@@ -15,10 +15,6 @@ from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
 
-# Ensures console is enabled when this file is imported
-if not console.enabled:
-    console.enable()
-
 
 def replace_root_path(path: Path) -> None:
     """Replaces the path to the local root directory used to store all Sun lab projects with the provided path.

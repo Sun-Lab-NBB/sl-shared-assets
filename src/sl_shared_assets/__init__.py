@@ -30,6 +30,11 @@ from .data_classes import (
 )
 from .transfer_tools import transfer_directory
 from .packaging_tools import calculate_directory_checksum
+from ataraxis_base_utilities import console
+
+# Ensures console is enabled when this library is imported
+if not console.enabled:
+    console.enable()
 
 __all__ = [
     # Server module
