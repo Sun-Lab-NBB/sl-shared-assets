@@ -7,7 +7,6 @@ import re
 import copy
 import shutil as sh
 from pathlib import Path
-import warnings
 from dataclasses import field, dataclass
 
 import appdirs
@@ -359,510 +358,510 @@ class ProjectConfiguration(YamlConfig):
 
 @dataclass()
 class RawData:
-    """Stores the paths to the directories and files that make up the 'raw_data' session directory.
+    """Stores the paths to the directories and files that make up the 'raw_data' session-specific directory.
 
     The raw_data directory stores the data acquired during the session runtime before and after preprocessing. Since
     preprocessing does not alter the data, any data in that folder is considered 'raw'. The raw_data folder is initially
     created on the VRPC and, after preprocessing, is copied to the BioHPC server and the Synology NAS for long-term
     storage and further processing.
-
-    Notes:
-        The overall structure of the raw_data directory remains fixed for the entire lifetime of the data. It is reused
-        across all destinations.
     """
 
-    raw_data_path: str | Path
+    raw_data_path: Path = Path()
     """Stores the path to the root raw_data directory of the session. This directory stores all raw data during 
     acquisition and preprocessing. Note, preprocessing does not alter raw data, so at any point in time all data inside
     the folder is considered 'raw'."""
-    camera_data_path: str | Path = "null"
+    camera_data_path: Path = Path()
     """Stores the path to the directory that contains all camera data acquired during the session. Primarily, this 
     includes .mp4 video files from each recorded camera."""
-    mesoscope_data_path: str | Path = "null"
+    mesoscope_data_path: Path = Path()
     """Stores the path to the directory that contains all Mesoscope data acquired during the session. Primarily, this 
     includes the mesoscope-acquired .tiff files (brain activity data) and the motion estimation data."""
-    behavior_data_path: str | Path = "null"
+    behavior_data_path: Path = Path()
     """Stores the path to the directory that contains all behavior data acquired during the session. Primarily, this 
     includes the .npz log files used by data-acquisition libraries to store all acquired data. The data stored in this 
     way includes the camera and mesoscope frame timestamps and the states of Mesoscope-VR components, such as lick 
     sensors, rotary encoders, and other modules."""
-    zaber_positions_path: str | Path = "null"
+    zaber_positions_path: Path = Path()
     """Stores the path to the zaber_positions.yaml file. This file contains the snapshot of all Zaber motor positions 
     at the end of the session. Zaber motors are used to position the LickPort and the HeadBar manipulators, which is 
     essential for supporting proper brain imaging and animal's running behavior during the session."""
-    session_descriptor_path: str | Path = "null"
+    session_descriptor_path: Path = Path()
     """Stores the path to the session_descriptor.yaml file. This file is partially filled by the system during runtime 
     and partially by the experimenter after the runtime. It contains session-specific information, such as the specific
     training parameters, the positions of the Mesoscope objective and the notes made by the experimenter during 
     runtime."""
-    hardware_configuration_path: str | Path = "null"
+    hardware_configuration_path: Path = Path()
     """Stores the path to the hardware_configuration.yaml file. This file contains the partial snapshot of the 
     calibration parameters used by the Mesoscope-VR system components during runtime. Primarily, this is used during 
     data processing to read the .npz data log files generated during runtime."""
-    surgery_metadata_path: str | Path = "null"
+    surgery_metadata_path: Path = Path()
     """Stores the path to the surgery_metadata.yaml file. This file contains the most actual information about the 
     surgical intervention(s) performed on the animal prior to the session."""
-    project_configuration_path: str | Path = "null"
+    project_configuration_path: Path = Path()
     """Stores the path to the project_configuration.yaml file. This file contains the snapshot of the configuration 
     parameters for the session's project."""
-    session_data_path: str | Path = "null"
+    session_data_path: Path = Path()
     """Stores the path to the session_data.yaml file. This path is used b y the SessionData instance to save itself to 
     disk as a .yaml file. The file contains all paths used during data acquisition and processing on both the VRPC and 
     the BioHPC server."""
-    experiment_configuration_path: str | Path = "null"
+    experiment_configuration_path: Path = Path()
     """Stores the path to the experiment_configuration.yaml file. This file contains the snapshot of the 
     experiment runtime configuration used by the session. This file is only created for experiment session. It does not
     exist for behavior training sessions."""
-    mesoscope_positions_path: str | Path = "null"
+    mesoscope_positions_path: Path = Path()
     """Stores the path to the mesoscope_positions.yaml file. This file contains the snapshot of the positions used
     by the Mesoscope at the end of the session. This includes both the physical position of the mesoscope objective and
     the 'virtual' tip, tilt, and fastZ positions set via ScanImage software. This file is only created for experiment 
     sessions that use the mesoscope, it is omitted for behavior training sessions."""
-    window_screenshot_path: str | Path = "null"
+    window_screenshot_path: Path = Path()
     """Stores the path to the .png screenshot of the ScanImagePC screen. The screenshot should contain the image of the 
     cranial window and the red-dot alignment windows. This is used to generate a visual snapshot of the cranial window
     alignment and appearance for each experiment session. This file is only created for experiment sessions that use 
     the mesoscope, it is omitted for behavior training sessions."""
-    telomere_path: str | Path = "null"
+    telomere_path: Path = Path()
     """Stores the path to the telomere.bin file. This file is created by the data processing pipelines running on the 
-    BioHPC server to confirm that the raw_data transferred to the server was not altered or damage in transmission. This
-    path is used by the BioHPC server pipeline. The VRPC uses the path stored in the 'destinations' section to check 
-    for the existence of the file when it purges redundant data."""
-    checksum_path: str | Path = "null"
+    BioHPC server to confirm that the raw_data transferred to the server was not altered or damage in transmission."""
+    checksum_path: Path = Path()
     """Stores the path to the ax_checksum.txt file. This file is generated as part of packaging the data for 
     transmission and stores the xxHash-128 checksum of the data. It is used to verify that the transmission did not 
-    damage or otherwise alter the data.."""
+    damage or otherwise alter the data."""
 
-    def __post_init__(self) -> None:
-        """This method is automatically called after class instantiation and ensures that all path fields of the class
-        are converted to Path objects.
-        """
+    def resolve_paths(self, root_directory_path: Path) -> None:
+        """Resolves all paths managed by the class instance based on the input root directory path.
 
-        # Translates the root raw_data path to the Path object before using it to determine other Path objects.
-        self.raw_data_path = Path(self.raw_data_path)
-
-        # When the class is instantiated for the first time, resolves all 'null' path placeholders
-        if self.camera_data_path == "null":
-            self.camera_data_path = self.raw_data_path.joinpath("camera_data")
-        if self.mesoscope_data_path == "null":
-            self.mesoscope_data_path = self.raw_data_path.joinpath("mesoscope_data")
-        if self.behavior_data_path == "null":
-            self.behavior_data_path = self.raw_data_path.joinpath("behavior_data")
-        if self.zaber_positions_path == "null":
-            self.zaber_positions_path = self.raw_data_path.joinpath("zaber_positions.yaml")
-        if self.session_descriptor_path == "null":
-            self.session_descriptor_path = self.raw_data_path.joinpath("session_descriptor.yaml")
-        if self.hardware_configuration_path == "null":
-            self.hardware_configuration_path = self.raw_data_path.joinpath("hardware_configuration.yaml")
-        if self.surgery_metadata_path == "null":
-            self.surgery_metadata_path = self.raw_data_path.joinpath("surgery_metadata.yaml")
-        if self.project_configuration_path == "null":
-            self.project_configuration_path = self.raw_data_path.joinpath("project_configuration.yaml")
-        if self.session_data_path == "null":
-            self.session_data_path = self.raw_data_path.joinpath("session_data.yaml")
-        if self.experiment_configuration_path == "null":
-            self.experiment_configuration_path = self.raw_data_path.joinpath("experiment_configuration.yaml")
-        if self.mesoscope_positions_path == "null":
-            self.mesoscope_positions_path = self.raw_data_path.joinpath("mesoscope_positions.yaml")
-        if self.window_screenshot_path == "null":
-            self.window_screenshot_path = self.raw_data_path.joinpath("window_screenshot.png")
-        if self.telomere_path == "null":
-            self.telomere_path = self.raw_data_path.joinpath("telomere.bin")
-        if self.checksum_path == "null":
-            self.checksum_path = self.raw_data_path.joinpath("ax_checksum.txt")
-
-    def make_string(self) -> None:
-        """Converts all Path objects stored inside the class to strings.
-
-        This transformation is required to support dumping class data into a .YAML file so that the data can be stored
-        on disk.
-        """
-        self.raw_data_path = str(self.raw_data_path)
-        self.camera_data_path = str(self.camera_data_path)
-        self.mesoscope_data_path = str(self.mesoscope_data_path)
-        self.behavior_data_path = str(self.behavior_data_path)
-        self.zaber_positions_path = str(self.zaber_positions_path)
-        self.session_descriptor_path = str(self.session_descriptor_path)
-        self.hardware_configuration_path = str(self.hardware_configuration_path)
-        self.surgery_metadata_path = str(self.surgery_metadata_path)
-        self.project_configuration_path = str(self.project_configuration_path)
-        self.session_data_path = str(self.session_data_path)
-        self.experiment_configuration_path = str(self.experiment_configuration_path)
-        self.mesoscope_positions_path = str(self.mesoscope_positions_path)
-        self.window_screenshot_path = str(self.window_screenshot_path)
-        self.telomere_path = str(self.telomere_path)
-        self.checksum_path = str(self.checksum_path)
-
-    def make_dirs(self) -> None:
-        """Ensures that all major subdirectories and the root raw_data directory exist.
-
-        This method is used by the VRPC to generate the raw_data directory when it creates a new session.
-        """
-        ensure_directory_exists(Path(self.raw_data_path))
-        ensure_directory_exists(Path(self.camera_data_path))
-        ensure_directory_exists(Path(self.mesoscope_data_path))
-        ensure_directory_exists(Path(self.behavior_data_path))
-
-    def switch_root(self, new_root: Path) -> None:
-        """Changes the root of the managed raw_data directory to the provided root path.
-
-        This service method is used by the SessionData class to convert all paths in this class to be relative to the
-        new root. This is used to adjust the SessionData instance to work for the VRPC (one root) or the BioHPC server
-        (another root). This method is only implemented for subclasses intended to be used both locally and on the
-        BioHPC server.
-
-        Note:
-            This is the only class that contains this method. Other classes are re-initialized using the data loaded
-            from the RawData section, if necessary.
+        This method is called each time the class is instantiated to regenerate the managed path hierarchy on any
+        machine that instantiates the class.
 
         Args:
-            new_root: The new root directory to use for all paths inside the instance. This has to be the path to the
-                directory that stores all Sun lab projects on the target machine.
+            root_directory_path: The path to the top-level directory of the local hierarchy. Depending on the managed
+                hierarchy, this has to point to a directory under the main /session, /animal, or /project directory of
+                the managed session.
         """
-        # Gets current root from the raw_data_path.
-        old_root = Path(self.raw_data_path).parents[3]
 
-        # Updates all paths by replacing old_root with new_root
-        self.raw_data_path = new_root.joinpath(Path(self.raw_data_path).relative_to(old_root))
-        self.camera_data_path = new_root.joinpath(Path(self.camera_data_path).relative_to(old_root))
-        self.mesoscope_data_path = new_root.joinpath(Path(self.mesoscope_data_path).relative_to(old_root))
-        self.behavior_data_path = new_root.joinpath(Path(self.behavior_data_path).relative_to(old_root))
-        self.zaber_positions_path = new_root.joinpath(Path(self.zaber_positions_path).relative_to(old_root))
-        self.session_descriptor_path = new_root.joinpath(Path(self.session_descriptor_path).relative_to(old_root))
-        self.hardware_configuration_path = new_root.joinpath(
-            Path(self.hardware_configuration_path).relative_to(old_root)
-        )
-        self.surgery_metadata_path = new_root.joinpath(Path(self.surgery_metadata_path).relative_to(old_root))
-        self.project_configuration_path = new_root.joinpath(Path(self.project_configuration_path).relative_to(old_root))
-        self.session_data_path = new_root.joinpath(Path(self.session_data_path).relative_to(old_root))
-        self.experiment_configuration_path = new_root.joinpath(
-            Path(self.experiment_configuration_path).relative_to(old_root)
-        )
-        self.mesoscope_positions_path = new_root.joinpath(Path(self.mesoscope_positions_path).relative_to(old_root))
-        self.window_screenshot_path = new_root.joinpath(Path(self.window_screenshot_path).relative_to(old_root))
-        self.telomere_path = new_root.joinpath(Path(self.telomere_path).relative_to(old_root))
-        self.checksum_path = new_root.joinpath(Path(self.checksum_path).relative_to(old_root))
+        # Generates the managed paths
+        self.raw_data_path = root_directory_path
+        self.camera_data_path = self.raw_data_path.joinpath("camera_data")
+        self.mesoscope_data_path = self.raw_data_path.joinpath("mesoscope_data")
+        self.behavior_data_path = self.raw_data_path.joinpath("behavior_data")
+        self.zaber_positions_path = self.raw_data_path.joinpath("zaber_positions.yaml")
+        self.session_descriptor_path = self.raw_data_path.joinpath("session_descriptor.yaml")
+        self.hardware_configuration_path = self.raw_data_path.joinpath("hardware_configuration.yaml")
+        self.surgery_metadata_path = self.raw_data_path.joinpath("surgery_metadata.yaml")
+        self.project_configuration_path = self.raw_data_path.joinpath("project_configuration.yaml")
+        self.session_data_path = self.raw_data_path.joinpath("session_data.yaml")
+        self.experiment_configuration_path = self.raw_data_path.joinpath("experiment_configuration.yaml")
+        self.mesoscope_positions_path = self.raw_data_path.joinpath("mesoscope_positions.yaml")
+        self.window_screenshot_path = self.raw_data_path.joinpath("window_screenshot.png")
+        self.telomere_path = self.raw_data_path.joinpath("telomere.bin")
+        self.checksum_path = self.raw_data_path.joinpath("ax_checksum.txt")
+
+    def make_directories(self) -> None:
+        """Ensures that all major subdirectories and the root directory exist."""
+        ensure_directory_exists(self.raw_data_path)
+        ensure_directory_exists(self.camera_data_path)
+        ensure_directory_exists(self.mesoscope_data_path)
+        ensure_directory_exists(self.behavior_data_path)
+
+
+@dataclass()
+class DeepLabCutData:
+    """Stores the paths to the directories and files that make up the 'deeplabcut' project-specific directory.
+
+    DeepLabCut (DLC) is used to track animal body parts and poses in video data acquired during experiment and training
+    sessions. Since DLC is designed to work with projects, rather than single animals or sessions, each Sun lab
+    project data hierarchy contains a dedicated 'deeplabcut' directory under the root project directory. The contents of
+    that directory are largely managed by the DLC itself. Therefore, each session of a given project refers to and
+    uses the same 'deeplabcut' directory.
+    """
+
+    deeplabcut_path: Path = Path()
+    """Stores the path to the project-specific DeepLabCut directory. This folder stores all DeepLabCut data specific to
+    a single project, which is reused during the processing of all sessions of the project."""
+
+    def resolve_paths(self, root_directory_path: Path) -> None:
+        """Resolves all paths managed by the class instance based on the input root directory path.
+
+        This method is called each time the class is instantiated to regenerate the managed path hierarchy on any
+        machine that instantiates the class.
+
+        Args:
+            root_directory_path: The path to the top-level directory of the local hierarchy. Depending on the managed
+                hierarchy, this has to point to a directory under the main /session, /animal, or /project directory of
+                the managed session.
+        """
+
+        # Generates the managed paths
+        self.deeplabcut_path = root_directory_path
+
+    def make_directories(self) -> None:
+        """Ensures that all major subdirectories and the root directory exist."""
+        ensure_directory_exists(self.deeplabcut_path)
+
+
+@dataclass()
+class ConfigurationData:
+    """Stores the paths to the directories and files that make up the 'configuration' project-specific directory.
+
+    The configuration directory contains various configuration files and settings used by data acquisition,
+    preprocessing, and processing pipelines in the lab. Generally, all configuration settings are defined once for each
+    project and are reused for every session within the project. Therefore, this directory is created under each main
+    project directory.
+
+    Notes:
+        Some attribute names inside this section match the names in the RawData section. This is intentional, as some
+        configuration files are copied into the raw_data session directories to allow reinstating the session data
+        hierarchy across machines.
+    """
+
+    configuration_path: Path = Path()
+    """Stores the path to the project-specific configuration directory. This directory is used by all animals 
+    and sessions of the project to store all pan-project configuration files. The configuration data is reused by all
+    sessions in the project."""
+    experiment_configuration_path: Path = Path()
+    """Stores the path to the experiment_configuration.yaml file. This file contains the snapshot of the 
+    experiment runtime configuration used by the session. This file is only created for experiment session. It does not
+    exist for behavior training sessions."""
+    project_configuration_path: Path = Path()
+    """Stores the path to the project_configuration.yaml file. This file contains the snapshot of the configuration 
+    parameters for the session's project."""
+    suite2p_configuration_path: Path = Path()
+    """Stores the path to the suite2p_configuration.yaml file stored inside the project's 'configuration' directory on
+    the fast BioHPC server volume. This configuration file specifies the parameters for the 'single day' suite2p 
+    registration pipeline, which is applied to each session that generates brain activity data."""
+    multiday_configuration_path: Path = Path()
+    """Stores the path to the multiday_configuration.yaml file stored inside the project's 'configuration' directory 
+    on the fast BioHPC server volume. This configuration file specifies the parameters for the 'multiday' 
+    sl-suite2p-based registration pipelines used tot rack brain cells across multiple sessions."""
+
+    def resolve_paths(self, root_directory_path: Path, experiment_name: str | None = None) -> None:
+        """Resolves all paths managed by the class instance based on the input root directory path.
+
+        This method is called each time the class is instantiated to regenerate the managed path hierarchy on any
+        machine that instantiates the class.
+
+        Args:
+            root_directory_path: The path to the top-level directory of the local hierarchy. Depending on the managed
+                hierarchy, this has to point to a directory under the main /session, /animal, or /project directory of
+                the managed session.
+            experiment_name: Optionally specifies the name of the experiment executed as part of the managed session's
+                runtime. This is used to correctly configure the path to the specific ExperimentConfiguration data file.
+                If the managed session is not an Experiment session, this parameter should be set to None.
+        """
+
+        # Generates the managed paths
+        self.configuration_path = root_directory_path
+        if experiment_name is None:
+            self.experiment_configuration_path = self.configuration_path.joinpath("null")
+        else:
+            self.experiment_configuration_path = self.configuration_path.joinpath(f"{experiment_name}.yaml")
+        self.project_configuration_path = self.configuration_path.joinpath("project_configuration.yaml")
+        self.suite2p_configuration_path = self.configuration_path.joinpath("suite2p_configuration.yaml")
+        self.multiday_configuration_path = self.configuration_path.joinpath("multiday_configuration.yaml")
+
+    def make_directories(self) -> None:
+        """Ensures that all major subdirectories and the root directory exist."""
+        ensure_directory_exists(self.configuration_path)
 
 
 @dataclass()
 class ProcessedData:
-    """Stores the paths to the directories and files that make up the 'processed_data' session directory.
+    """Stores the paths to the directories and files that make up the 'processed_data' session-specific directory.
 
-    The processed_data directory stores the data generated by various processing pipelines from the raw data. Processed
-    data represents an intermediate step between raw data and the dataset used in the data analysis, but is not itself
-    designed to be analyzed.
+    The processed_data directory stores the data generated by various processing pipelines from the raw data (contents
+    of the raw_data directory). Processed data represents an intermediate step between raw data and the dataset used in
+    the data analysis, but is not itself designed to be analyzed.
 
     Notes:
         The paths from this section are typically used only on the BioHPC server. This is because most data processing
         in the lab is performed using the processing server's resources. On the server, processed data is stored on
-        the fast volume, in contrast to raw data, which is stored on the slow volume. However, to support local testing,
-        the class resolves the paths in this section both locally and globally (on the server).
+        the fast (NVME) drive volume, in contrast to raw data, which is stored on the slow (SSD) drive volume.
 
+        When this class is instantiated on a machine other than BioHPC server, for example, to test processing
+        pipelines, it uses the same drive as the raw_data folder to create the processed_data folder. This relies on the
+        assumption that non-server machines in the lab only use fast NVME drives, so there is no need to separate
+        storage and processing volumes.
     """
 
-    processed_data_path: str | Path
+    processed_data_path: Path = Path()
     """Stores the path to the root processed_data directory of the session. This directory stores the processed data 
     as it is generated by various data processing pipelines."""
-    deeplabcut_path: str | Path
-    """Stores the path to the root DeepLabCut project directory. Since DeepLabCut adopts a project-based directory 
-    management hierarchy, it is easier to have a single DLC folder shared by all animals and sessions of a given 
-    project. This root folder is typically stored under the main project directory on the fast BioHPC server volume."""
-    configuration_path: str | Path
-    """Stores the path to the project's processed data configuration directory. This directory is used by all animals 
-    and sessions of the project to store data processing configuration files. Since processing configuration is 
-    typically reused for all data in the project, this allows updating a single file to control the processing for all 
-    data. This directory is typically stored on the fast BioHPC server volume."""
-    camera_data_path: str | Path = "null"
-    """Stores the output of the DeepLabCut pose estimation pipeline."""
-    mesoscope_data_path: str | Path = "null"
-    """Stores the output of the suite2p cell registration pipeline."""
-    behavior_data_path: str | Path = "null"
-    """Stores the output of the Sun lab behavior data extraction pipeline."""
-    suite2p_configuration_path: str | Path = "null"
-    """Stores the path to the suite2p_configuration.yaml file stored inside the project's 'configuration' directory on
-    the fast BioHPC server volume. This configuration file specifies the parameters for the 'single day' suite2p 
-    registration pipeline, which is applied to each session that generates brain activity data."""
-    processing_tracker_path: str | Path = "null"
-    """Stores the path to the processing_tracker.yaml file stored inside the sessions' root processed_data directory on 
-    the fast BioHPC server volume. This file is used to track which processing pipelines to apply to the target 
-    session and the status (success / failure) of each processing step.
+    camera_data_path: Path = Path()
+    """Stores the path to the directory that contains video tracking data generated by our DeepLabCut-based video 
+    processing pipelines."""
+    mesoscope_data_path: Path = Path()
+    """Stores path to the directory that contains processed brain activity (cell) data generated by our suite2p-based 
+    photometry processing pipelines (single day and multi day)."""
+    behavior_data_path: Path = Path()
+    """Stores the path to the directory that contains the non-video behavior and system runtime data extracted from 
+    .npz log files by our in-house log parsing pipeline."""
+    job_logs_path: Path = Path()
+    """Stores the path to the directory that stores the standard output and standard error data collected during 
+    server-side data processing pipeline runtimes. Since we use SLURM job manager to execute multiple compute jobs on 
+    the BioHPC server, all information sent to the terminal during runtime is redirected to text files stored in this
+    directory."""
+    processing_tracker_path: Path = Path()
+    """Stores the path to the processing_tracker.yaml file stored inside the sessions' root processed_data directory. 
+    This file is used to track which processing pipelines need to be applied to the target session and the status 
+    (success / failure) each of these pipelines. Primarily, this is used to optimize data processing to avoid redundant 
+    operations.
     """
-    multiday_configuration_path: str | Path = "null"
-    """Stores the path to the multiday_configuration.yaml file stored inside the project's 'configuration' directory 
-    on the fast BioHPC server volume. This configuration file specifies the parameters for the 'multiday' 
-    sl-suite2p-based registration pipelines used tot rack brain cells across multiple sessions."""
 
-    def __post_init__(self) -> None:
-        """This method is automatically called after class instantiation and ensures that all path fields of the class
-        are converted to Path objects.
+    def resolve_paths(self, root_directory_path: Path) -> None:
+        """Resolves all paths managed by the class instance based on the input root directory path.
+
+        This method is called each time the class is instantiated to regenerate the managed path hierarchy on any
+        machine that instantiates the class.
+
+        Args:
+            root_directory_path: The path to the top-level directory of the local hierarchy. Depending on the managed
+                hierarchy, this has to point to a directory under the main /session, /animal, or /project directory of
+                the managed session.
         """
+        # Generates the managed paths
+        self.processed_data_path = root_directory_path
+        self.camera_data_path = self.processed_data_path.joinpath("camera_data")
+        self.mesoscope_data_path = self.processed_data_path.joinpath("mesoscope_data")
+        self.behavior_data_path = self.processed_data_path.joinpath("behavior_data")
+        self.job_logs_path = self.processed_data_path.joinpath("job_logs")
+        self.processing_tracker_path = self.processed_data_path.joinpath("processing_tracker.yaml")
 
-        # Ensures all objects that have to be provided externally are transformed to Path objects. Unlike 'null' fields,
-        # these paths cannot be resolved automatically
-        self.processed_data_path = Path(self.processed_data_path)
-        self.deeplabcut_path = Path(self.deeplabcut_path)
-        self.configuration_path = Path(self.configuration_path)
+    def make_directories(self) -> None:
+        """Ensures that all major subdirectories and the root directory exist."""
 
-        # When the class is instantiated for the first time, resolves all 'null' path placeholders
-        if self.camera_data_path == "null":
-            self.camera_data_path = self.processed_data_path.joinpath("camera_data")
-        if self.mesoscope_data_path == "null":
-            self.mesoscope_data_path = self.processed_data_path.joinpath("mesoscope_data")
-        if self.behavior_data_path == "null":
-            self.behavior_data_path = self.processed_data_path.joinpath("behavior_data")
-        if self.suite2p_configuration_path == "null":
-            self.suite2p_configuration_path = self.processed_data_path.joinpath("suite2p_configuration.yaml")
-        if self.processing_tracker_path == "null":
-            self.processing_tracker_path = self.processed_data_path.joinpath("processing_tracker.yaml")
-        if self.multiday_configuration_path == "null":
-            self.multiday_configuration_path = self.processed_data_path.joinpath("multiday_configuration.yaml")
-
-    def make_string(self) -> None:
-        """Converts all Path objects stored inside the class to strings.
-
-        This transformation is required to support dumping class data into a .YAML file so that the data can be stored
-        on disk.
-        """
-        self.processed_data_path = str(self.processed_data_path)
-        self.deeplabcut_path = str(self.deeplabcut_path)
-        self.configuration_path = str(self.configuration_path)
-        self.camera_data_path = str(self.camera_data_path)
-        self.mesoscope_data_path = str(self.mesoscope_data_path)
-        self.behavior_data_path = str(self.behavior_data_path)
-        self.suite2p_configuration_path = str(self.suite2p_configuration_path)
-        self.processing_tracker_path = str(self.processing_tracker_path)
-        self.multiday_configuration_path = str(self.multiday_configuration_path)
-
-    def make_dirs(self) -> None:
-        """Ensures that all major subdirectories of the processed_data directory exist.
-
-        This method is used by the BioHPC server to generate the processed_data directory as part of the sl-forgery
-        library runtime.
-        """
-        ensure_directory_exists(Path(self.processed_data_path))
-        ensure_directory_exists(Path(self.deeplabcut_path))
-        ensure_directory_exists(Path(self.configuration_path))
-        ensure_directory_exists(Path(self.camera_data_path))
-        ensure_directory_exists(Path(self.mesoscope_data_path))
-        ensure_directory_exists(Path(self.behavior_data_path))
+        ensure_directory_exists(self.processed_data_path)
+        ensure_directory_exists(self.camera_data_path)
+        ensure_directory_exists(self.mesoscope_data_path)
+        ensure_directory_exists(self.behavior_data_path)
+        ensure_directory_exists(self.job_logs_path)
 
 
 @dataclass()
-class PersistentData:
-    """Stores the paths to the directories and files that make up the 'persistent_data' directories of the VRPC and
-    the ScanImagePC.
+class VRPCPersistentData:
+    """Stores the paths to the directories and files that make up the 'persistent_data' directory on the VRPC.
 
-    Persistent data directories are used to keep certain files on the VRPC and the ScanImagePC. Typically, this data
-    is reused during the following sessions. For example, a copy of Zaber motor positions is persisted on the VRPC for
-    each animal after every session to support automatically restoring Zaber motors to the positions used during the
-    previous session.
+    Persistent data directories are only used during data acquisition. Therefore, unlike most other directories, they
+    are purposefully designed for specific PCs that participate in data acquisition. This section manages the
+    animal-specific persistent_data directory stored on the VRPC.
 
-    Notes:
-        Persistent data includes the project and experiment configuration data. Some persistent data is overwritten
-        after each session, other data is generated once and kept through the animal's lifetime. Primarily, this data is
-        only used internally by the sl-experiment or sl-forgery libraries and is not intended for end-users.
+    VRPC persistent data directory is used to preserve configuration data, such as the positions of Zaber motors and
+    Meososcope objective, so that they can be reused across sessions of the same animals. The data in this directory
+    is read at the beginning of each session and replaced at the end of each session.
     """
 
-    scanimage_persistent_path: str | Path
+    persistent_data_path: Path = Path()
     """Stores the path to the project and animal specific 'persistent_data' directory to which the managed session 
-    belongs, relative to the ScanImagePC root. This directory is primarily used to store reference motion registration 
-    data acquired during the first experiment session for each animal."""
-    vrpc_persistent_path: str | Path
-    """Stores the path to the project and animal specific 'persistent_data' directory to which the managed session 
-    belongs, relative to the VRPC root. This directory is primarily used to back up the Zaber and Mesoscope positions, 
-    so that they can be restored between sessions of the same animals."""
-    zaber_positions_path: str | Path = "null"
+    belongs, relative to the VRPC root. This directory is exclusively used on the VRPC."""
+    zaber_positions_path: Path = Path()
     """Stores the path to the Zaber motor positions snapshot generated at the end of the previous session runtime. This 
     is used to automatically restore all Zaber motors to the same position across all sessions."""
-    mesoscope_positions_path: str | Path = "null"
+    mesoscope_positions_path: Path = Path()
     """Stores the path to the Mesoscope positions snapshot generated at the end of the previous session runtime. This 
     is used to help the user to (manually) restore the Mesoscope to the same position across all sessions."""
-    motion_estimator_path: str | Path = "null"
+
+    def resolve_paths(self, root_directory_path: Path) -> None:
+        """Resolves all paths managed by the class instance based on the input root directory path.
+
+        This method is called each time the class is instantiated to regenerate the managed path hierarchy on any
+        machine that instantiates the class.
+
+        Args:
+            root_directory_path: The path to the top-level directory of the local hierarchy. Depending on the managed
+                hierarchy, this has to point to a directory under the main /session, /animal, or /project directory of
+                the managed session.
+        """
+
+        # Generates the managed paths
+        self.persistent_data_path = root_directory_path
+        self.zaber_positions_path = self.persistent_data_path.joinpath("zaber_positions.yaml")
+        self.mesoscope_positions_path = self.persistent_data_path.joinpath("mesoscope_positions.yaml")
+
+    def make_directories(self) -> None:
+        """Ensures that all major subdirectories and the root directory exist."""
+
+        ensure_directory_exists(self.persistent_data_path)
+
+
+@dataclass()
+class ScanImagePCPersistentData:
+    """Stores the paths to the directories and files that make up the 'persistent_data' directory on the ScanImagePC.
+
+    Persistent data directories are only used during data acquisition. Therefore, unlike most other directories, they
+    are purposefully designed for specific PCs that participate in data acquisition. This section manages the
+    animal-specific persistent_data directory stored on the ScanImagePC (Mesoscope PC).
+
+    ScanImagePC persistent data directory is used to preserve the motion estimation snapshot, generated during the first
+    experiment session. This is necessary to align the brain recording field of view across sessions. In turn, this
+    is used to carry out 'online' motion and z-drift correction, improving the accuracy of across-day (multi-day)
+    cell tracking.
+    """
+
+    persistent_data_path: Path = Path()
+    """Stores the path to the project and animal specific 'persistent_data' directory to which the managed session 
+    belongs, relative to the ScanImagePC root. This directory is exclusively used on the ScanImagePC (Mesoscope PC)."""
+    motion_estimator_path: Path = Path()
     """Stores the 'reference' motion estimator file generated during the first experiment session of each animal. This 
     file is kept on the ScanImagePC to image the same population of cells across all experiment sessions."""
 
-    def __post_init__(self) -> None:
-        """This method is automatically called after class instantiation and ensures that all path fields of the class
-        are converted to Path objects.
+    def resolve_paths(self, root_directory_path: Path) -> None:
+        """Resolves all paths managed by the class instance based on the input root directory path.
+
+        This method is called each time the class is instantiated to regenerate the managed path hierarchy on any
+        machine that instantiates the class.
+
+        Args:
+            root_directory_path: The path to the top-level directory of the local hierarchy. Depending on the managed
+                hierarchy, this has to point to a directory under the main /session, /animal, or /project directory of
+                the managed session.
         """
 
-        # Converts 'anchor' paths that have to be provided at class instantiation
-        self.scanimage_persistent_path = Path(self.scanimage_persistent_path)
-        self.vrpc_persistent_path = Path(self.vrpc_persistent_path)
+        # Generates the managed paths
+        self.persistent_data_path = root_directory_path
+        self.motion_estimator_path = self.persistent_data_path.joinpath("MotionEstimator.me")
 
-        # Replaces 'null' defaults with automatically resolved paths
-        if self.zaber_positions_path == "null":
-            self.zaber_positions_path = self.vrpc_persistent_path.joinpath("zaber_positions.yaml")
-        if self.mesoscope_positions_path == "null":
-            self.mesoscope_positions_path = self.vrpc_persistent_path.joinpath("mesoscope_positions.yaml")
-        if self.motion_estimator_path == "null":
-            self.motion_estimator_path = self.scanimage_persistent_path.joinpath("MotionEstimator.me")
+    def make_directories(self) -> None:
+        """Ensures that all major subdirectories and the root directory exist."""
 
-    def make_string(self) -> None:
-        """Converts all Path objects stored inside the class to strings.
-
-        This transformation is required to support dumping class data into a .YAML file so that the data can be stored
-        on disk.
-        """
-        self.scanimage_persistent_path = str(self.scanimage_persistent_path)
-        self.vrpc_persistent_path = str(self.vrpc_persistent_path)
-        self.zaber_positions_path = str(self.zaber_positions_path)
-        self.mesoscope_positions_path = str(self.mesoscope_positions_path)
-        self.motion_estimator_path = str(self.motion_estimator_path)
-
-    def make_dirs(self) -> None:
-        """Ensures that the VRPC and the ScanImagePC persistent_data directories exist."""
-
-        # We need to call ensure_directory_exists one for each unique directory tree
-        ensure_directory_exists(Path(self.vrpc_persistent_path))  # vrpc_root/project/animal/persistent_data
-        ensure_directory_exists(Path(self.scanimage_persistent_path))  # scanimagepc_root/project/animal/persistent_data
+        ensure_directory_exists(self.persistent_data_path)
 
 
 @dataclass()
 class MesoscopeData:
-    """Stores the paths to the directories used by the ScanImagePC to save mesoscope-generated data during session
-    runtime.
+    """Stores the paths to the directories and files that make up the 'meso_data' directory on the ScanImagePC.
 
-    The ScanImagePC is largely isolated from the VRPC during runtime. For the VRPC to pull the data acquired by the
-    ScanImagePC, it has to use the predefined directory structure to save the data. This class stores the predefined
-    path to various directories where ScanImagePC is expected to save the data and store it after acquisition.sers.
+    The meso_data directory is the root directory where all mesoscope-generated data is stored on the ScanImagePC. The
+    path to this directory should be given relative to the VRPC root and be mounted to the VRPC filesystem via the
+    SMB or equivalent protocol.
+
+    During runtime, the ScanImagePC should organize all collected data under this root directory. During preprocessing,
+    the VRPC uses SMB to access the data in this directory and merge it into the 'raw_data' session directory. The paths
+    in this section, therefore, are specific to the VRPC and are not used on other PCs.
     """
 
-    root_data_path: str | Path
+    meso_data_path: Path = Path()
     """Stores the path to the root ScanImagePC data directory, mounted to the VRPC filesystem via the SMB or equivalent 
-    protocol. This path is used during experiment session runtimes to discover the cranial window screenshots 
-    taken by the user before starting the experiment."""
-    session_specific_path: str | Path
+    protocol. All mesoscope-generated data is stored under this root directory before it is merged into the VRPC-managed
+    raw_data directory of each session."""
+    mesoscope_data_path: Path = Path()
+    """Stores the path to the 'default' mesoscope_data directory. All experiment sessions across all animals and 
+    projects use the same mesoscope_data directory to save the data generated by the mesoscope via ScanImage 
+    software. This simplifies ScanImagePC configuration process during runtime, as all data is always saved in the same
+    directory. During preprocessing, the data is moved from the default directory first into a session-specific 
+    ScanImagePC directory and then into the VRPC raw_data session directory."""
+    session_specific_path: Path = Path()
     """Stores the path to the session-specific data directory. This directory is generated at the end of each experiment
-    runtime to prepare mesoscope data for further processing and to reset the 'shared' folder for the next session's 
-    runtime."""
-    mesoscope_data_path: str | Path = "null"
-    """Stores the path to the 'general' mesoscope_data directory. All experiment sessions (across all animals and 
-    projects) use the same mesoscope_data directory to save the data generated by the mesoscope via ScanImage 
-    software. This simplifies ScanImagePC configuration process during runtime. The data is moved into a 
-    session-specific directory during preprocessing."""
-    ubiquitin_path: str | Path = "null"
+    runtime to prepare mesoscope data for being moved to the VRPC-managed raw_data directory and to reset the 'default' 
+    mesoscope_data directory for the next session's runtime."""
+    ubiquitin_path: Path = Path()
     """Stores the path to the 'ubiquitin.bin' file. This file is automatically generated inside the session-specific 
-    data folder after its contents are safely transferred to the VRPC as part of preprocessing. During redundant data
-    removal, the VRPC searches for directories marked with ubiquitin.bin, so that they can be safely removed from the 
+    data directory after its contents are safely transferred to the VRPC as part of preprocessing. During redundant data
+    removal step of preprocessing, the VRPC searches for directories marked with ubiquitin.bin and deletes them from the
     ScanImagePC filesystem."""
 
-    def __post_init__(self) -> None:
-        """This method is automatically called after class instantiation and ensures that all path fields of the class
-        are converted to Path objects.
+    def resolve_paths(self, root_mesoscope_path: Path, session_name: str) -> None:
+        """Resolves all paths managed by the class instance based on the input root directory path.
+
+        This method is called each time the class is instantiated to regenerate the managed path hierarchy on any
+        machine that instantiates the class.
+
+        Args:
+            root_mesoscope_path: The path to the top-level directory of the ScanImagePC data hierarchy mounted to the
+                VRPC via the SMB or equivalent protocol.
+            session_name: The name of the session for which this subclass is initialized.
         """
-        # Converts the paths that have to be provided at class instantiation to the Path objects.
-        self.root_data_path = Path(self.root_data_path)
-        self.session_specific_path = Path(self.session_specific_path)
 
-        # Resolves the 'null' placeholders using the 'anchor' paths above
-        if self.mesoscope_data_path == "null":
-            self.mesoscope_data_path = self.root_data_path.joinpath("mesoscope_data")
-        if self.ubiquitin_path == "null":
-            self.ubiquitin_path = self.session_specific_path.joinpath("ubiquitin.bin")
+        # Generates the managed paths
+        self.meso_data_path = root_mesoscope_path
+        self.session_specific_path = self.meso_data_path.joinpath(session_name)
+        self.ubiquitin_path = self.session_specific_path.joinpath("ubiquitin.bin")
+        self.mesoscope_data_path = self.meso_data_path.joinpath("mesoscope_data")
 
-    def make_string(self) -> None:
-        """Converts all Path objects stored inside the class to strings.
+    def make_directories(self) -> None:
+        """Ensures that all major subdirectories and the root directory exist."""
 
-        This transformation is required to support dumping class data into a .YAML file so that the data can be stored
-        on disk.
-        """
-        self.root_data_path = str(self.root_data_path)
-        self.session_specific_path = str(self.session_specific_path)
-        self.mesoscope_data_path = str(self.mesoscope_data_path)
-        self.ubiquitin_path = str(self.ubiquitin_path)
-
-    def make_dirs(self) -> None:
-        """Ensures that the ScanImagePC data acquisition directories exist."""
-
-        # Does not create the session-specific directory. This is on purpose, as the session-specific directory
-        # is generated during runtime by renaming the 'general' mesoscope_data directory. The 'general' directory is
-        # then recreated from scratch. This ensures that the general directory is empty (ready for the next session)
-        # with minimal I/O overhead.
-        ensure_directory_exists(Path(self.mesoscope_data_path))
+        ensure_directory_exists(self.meso_data_path)
 
 
 @dataclass()
-class Destinations:
-    """Stores the paths to the VRPC filesystem-mounted Synology NAS and BioHPC server directories.
+class VRPCDestinations:
+    """Stores the paths to the VRPC filesystem-mounted directories of the Synology NAS and BioHPC server.
 
-    These directories are used during data preprocessing to transfer the preprocessed raw_data directory from the
-    VRPC to the long-term storage destinations.
+    The paths from this section are primarily used to transfer preprocessed data to the long-term storage destinations.
+    Additionally, they allow VRPC to interface with the configuration directory of the BioHPC server to start data
+    processing jobs and to read the data from the processed_data directory to remove redundant data from the VRPC
+    filesystem.
+
+    Overall, this section is intended solely for the VRPC and should not be used on other PCs.
     """
 
-    nas_raw_data_path: str | Path
+    nas_raw_data_path: Path = Path()
     """Stores the path to the session's raw_data directory on the Synology NAS, which is mounted to the VRPC via the 
     SMB or equivalent protocol."""
-    server_raw_data_path: str | Path
+    server_raw_data_path: Path = Path()
     """Stores the path to the session's raw_data directory on the BioHPC server, which is mounted to the VRPC via the 
     SMB or equivalent protocol."""
-    server_processed_data_path: str | Path
+    server_processed_data_path: Path = Path()
     """Stores the path to the session's processed_data directory on the BioHPC server, which is mounted to the VRPC via 
     the SMB or equivalent protocol."""
-    server_configuration_path: str | Path
+    server_configuration_path: Path = Path()
     """Stores the path to the project-specific 'configuration' directory on the BioHPC server, which is mounted to the 
     VRPC via the SMB or equivalent protocol."""
-    server_telomere_path: str | Path = "null"
-    """Stores the path to the session's telomere.bin marker. This marker is generated as part of BioHPC-side data 
-    processing pipeline to notify he VRPC that the server received the data intact. it is used to determine which 
-    data can be safely removed from the VRPC filesystem."""
-    server_suite2p_configuration_path: str | Path = "null"
+    telomere_path: Path = Path()
+    """Stores the path to the session's telomere.bin marker. This marker is generated as part of data processing on the 
+    BioHPC server to notify the VRPC that the server received preprocessed data intact. The presence of this marker is 
+    used by the VRPC to determine which locally stored raw_data is safe to delete from the filesystem."""
+    suite2p_configuration_path: Path = Path()
     """Stores the path to the suite2p_configuration.yaml file stored inside the project's 'configuration' directory on
-    the fast BioHPC server volume. This configuration file specifies the parameters for the 'single day' suite2p 
-    registration pipeline, which is applied to each session that generates brain activity data."""
-    server_processing_tracker_path: str | Path = "null"
+    the BioHPC server. This configuration file specifies the parameters for the 'single day' sl-suite2p registration 
+    pipeline, which is applied to each session that generates brain activity data."""
+    processing_tracker_path: Path = Path()
     """Stores the path to the processing_tracker.yaml file stored inside the sessions' root processed_data directory on 
-    the fast BioHPC server volume. This file is used to track which processing pipelines to apply to the target 
-    session and the status (success / failure) of each processing step.
+    the BioHPC server. This file tracks which processing pipelines need to be applied the target session and the status 
+    (success / failure) of each applied pipeline.
     """
-    server_multiday_configuration_path: str | Path = "null"
+    multiday_configuration_path: Path = Path()
     """Stores the path to the multiday_configuration.yaml file stored inside the project's 'configuration' directory 
-    on the fast BioHPC server volume. This configuration file specifies the parameters for the 'multiday' 
-    sl-suite2p-based registration pipelines used tot rack brain cells across multiple sessions."""
+    on the BioHPC server. This configuration file specifies the parameters for the 'multiday' sl-suite2p registration 
+    pipeline used to track brain cells across multiple sessions."""
 
-    def __post_init__(self) -> None:
-        """This method is automatically called after class instantiation and ensures that all path fields of the class
-        are converted to Path objects.
+    def resolve_paths(
+        self,
+        nas_raw_data_path: Path,
+        server_raw_data_path: Path,
+        server_processed_data_path: Path,
+        server_configuration_path: Path,
+    ) -> None:
+        """Resolves all paths managed by the class instance based on the input root directory paths.
+
+        This method is called each time the class is instantiated to regenerate the managed path hierarchy on any
+        machine that instantiates the class.
+
+        Args:
+            nas_raw_data_path: The path to the session's raw_data directory on the Synology NAS, relative to the VRPC
+                filesystem root.
+            server_raw_data_path: The path to the session's raw_data directory on the BioHPC server, relative to the
+                VRPC filesystem root.
+            server_processed_data_path: The path to the session's processed_data directory on the BioHPC server,
+                relative to the VRPC filesystem root.
+            server_configuration_path: The path to the project-specific 'configuration' directory on the BioHPC server,
+                relative to the VRPC filesystem root.
         """
-        self.nas_raw_data_path = Path(self.nas_raw_data_path)
-        self.server_raw_data_path = Path(self.server_raw_data_path)
-        self.server_configuration_path = Path(self.server_configuration_path)
-        self.server_processed_data_path = Path(self.server_processed_data_path)
 
-        if self.server_telomere_path == "null":
-            self.server_telomere_path = self.server_raw_data_path.joinpath("telomere.bin")
-        if self.server_suite2p_configuration_path == "null":
-            self.server_suite2p_configuration_path = self.server_configuration_path.joinpath(
-                "suite2p_configuration.yaml"
-            )
-        if self.server_processing_tracker_path == "null":
-            self.server_processing_tracker_path = self.server_processed_data_path.joinpath("processing_tracker.yaml")
-        if self.server_multiday_configuration_path == "null":
-            self.server_multiday_configuration_path = self.server_configuration_path.joinpath(
-                "multiday_configuration.yaml"
-            )
+        # Generates the managed paths
+        self.nas_raw_data_path = nas_raw_data_path
+        self.server_raw_data_path = server_raw_data_path
+        self.server_processed_data_path = server_processed_data_path
+        self.server_configuration_path = server_configuration_path
+        self.telomere_path = self.server_raw_data_path.joinpath("telomere.bin")
+        self.suite2p_configuration_path = self.server_configuration_path.joinpath("suite2p_configuration.yaml")
+        self.processing_tracker_path = self.server_processed_data_path.joinpath("processing_tracker.yaml")
+        self.multiday_configuration_path = self.server_configuration_path.joinpath("multiday_configuration.yaml")
 
-    def make_string(self) -> None:
-        """Converts all Path objects stored inside the class to strings.
-
-        This transformation is required to support dumping class data into a .YAML file so that the data can be stored
-        on disk.
-        """
-        self.nas_raw_data_path = str(self.nas_raw_data_path)
-        self.server_raw_data_path = str(self.server_raw_data_path)
-        self.server_telomere_path = str(self.server_telomere_path)
-        self.server_configuration_path = str(self.server_configuration_path)
-        self.server_processed_data_path = str(self.server_processed_data_path)
-        self.server_suite2p_configuration_path = str(self.server_suite2p_configuration_path)
-        self.server_processing_tracker_path = str(self.server_processing_tracker_path)
-        self.server_multiday_configuration_path = str(self.server_multiday_configuration_path)
-
-    def make_dirs(self) -> None:
-        """Ensures that all destination directories exist."""
-        ensure_directory_exists(Path(self.nas_raw_data_path))
-        ensure_directory_exists(Path(self.server_raw_data_path))
-        ensure_directory_exists(Path(self.server_configuration_path))
-        ensure_directory_exists(Path(self.server_processed_data_path))
+    def make_directories(self) -> None:
+        """Ensures that all major subdirectories and the root directory exist."""
+        ensure_directory_exists(self.nas_raw_data_path)
+        ensure_directory_exists(self.server_raw_data_path)
+        ensure_directory_exists(self.server_configuration_path)
+        ensure_directory_exists(self.server_processed_data_path)
 
 
 @dataclass
@@ -908,32 +907,30 @@ class SessionData(YamlConfig):
     field is not None (null), it communicates the specific experiment configuration used by the session. During runtime,
     the name stored here is used to load the specific experiment configuration data stored in a .yaml file with the 
     same name. If the session is not an experiment session, this field is ignored."""
-    raw_data: RawData
-    """This section stores the paths to various directories and files that make up the raw_data subfolder. This 
-    subfolder stores all data acquired during training or experiment runtimes before and after preprocessing. Note, the 
-    preprocessing does not change the raw data in any way other than lossless compression and minor format 
-    reorganization. Therefore, the data is considered 'raw' both before and after preprocessing."""
-    processed_data: ProcessedData
-    """This section stores the paths to various directories used to store processed session data. Processed data is 
-    generated from raw data by running various processing pipelines, such as suite2p, DeepLabCut and Sun lab's behavior 
-    parsing pipelines. Typically, all data is processed on the BioHPC server and may be stored on a filesystem volume 
-    different from the one that stores the raw data."""
-    persistent_data: PersistentData
-    """This section stores the paths to various files and directories that are held back on the VRPC and ScanImagePC 
-    after the session data is transferred to long-term storage destinations as part of preprocessing. Typically, this 
-    data is reused during the acquisition of future runtime session data. This section is not used during data 
-    processing."""
-    mesoscope_data: MesoscopeData
-    """This section stores the paths to various directories used by the ScanImagePC when acquiring mesoscope-related 
-    data. During runtime, the VRPC (behavior data and experiment control) and the ScanImagePC (brain activity data and 
-    Mesoscope control) operate mostly independently of each-other. During preprocessing, the VRPC pulls the data from 
-    the ScanImagePC, using the paths in this section to find the data to be transferred. This section is not used 
-    during data processing."""
-    destinations: Destinations
-    """This section stores the paths to the destination directories on the BioHPC server and Synology NAS, to which the 
-    data is copied as part of preprocessing for long-term storage and further processing. Both of these directories 
-    should be mapped (mounted) to the VRPC's filesystem via the SMB or equivalent protocol. This section is not used 
-    during data processing."""
+    raw_data: RawData = field(default_factory=lambda: RawData())
+    """Stores the paths to all subfolders and files found under the /project/animal/session/raw_data directory of any 
+    PC used to work with Sun lab data."""
+    processed_data: ProcessedData = field(default_factory=lambda: ProcessedData())
+    """Stores the paths to all subfolders and files found under the /project/animal/session/processed_data directory of 
+    any PC used to work with Sun lab data."""
+    deeplabcut_data: DeepLabCutData = field(default_factory=lambda: DeepLabCutData())
+    """Stores the paths to all subfolders and files found under the /project/deeplabcut directory of any PC used to 
+    work with Sun lab data."""
+    configuration_data: ConfigurationData = field(default_factory=lambda: ConfigurationData())
+    """Stores the paths to all subfolders and files found under the /project/configuration directory of any PC used to 
+    work with Sun lab data."""
+    vrpc_persistent_data: VRPCPersistentData = field(default_factory=lambda: VRPCPersistentData())
+    """Stores the paths to all subfolders and files found under the /project/animal/persistent_data directory of 
+    the VRPC used in the Sun lab to acquire behavior data."""
+    scanimagepc_persistent_data: ScanImagePCPersistentData = field(default_factory=lambda: ScanImagePCPersistentData())
+    """Stores the paths to all subfolders and files found under the /project/animal/persistent_data directory of 
+    the ScanImagePC used in the Sun lab to acquire brain activity data."""
+    mesoscope_data: MesoscopeData = field(default_factory=lambda: MesoscopeData())
+    """Stores the paths to all subfolders and files found under the /meso_data (root mesoscope data) directory of 
+    the ScanImagePC used in the Sun lab to acquire brain activity data."""
+    destinations: VRPCDestinations = field(default_factory=lambda: VRPCDestinations())
+    """Stores the paths to all subfolders and files under various VRPC-filesystem-mounted directories of other machines 
+    used in the Sun lab for long-term data storage."""
 
     @classmethod
     def create(
@@ -982,8 +979,8 @@ class SessionData(YamlConfig):
         if session_name is None:
             session_name = str(get_timestamp(time_separator="-"))
 
-        # Extracts the root directory paths stored inside the project configuration file. All roots are expected to be
-        # mounted on the local (VRPC) via SMB or equivalent protocol and be relative to the VRPC root.
+        # Extracts the root directory paths stored inside the project configuration file. These roots are then used to
+        # initialize this class instance.
         vrpc_root = Path(project_configuration.local_root_directory)
         mesoscope_root = Path(project_configuration.local_mesoscope_directory)
         biohpc_root = Path(project_configuration.local_server_directory)
@@ -993,7 +990,7 @@ class SessionData(YamlConfig):
         # Extracts the name of the project stored inside the project configuration file.
         project_name = project_configuration.project_name
 
-        # Constructs the session directory path and generates the directory
+        # Constructs the session directory path
         session_path = vrpc_root.joinpath(project_name, animal_id, session_name)
 
         # Handles potential session name conflicts
@@ -1011,40 +1008,51 @@ class SessionData(YamlConfig):
                 f"already exists. The newly created session directory uses a '_{counter}' postfix to distinguish "
                 f"itself from the already existing session directory."
             )
-            warnings.warn(message=message)
+            console.echo(message=message, level=LogLevel.ERROR)
 
         # Generates subclasses stored inside the main class instance based on the data resolved above. Note; most fields
-        # of these classes are initialized automatically, using the 'root' path arguments.
-        raw_data = RawData(
-            raw_data_path=session_path.joinpath("raw_data"),
-        )
-        raw_data.make_dirs()  # Generates the local directory tree
+        # of these classes are resolved automatically, based on one or more 'root' paths provided to the 'resolve_paths'
+        # method.
+        raw_data = RawData()
+        raw_data.resolve_paths(root_directory_path=session_path.joinpath("raw_data"))
+        raw_data.make_directories()  # Generates the local directory tree
 
-        processed_data = ProcessedData(
-            processed_data_path=session_path.joinpath("processed_data"),
-            deeplabcut_path=vrpc_root.joinpath(project_name, "deeplabcut"),
-            configuration_path=vrpc_root.joinpath(project_name, "configuration"),
-        )
+        processed_data = ProcessedData()
+        processed_data.resolve_paths(root_directory_path=session_path.joinpath("processed_data"))
+        processed_data.make_directories()
 
+        dlc_data = DeepLabCutData()
+        dlc_data.resolve_paths(root_directory_path=vrpc_root.joinpath(project_name, "deeplabcut"))
+        dlc_data.make_directories()
+
+        configuration_data = ConfigurationData()
+        configuration_data.resolve_paths(
+            root_directory_path=vrpc_root.joinpath(project_name, "configuration"), experiment_name=experiment_name
+        )
+        configuration_data.make_directories()
+
+        vrpc_persistent_data = VRPCPersistentData()
         vrpc_persistent_path = vrpc_root.joinpath(project_name, animal_id, "persistent_data")
+        vrpc_persistent_data.resolve_paths(root_directory_path=vrpc_persistent_path)
+        vrpc_persistent_data.make_directories()
+
+        scanimagepc_persistent_data = ScanImagePCPersistentData()
         scanimagepc_persistent_path = mesoscope_root.joinpath(project_name, animal_id, "persistent_data")
-        persistent_data = PersistentData(
-            vrpc_persistent_path=vrpc_persistent_path, scanimage_persistent_path=scanimagepc_persistent_path
-        )
-        persistent_data.make_dirs()  # Generates all persistent directory trees
+        scanimagepc_persistent_data.resolve_paths(root_directory_path=scanimagepc_persistent_path)
+        scanimagepc_persistent_data.make_directories()
 
-        mesoscope_data = MesoscopeData(
-            root_data_path=mesoscope_root, session_specific_path=mesoscope_root.joinpath(session_name)
-        )
-        mesoscope_data.make_dirs()  # Generates all Mesoscope directory trees
+        mesoscope_data = MesoscopeData()
+        mesoscope_data.resolve_paths(root_mesoscope_path=mesoscope_root, session_name=session_name)
+        mesoscope_data.make_directories()
 
-        destinations = Destinations(
+        destinations = VRPCDestinations()
+        destinations.resolve_paths(
             nas_raw_data_path=nas_root.joinpath(project_name, animal_id, session_name, "raw_data"),
             server_raw_data_path=biohpc_root.joinpath(project_name, animal_id, session_name, "raw_data"),
-            server_configuration_path=biohpc_workdir.joinpath(project_name, "configuration"),
+            server_configuration_path=biohpc_root.joinpath(project_name, "configuration"),
             server_processed_data_path=biohpc_workdir.joinpath(project_name, "processed_data"),
         )
-        destinations.make_dirs()  # Generates all destination directory trees
+        destinations.make_directories()
 
         # Packages the sections generated above into a SessionData instance
         instance = SessionData(
@@ -1053,8 +1061,11 @@ class SessionData(YamlConfig):
             session_name=session_name,
             session_type=session_type,
             raw_data=raw_data,
+            deeplabcut_data=dlc_data,
+            configuration_data=configuration_data,
             processed_data=processed_data,
-            persistent_data=persistent_data,
+            vrpc_persistent_data=vrpc_persistent_data,
+            scanimagepc_persistent_data=scanimagepc_persistent_data,
             mesoscope_data=mesoscope_data,
             destinations=destinations,
             experiment_name=experiment_name,
@@ -1068,19 +1079,16 @@ class SessionData(YamlConfig):
         # classes is not exhaustive. More classes are saved as part of the session runtime management class start() and
         # __init__() method runtimes:
 
-        # Resolves the path to the project configuration folder
-        vrpc_configuration_path = vrpc_root.joinpath(project_name, "configuration")
-
         # Discovers and saves the necessary configuration class instances to the raw_data folder of the managed session:
         # Project Configuration
         sh.copy2(
-            src=vrpc_configuration_path.joinpath("project_configuration.yaml"),
+            src=instance.configuration_data.project_configuration_path,
             dst=instance.raw_data.project_configuration_path,
         )
         # Experiment Configuration, if the session type is Experiment.
         if experiment_name is not None:
             sh.copy2(
-                src=vrpc_configuration_path.joinpath(f"{experiment_name}.yaml"),
+                src=instance.configuration_data.experiment_configuration_path,
                 dst=instance.raw_data.experiment_configuration_path,
             )
 
@@ -1104,9 +1112,10 @@ class SessionData(YamlConfig):
 
         Args:
             session_path: The path to the root directory of an existing session, e.g.: vrpc_root/project/animal/session.
-            on_server: Determines whether the method is used to initialize an existing session on the VRPC or the
-                BioHPC server. Note, VRPC runtimes use the same 'root' directory to store raw_data and processed_data
-                subfolders. BioHPC server runtimes use different volumes (drives) to store these subfolders.
+            on_server: Determines whether the method is used to initialize an existing session on the BioHPC server or
+                a non-server machine. Note, non-server runtimes use the same 'root' directory to store raw_data and
+                processed_data subfolders. BioHPC server runtimes use different volumes (drives) to store these
+                subfolders.
 
         Returns:
             An initialized SessionData instance for the session whose data is stored at the provided path.
@@ -1126,48 +1135,100 @@ class SessionData(YamlConfig):
             )
             console.error(message=message, error=FileNotFoundError)
 
-        # Loads class data from .yaml
+        # Loads class data from .yaml file
         instance: SessionData = cls.from_yaml(file_path=session_data_path)  # type: ignore
 
         # The method assumes that the 'donor' .yaml file is always stored inside the raw_data directory of the session
         # to be processed. Since the directory itself might have moved (between or even within the same PC) relative to
         # where it was when the SessionData snapshot was generated, reconfigures the paths to all raw_data files using
         # the root from above.
-        instance.raw_data.switch_root(new_root=session_path.parents[2])
+        local_root = session_path.parents[2]
+
+        # RAW DATA
+        new_root = local_root.joinpath(instance.project_name, instance.animal_id, instance.session_name, "raw_data")
+        instance.raw_data.resolve_paths(root_directory_path=new_root)
+
+        # Uses the adjusted raw_data section to load the ProjectConfiguration instance. This is used below to resolve
+        # all other SessionData sections, as it stores various required root directories.
+        project_configuration: ProjectConfiguration = ProjectConfiguration.load(
+            project_name=instance.project_name,
+            configuration_path=Path(instance.raw_data.project_configuration_path),
+        )
+
+        # Resolves the new roots for all sections that use the same root as the raw_data directory:
+
+        # CONFIGURATION
+        new_root = local_root.joinpath(instance.project_name, "configuration")
+        instance.configuration_data.resolve_paths(
+            root_directory_path=new_root, experiment_name=instance.experiment_name
+        )
+
+        # DEEPLABCUT
+        new_root = local_root.joinpath(instance.project_name, "deeplabcut")
+        instance.deeplabcut_data.resolve_paths(root_directory_path=new_root)
+
+        # Resolves the roots for all VRPC-specific sections that use the data from the ProjectConfiguration instance:
+
+        # VRPC PERSISTENT DATA
+        new_root = Path(project_configuration.local_root_directory).joinpath(
+            instance.project_name, instance.animal_id, "persistent_data"
+        )
+        instance.vrpc_persistent_data.resolve_paths(root_directory_path=new_root)
+
+        # SCANIMAGEPC PERSISTENT DATA
+        new_root = Path(project_configuration.local_mesoscope_directory).joinpath(
+            instance.project_name, instance.animal_id, "persistent_data"
+        )
+        instance.scanimagepc_persistent_data.resolve_paths(root_directory_path=new_root)
+
+        # MESOSCOPE DATA
+        instance.mesoscope_data.resolve_paths(
+            root_mesoscope_path=Path(project_configuration.local_mesoscope_directory),
+            session_name=instance.session_name,
+        )
+
+        # DESTINATIONS
+        instance.destinations.resolve_paths(
+            nas_raw_data_path=Path(project_configuration.local_nas_directory).joinpath(
+                instance.project_name, instance.animal_id, instance.session_name, "raw_data"
+            ),
+            server_raw_data_path=Path(project_configuration.local_server_directory).joinpath(
+                instance.project_name, instance.animal_id, instance.session_name, "raw_data"
+            ),
+            server_configuration_path=Path(project_configuration.local_server_directory).joinpath(
+                instance.project_name, "configuration"
+            ),
+            server_processed_data_path=Path(project_configuration.local_server_working_directory).joinpath(
+                instance.project_name, instance.animal_id, instance.session_name, "processed_data"
+            ),
+        )
 
         # Resolves the paths to the processed_data directories. The resolution strategy depends on whether the method is
         # called on the VRPC (locally) or the BioHPC server (remotely).
-        new_root: Path
         if not on_server:
             # Local runtimes use the same root session directory for both raw_data and processed_data. This stems from
             # the assumption that most local machines in the lab only use NVME (fast) volumes and, therefore, do not
             # need to separate 'storage' and 'working' data directories.
-
-            # Regenerates the processed_data paths using the information loaded from the session_data.yaml file and
-            # static path definition rules used in the lab.
-            new_root = session_path.parents[2]  # Reuses the local root for non-server runtimes
+            new_root = local_root  # Reuses the local root for non-server runtimes
 
         else:
             # The BioHPC server stores raw_data on slow volume and processed_data on fast (NVME) volume. Therefore, to
             # configure processed_data paths, the method first needs to load the fast volume root path from the
             # project_configuration.yaml file stored in the raw_data folder.
-            project_configuration: ProjectConfiguration = ProjectConfiguration.load(
-                project_name=instance.project_name,
-                configuration_path=Path(instance.raw_data.project_configuration_path),
-            )
             new_root = Path(project_configuration.remote_working_directory)
 
         # Regenerates the processed_data path depending on the root resolution above
-        instance.processed_data = ProcessedData(
-            processed_data_path=new_root.joinpath(
+        instance.processed_data.resolve_paths(
+            root_directory_path=new_root.joinpath(
                 instance.project_name, instance.animal_id, instance.session_name, "processed_data"
-            ),
-            configuration_path=new_root.joinpath(instance.project_name, instance.animal_id, "configuration"),
-            deeplabcut_path=new_root.joinpath(instance.project_name, "deeplabcut"),
+            )
         )
 
-        # Generates processed_data directories
-        instance.processed_data.make_dirs()
+        # Generates data directory hierarchies that may be missing on the local machine
+        instance.raw_data.make_directories()
+        instance.configuration_data.make_directories()
+        instance.deeplabcut_data.make_directories()
+        instance.processed_data.make_directories()
 
         # Returns the initialized SessionData instance to caller
         return instance
@@ -1180,21 +1241,8 @@ class SessionData(YamlConfig):
         create() method runtime.
         """
 
-        # Copies instance data to prevent it from being modified by reference when executing the steps below
-        original = copy.deepcopy(self)
-
-        # Extracts the target file path before it is converted to a string.
-        file_path: Path = copy.copy(self.raw_data.session_data_path)  # type: ignore
-
-        # Converts all Paths objects to strings before dumping the data to YAML.
-        original.raw_data.make_string()
-        original.processed_data.make_string()
-        original.persistent_data.make_string()
-        original.mesoscope_data.make_string()
-        original.destinations.make_string()
-
         # Saves instance data as a .YAML file
-        original.to_yaml(file_path=file_path)
+        self.to_yaml(file_path=self.raw_data.session_data_path)
 
 
 @dataclass()
