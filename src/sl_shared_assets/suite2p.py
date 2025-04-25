@@ -292,7 +292,8 @@ class ROIDetection:
     """The maximum number of iterations allowed for cell extraction."""
 
     nbinned: int = 5000
-    """The maximum number of binned frames to use for ROI detection to speed up processing."""
+    """The maximum number of binned frames to use for ROI detection. Settings this value to a higher number leads to 
+    more ROIs being detected, but reduces processing speed and increases RAM overhead."""
 
     denoise: bool = False
     """Determines whether to denoise the binned movie before cell detection in sparse mode to enhance performance. 
@@ -403,12 +404,145 @@ class Channel2:
     """The threshold for considering an ROI registered in one channel as detected in the second channel."""
 
 
+@dataclass()
+class MultidayIO:
+    """Stores settings for loading and saving various data objects used during the multiday registration pipeline."""
+    pickle_protocol: int = 5
+    """Specifies the version of the pickle protocol used to serialize intermediate data."""
+
+    sessions: list[str] = field(default_factory=list)
+    """Specifies the list of sessions to register across days. For each session, the list needs to include the 
+    absolute path to the root session directory that stores the raw_data folder."""
+
+    output_directory: str = ""
+    """Specifies the root output directory. The runtime creates 'multiday_suite2p' folder under this directory and 
+    caches all intermediate and final outputs under that subdirectory."""
+
+
+@dataclass()
+class MultidayCellDetection:
+    """Stores settings used to detect cell candidates for tracking across multiple days (sessions)."""
+
+    prob_threshold: float = 0.85
+    """Specifies the minimum required cell ROI classifier score. Cells with a lower classifier score are excluded from 
+    processing."""
+
+    max_size: int = 1000
+    """Specifies the maximum allowed cell size, in pixels. Cells that exceed this size are excluded from processing."""
+
+    stripe_borders: list[int] = field(default_factory=lambda: [462, 924])
+    """Stores the x-coordinate of combined image stripe borders. For mesoscope images, 'stripes' are the individual 
+    imaging ROIs acquired in the 'multiple-ROI' mode."""
+
+    stripe_margin: int = 30
+    """The minimum distance, in pixels, that cells should have between them and the stripe borders. Cells that are too 
+    close to stripe borders are excluded from processing to avoid registration issues for cells that span multiple 
+    stripes."""
+
+
+@dataclass()
+class MultidayRegistration:
+    """Stores settings used to align (register) multiple sessions from the same animal to each-other."""
+
+    img_type: str = "enhanced_img"
+    """The image to use for across-day registration."""
+
+    grid_sampling_factor: int = 1
+    """The grid sampling factor applied at the final registration level."""
+
+    scale_sampling: int = 20
+    """The number of sampling iterations performed at each level."""
+
+    speed_factor: int = 3
+    """The relative force of the transform applied to session masks while registering sessions across days."""
+
+
+@dataclass()
+class MultidayClustering:
+    """Stores settings used to cluster (track) cell masks across multiple registered sessions."""
+
+    criterion: str = "distance"
+    """Specifies the criterion for clustering cell masks together."""
+
+    threshold: float = 0.75
+    """Specifies the threshold for the clustering algorithm."""
+
+    min_sessions_perc: int = 50
+    """Specifies the minimum percentage of sessions that must include the cell mask for it to be included in the 
+    final dataset. This allows filtering out cells that are mostly not active across days."""
+
+    min_perc: int = 50
+    """Specifies the percentage of sessions to use for creating the template mask."""
+
+    step_sizes: list[int] = field(default_factory=lambda: [200, 200])
+    """Specifies the block size for the clustering process. To reduce RAM overhead, the clustering algorithm is applied 
+    across planes in blocks."""
+
+    bin_size: int = 50
+    """Specifies the bin size for cell mask lookup. To avoid edge cases, the algorithm looks for cell masks around 
+    template center + bin_size."""
+
+    max_distance: int = 20
+    """Specifies the maximum distance, in pixels, that can separate masks across multiple sessions. The clustering 
+    algorithm will only consider cells matching if their masks are located at most within this distance from each-other 
+    across days."""
+
+    min_size_non_overlap: int = 25
+    """The minimum size of the template mask, in pixels."""
+
+
+@dataclass()
+class MultidaySpikeDeconvolution:
+    """Stores settings used to deconvolve calcium signals to infer spike trains from cells tracked across multiple
+    days."""
+
+    baseline: str = "maximin"
+    """Specifies the method to compute the baseline of each trace. This baseline is then subtracted from each cell. 
+    ‘maximin’ computes a moving baseline by filtering the data with a Gaussian of width 'sig_baseline' * 'fs', and then 
+    minimum filtering with a window of 'win_baseline' * 'fs', and then maximum filtering with the same window. 
+    ‘constant’ computes a constant baseline by filtering with a Gaussian of width 'sig_baseline' * 'fs' and then taking 
+    the minimum value of this filtered trace. ‘constant_percentile’ computes a constant baseline by taking the 
+    'prctile_baseline' percentile of the trace."""
+
+    win_baseline: float = 60.0
+    """The time window, in seconds, over which to compute the baseline filter."""
+
+    sig_baseline: float = 10.0
+    """The standard deviation, in seconds, of the Gaussian filter applied to smooth the baseline signal."""
+
+    l2_reg: float = 0.1
+    """The L2 regularization strength applied during spike deconvolution."""
+
+    neucoeff: float = 0.7
+    """The neuropil coefficient applied for signal correction before deconvolution."""
+
+
+@dataclass()
+class MultiDay:
+    """Aggregates all settings used to track cells across multiple days (sessions) and extract their activity.
+
+    These settings are used to configure the multiday suite2p extraction pipeline, adapted from the original
+    implementation here: https://github.com/sprustonlab/multiday-suite2p-public.
+
+    Notes:
+        Due to the API difference between suite2p 'ops' dictionary and multiday pipeline 'settings' object, this
+        dictionary is appended to the main suite23p configuration dictionary as a sub-dictionary. This is in contrast
+        to all other suite2p settings, which are all appended as single-value keys.
+    """
+
+    cell_detection: MultidayCellDetection = field(default_factory=MultidayCellDetection)
+    registration: MultidayRegistration = field(default_factory=MultidayRegistration)
+    clustering: MultidayClustering = field(default_factory=MultidayClustering)
+    demix: MultidaySpikeDeconvolution = field(default_factory=MultidaySpikeDeconvolution)
+    io: MultidayIO = field(default_factory=MultidayIO)
+
+
 @dataclass
 class Suite2PConfiguration(YamlConfig):
     """Stores the user-addressable suite2p configuration parameters, organized into subsections.
 
     This class is used during processing to instruct suite2p on how to process the data. Specifically, it provides a
-    user-friendly way of specifying all user-addressable parameters through a .YAML file. The sl-forgery library then
+    user-friendly way of specifying all user-addressable parameters through a .YAML file. The sl-suited2p library then
     loads the data from .yaml file and uses it to configure the single-day suite2p pipeline and the multiday suite2p
     pipeline.
 
@@ -430,6 +564,7 @@ class Suite2PConfiguration(YamlConfig):
     spike_deconvolution: SpikeDeconvolution = field(default_factory=SpikeDeconvolution)
     classification: Classification = field(default_factory=Classification)
     channel2: Channel2 = field(default_factory=Channel2)
+    multiday: MultiDay = field(default_factory=MultiDay)
 
     def to_ops(self) -> dict[str, Any]:
         """Converts the class instance to a dictionary and returns it to caller.
