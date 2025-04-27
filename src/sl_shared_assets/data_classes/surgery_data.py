@@ -1,7 +1,8 @@
-"""This module provides classes to store subject surgery data. This is used to store the data extracted from the Sun lab
+"""This module provides classes to store animal surgery data. This is used to store the data extracted from the Sun lab
 surgery log, so that subject surgery data is always kept together with training and experiment data."""
 
 from dataclasses import dataclass
+
 from ataraxis_data_structures import YamlConfig
 
 

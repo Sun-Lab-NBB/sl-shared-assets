@@ -1,7 +1,14 @@
-from dataclasses import dataclass, field
-from ataraxis_data_structures import YamlConfig
-from pathlib import Path
+"""This module provides classes used to configure data acquisition and processing runtimes in the Sun lab.
+Classes from this library are saved as .yaml files to be edited by the user when a new project and / or session
+is created by the sl-experiment library. The runtime settings are then loaded from user-edited .yaml files by various
+lab pipelines."""
+
 import copy
+from pathlib import Path
+from dataclasses import field, dataclass
+
+from ataraxis_data_structures import YamlConfig
+
 
 @dataclass()
 class ExperimentState:
@@ -59,6 +66,15 @@ class ExperimentConfiguration(YamlConfig):
 
 @dataclass()
 class SystemConfiguration(YamlConfig):
+    """This class stores global Mesoscope-VR configuration parameters that expected to change comparatively frequently.
+
+    These parameters are shared by all projects in the lab. Primarily, they determine how the VRPC interacts with
+    various components of the Mesoscope-VR system used in the lab. Although most parameters in this class are designed
+    to be permanent, it is possible that the VRPC or Mesoscope-VR configuration changes, requiring an update to these
+    parameters. In that case, the instance of this class stored as a .yaml file inside the root project directory
+    on the VRPC can be modified to update the affected parameters.
+    """
+
     face_camera_index: int = 0
     """The index of the face camera in the list of all available Harvester-managed cameras."""
     left_camera_index: int = 0
@@ -109,9 +125,13 @@ class SystemConfiguration(YamlConfig):
     """
 
     @classmethod
-    def load(cls, path: Path):
+    def load(cls, path: Path) -> "SystemConfiguration":
+        """Loads the SystemConfiguration data from the specified .YAML file and returns it as a class instance.
 
-        instance = cls.from_yaml(path)
+        This is used at the beginning of each sl-experiment runtime to access the actual Mesoscope-VR configuration
+        parameters
+        """
+        instance: SystemConfiguration = cls.from_yaml(path)  # type: ignore
 
         # Converts all paths loaded as strings to Path objects used inside the library
         instance.google_credentials_path = Path(instance.google_credentials_path)
@@ -122,7 +142,17 @@ class SystemConfiguration(YamlConfig):
         if not isinstance(instance.valve_calibration_data, tuple):
             instance.valve_calibration_data = tuple((k, v) for k, v in instance.valve_calibration_data.items())
 
-    def save(self, path: Path):
+        return instance
+
+    def save(self, path: Path) -> None:
+        """Saves the SystemConfiguration data to the specified .YAML file.
+
+        This is typically only used once, the first time the VRPC is configured. After that, all projects reuse the
+        existing .yaml file.
+
+        Args:
+            path: The path to the system_configuration.yaml file to use for storing the data.
+        """
         # Copies instance data to prevent it from being modified by reference when executing the steps below
         original = copy.deepcopy(self)
 
@@ -134,3 +164,5 @@ class SystemConfiguration(YamlConfig):
         # Converts valve calibration data into dictionary format
         if isinstance(original.valve_calibration_data, tuple):
             original.valve_calibration_data = {k: v for k, v in original.valve_calibration_data}
+
+        original.to_yaml(file_path=path)

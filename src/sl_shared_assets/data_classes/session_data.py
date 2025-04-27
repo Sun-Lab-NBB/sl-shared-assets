@@ -1,3 +1,10 @@
+"""This module contains classes jointly responsible for maintaining the Sun lab project data hierarchy across all
+machines used to acquire, process, and store the data. Every valid experiment or training session conducted in the
+lab generates a specific directory structure. This structure is defined via the ProjectConfiguration and SessionData
+classes, which are also stored as .yaml files inside each session's raw_data and processed_data directories. Jointly,
+these classes contain all necessary information to restore the data hierarchy on any machine. All other Sun lab
+libraries use these classes to work with all lab-generated data."""
+
 import re
 import copy
 import shutil as sh
@@ -8,7 +15,8 @@ import appdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
-from .configuration_data import ExperimentConfiguration
+
+from .configuration_data import SystemConfiguration, ExperimentConfiguration
 
 
 def replace_root_path(path: Path) -> None:
@@ -46,8 +54,8 @@ class ProjectConfiguration(YamlConfig):
     An instance of this class is generated and saved as a .yaml file in the 'configuration' directory of each project
     when it is created. After that, the stored data is reused for every runtime (training or experiment session) carried
     out for each animal of the project. Additionally, a copy of the most actual configuration file is saved inside each
-    runtime session's 'raw_data' folder, providing seamless integration between the managed data and various Sun lab
-    (sl-) libraries.
+    runtime session's root folder, providing seamless integration between the managed data and various Sun lab (sl-)
+    libraries.
 
     Notes:
         Together with SessionData, this class forms the entry point for all interactions with the data acquired in the
@@ -56,8 +64,7 @@ class ProjectConfiguration(YamlConfig):
 
         Most lab projects only need to adjust the "surgery_sheet_id" and "water_log_sheet_id" fields of the class. Most
         fields in this class are used by the sl-experiment library to generate the SessionData class instance for each
-        session and during experiment data acquisition and preprocessing. Data processing pipelines use specialized
-        configuration files stored in other modules of this library.
+        session and during experiment data acquisition, preprocessing, and processing.
 
         Although all path fields use str | Path datatype, they are always stored as Path objects. These fields are
         converted to strings only when the data is dumped as a .yaml file.
@@ -163,6 +170,13 @@ class ProjectConfiguration(YamlConfig):
                 # Saves the root path to the file
                 with open(path_file, "w") as f:
                     f.write(str(root_path))
+
+                # The first time 'root_path' is resolved, also dumps an instance of the SystemConfiguration class to the
+                # root path. All future runtimes will then use this instance to flexibly configure how VRPC interacts
+                # with other Mesoscope-VR components.
+                system_configuration_path = root_path.joinpath("system_configuration.yaml")
+                system_configuration = SystemConfiguration()
+                system_configuration.save(path=system_configuration_path)
 
             # Once the location of the path storage file is resolved, reads the root path from the file
             with open(path_file, "r") as f:
@@ -334,7 +348,7 @@ class RawData:
     """Stores the path to the project_configuration.yaml file. This file contains the snapshot of the configuration 
     parameters for the session's project."""
     session_data_path: Path = Path()
-    """Stores the path to the session_data.yaml file. This path is used b y the SessionData instance to save itself to 
+    """Stores the path to the session_data.yaml file. This path is used by the SessionData instance to save itself to 
     disk as a .yaml file. The file contains all paths used during data acquisition and processing on both the VRPC and 
     the BioHPC server."""
     experiment_configuration_path: Path = Path()
@@ -358,6 +372,10 @@ class RawData:
     """Stores the path to the ax_checksum.txt file. This file is generated as part of packaging the data for 
     transmission and stores the xxHash-128 checksum of the data. It is used to verify that the transmission did not 
     damage or otherwise alter the data."""
+    system_configuration_path: Path = Path()
+    """Stores the path to the system_configuration.yaml file. This file contains the parameters that control how 
+    VRPC interacts with various Mesoscope-VR system components. Additionally, it contains Mesoscope-VR configuration
+    data expected to change fairly frequently (unlike most such data, which is permanently hard-coded)."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -387,6 +405,7 @@ class RawData:
         self.window_screenshot_path = self.raw_data_path.joinpath("window_screenshot.png")
         self.telomere_path = self.raw_data_path.joinpath("telomere.bin")
         self.checksum_path = self.raw_data_path.joinpath("ax_checksum.txt")
+        self.system_configuration_path = self.raw_data_path.joinpath("system_configuration.yaml")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist."""
@@ -450,6 +469,10 @@ class ConfigurationData:
     """Stores the path to the project-specific configuration directory. This directory is used by all animals 
     and sessions of the project to store all pan-project configuration files. The configuration data is reused by all
     sessions in the project."""
+    system_configuration_path: Path = Path()
+    """Stores the path to the system_configuration.yaml file. This file contains the parameters that control how 
+    VRPC interacts with various Mesoscope-VR system components. Additionally, it contains Mesoscope-VR configuration 
+    data expected to change fairly frequently (unlike most such data, which is permanently hard-coded)."""
     experiment_configuration_path: Path = Path()
     """Stores the path to the experiment_configuration.yaml file. This file contains the snapshot of the 
     experiment runtime configuration used by the session. This file is only created for experiment session. It does not
@@ -466,7 +489,9 @@ class ConfigurationData:
     on the fast BioHPC server volume. This configuration file specifies the parameters for the 'multiday' 
     sl-suite2p-based registration pipelines used tot rack brain cells across multiple sessions."""
 
-    def resolve_paths(self, root_directory_path: Path, experiment_name: str | None = None) -> None:
+    def resolve_paths(
+        self, root_directory_path: Path, system_configuration_path: Path, experiment_name: str | None = None
+    ) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
 
         This method is called each time the class is instantiated to regenerate the managed path hierarchy on any
@@ -476,6 +501,8 @@ class ConfigurationData:
             root_directory_path: The path to the top-level directory of the local hierarchy. Depending on the managed
                 hierarchy, this has to point to a directory under the main /session, /animal, or /project directory of
                 the managed session.
+            system_configuration_path: The path to the system_configuration.yaml file. Typically, this file is stored
+                inside the root project directory (directory where all projects are stored) on the VRPC.
             experiment_name: Optionally specifies the name of the experiment executed as part of the managed session's
                 runtime. This is used to correctly configure the path to the specific ExperimentConfiguration data file.
                 If the managed session is not an Experiment session, this parameter should be set to None.
@@ -483,6 +510,7 @@ class ConfigurationData:
 
         # Generates the managed paths
         self.configuration_path = root_directory_path
+        self.system_configuration_path = system_configuration_path
         if experiment_name is None:
             self.experiment_configuration_path = self.configuration_path.joinpath("null")
         else:
@@ -524,12 +552,6 @@ class ProcessedData:
     mesoscope_data_path: Path = Path()
     """Stores path to the directory that contains processed brain activity (cell) data generated by our suite2p-based 
     photometry processing pipelines (single day and multi day)."""
-    single_day_s2p_path: Path = Path()
-    """Stores the path to the directory under the main mesoscope_data directory, where single-day (single-session) 
-    suite2p processing output is stored."""
-    multi_day_s2p_path: Path = Path()
-    """Stores the path to the directory under the main mesoscope_data directory, where multi-day (multisession) 
-    suite2p processing output is stored."""
     behavior_data_path: Path = Path()
     """Stores the path to the directory that contains the non-video behavior and system runtime data extracted from 
     .npz log files by our in-house log parsing pipeline."""
@@ -538,12 +560,13 @@ class ProcessedData:
     server-side data processing pipeline runtimes. Since we use SLURM job manager to execute multiple compute jobs on 
     the BioHPC server, all information sent to the terminal during runtime is redirected to text files stored in this
     directory."""
-    processing_tracker_path: Path = Path()
-    """Stores the path to the processing_tracker.yaml file stored inside the sessions' root processed_data directory. 
-    This file is used to track which processing pipelines need to be applied to the target session and the status 
-    (success / failure) each of these pipelines. Primarily, this is used to optimize data processing to avoid redundant 
-    operations.
-    """
+    project_configuration_path: Path = Path()
+    """Stores the path to the project_configuration.yaml file. This file contains the snapshot of the configuration 
+    parameters for the session's project."""
+    session_data_path: Path = Path()
+    """Stores the path to the session_data.yaml file. This path is used by the SessionData instance to save itself to 
+    disk as a .yaml file. The file contains all paths used during data acquisition and processing on both the VRPC and 
+    the BioHPC server."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -560,19 +583,16 @@ class ProcessedData:
         self.processed_data_path = root_directory_path
         self.camera_data_path = self.processed_data_path.joinpath("camera_data")
         self.mesoscope_data_path = self.processed_data_path.joinpath("mesoscope_data")
-        self.single_day_s2p_path = self.mesoscope_data_path.joinpath("single_day")
-        self.multi_day_s2p_path = self.mesoscope_data_path.joinpath("multi_day")
         self.behavior_data_path = self.processed_data_path.joinpath("behavior_data")
         self.job_logs_path = self.processed_data_path.joinpath("job_logs")
-        self.processing_tracker_path = self.processed_data_path.joinpath("processing_tracker.yaml")
+        self.project_configuration_path = self.processed_data_path.joinpath("project_configuration.yaml")
+        self.session_data_path = self.processed_data_path.joinpath("session_data.yaml")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist."""
 
         ensure_directory_exists(self.processed_data_path)
         ensure_directory_exists(self.camera_data_path)
-        ensure_directory_exists(self.single_day_s2p_path)
-        ensure_directory_exists(self.multi_day_s2p_path)
         ensure_directory_exists(self.behavior_data_path)
         ensure_directory_exists(self.job_logs_path)
 
@@ -969,7 +989,9 @@ class SessionData(YamlConfig):
 
         configuration_data = ConfigurationData()
         configuration_data.resolve_paths(
-            root_directory_path=vrpc_root.joinpath(project_name, "configuration"), experiment_name=experiment_name
+            root_directory_path=vrpc_root.joinpath(project_name, "configuration"),
+            system_configuration_path=vrpc_root.joinpath("system_configuration.yaml"),
+            experiment_name=experiment_name,
         )
         configuration_data.make_directories()
 
@@ -1021,11 +1043,20 @@ class SessionData(YamlConfig):
         # classes is not exhaustive. More classes are saved as part of the session runtime management class start() and
         # __init__() method runtimes:
 
-        # Discovers and saves the necessary configuration class instances to the raw_data folder of the managed session:
+        # Discovers and saves the necessary configuration class instances to the raw_data and the processed_data folders
+        # of the managed session:
         # Project Configuration
         sh.copy2(
             src=instance.configuration_data.project_configuration_path,
             dst=instance.raw_data.project_configuration_path,
+        )
+        sh.copy2(
+            src=instance.configuration_data.project_configuration_path,
+            dst=instance.processed_data.project_configuration_path,
+        )  # ProjectConfiguration and SessionData are saved to both raw and processed data folders.
+        sh.copy2(
+            src=instance.configuration_data.system_configuration_path,
+            dst=instance.raw_data.system_configuration_path,
         )
         # Experiment Configuration, if the session type is Experiment.
         if experiment_name is not None:
@@ -1051,6 +1082,10 @@ class SessionData(YamlConfig):
 
         Notes:
             To create a new session, use the create() method instead.
+
+            Although session_data.yaml is stored both inside raw_data and processed_data subfolders, this method
+            always searches only inside the raw_data folder. Storing session data in both folders is only used to ensure
+            human experimenters can always trace all data in the lab back to the proper project, animal, and session.
 
         Args:
             session_path: The path to the root directory of an existing session, e.g.: vrpc_root/project/animal/session.
@@ -1102,7 +1137,9 @@ class SessionData(YamlConfig):
         # CONFIGURATION
         new_root = local_root.joinpath(instance.project_name, "configuration")
         instance.configuration_data.resolve_paths(
-            root_directory_path=new_root, experiment_name=instance.experiment_name
+            root_directory_path=new_root,
+            system_configuration_path=local_root.joinpath("system_configuration.yaml"),
+            experiment_name=instance.experiment_name,
         )
 
         # DEEPLABCUT
@@ -1166,6 +1203,18 @@ class SessionData(YamlConfig):
             )
         )
 
+        # Ensures that project configuration and session data classes are present in both raw_data and processed_data
+        # directories. This ensures that all data of the session can always be traced to the parent project, animal,
+        # and session.
+        sh.copy2(
+            src=instance.raw_data.session_data_path,
+            dst=instance.processed_data.session_data_path,
+        )
+        sh.copy2(
+            src=instance.raw_data.project_configuration_path,
+            dst=instance.processed_data.project_configuration_path,
+        )
+
         # Generates data directory hierarchies that may be missing on the local machine
         instance.raw_data.make_directories()
         instance.configuration_data.make_directories()
@@ -1176,7 +1225,8 @@ class SessionData(YamlConfig):
         return instance
 
     def _save(self) -> None:
-        """Saves the instance data to the 'raw_data' directory of the managed session as a 'session_data.yaml' file.
+        """Saves the instance data to the 'raw_data' directory and the 'processed_data' directory of the managed session
+         as a 'session_data.yaml' file.
 
         This is used to save the data stored in the instance to disk, so that it can be reused during preprocessing or
         data processing. The method is intended to only be used by the SessionData instance itself during its
@@ -1185,3 +1235,4 @@ class SessionData(YamlConfig):
 
         # Saves instance data as a .YAML file
         self.to_yaml(file_path=self.raw_data.session_data_path)
+        self.to_yaml(file_path=self.processed_data.session_data_path)

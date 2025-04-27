@@ -1,10 +1,10 @@
-"""This module provides classes used to store various data used by other Sun lab data acquisition and processing
-libraries.This includes classes used to store the data generated during acquisition and preprocessing and classes used
-to manage the runtime of other libraries (configuration data classes). Most classes from these modules are used by the
-major libraries 'sl-experiment' and 'sl-forgery'."""
-
+"""This module provides classes used to store the training and experiment data acquired by the sl-experiment library.
+Some classes from this library store raw data later processed by Sun lab data processing pipelines. Others are used to
+restore the Mesoscope-VR system to the same state across training or experiment sessions of the same animal.
+"""
 
 from dataclasses import dataclass
+
 from ataraxis_data_structures import YamlConfig
 
 
@@ -231,6 +231,3 @@ class MesoscopePositions(YamlConfig):
     """The Tilt-axis position, in degrees, of the Mesoscope objective used during session runtime."""
     mesoscope_tilt_position: float = 0.0
     """The Tip-axis position, in degrees, of the Mesoscope objective used during session runtime."""
-
-
-
