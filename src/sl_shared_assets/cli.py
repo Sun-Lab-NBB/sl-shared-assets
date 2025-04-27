@@ -6,7 +6,7 @@ import click
 
 from .server import generate_server_credentials
 from .data_classes import replace_root_path
-from .ascension_tools import ascend_tyche_data
+from .tools import ascend_tyche_data
 
 
 @click.command()

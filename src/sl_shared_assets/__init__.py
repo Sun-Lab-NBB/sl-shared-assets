@@ -8,9 +8,7 @@ Authors: Ivan Kondratyev (Inkaros), Kushaan Gupta, Yuantao Deng
 from ataraxis_base_utilities import console
 
 from .server import Server, ServerCredentials
-from .suite2p import (
-    Suite2PConfiguration,
-)
+from .suite2p import MultiDayS2PConfiguration, SingleDayS2PConfiguration
 from .data_classes import (
     DrugData,
     ImplantData,
@@ -30,8 +28,7 @@ from .data_classes import (
     ExperimentConfiguration,
     MesoscopeExperimentDescriptor,
 )
-from .transfer_tools import transfer_directory
-from .packaging_tools import calculate_directory_checksum
+from .tools import transfer_directory, calculate_directory_checksum
 
 # Ensures console is enabled when this library is imported
 if not console.enabled:
@@ -41,8 +38,9 @@ __all__ = [
     # Server module
     "Server",
     "ServerCredentials",
-    # Suite2p module
-    "Suite2PConfiguration",
+    # Suite2p package
+    "SingleDayS2PConfiguration",
+    "MultiDayS2PConfiguration",
     # Data classes module
     "DrugData",
     "ImplantData",

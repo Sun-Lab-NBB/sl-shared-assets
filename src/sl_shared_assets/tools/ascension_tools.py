@@ -1,6 +1,7 @@
 """This module provides tools for translating ('ascending') old Tyche data to use the modern data structure used in the
 Sun lab. The tools from this module will not work for any other data and also assume that the Tyche data has been
-preprocessed with an early version of the Sun lab mesoscope processing pipeline."""
+preprocessed with an early version of the Sun lab mesoscope processing pipeline. However, this module can be used as
+an example for how to convert other data formats to match use the Sun lab data structure."""
 
 from pathlib import Path
 import datetime
@@ -10,7 +11,7 @@ import numpy as np
 from ataraxis_base_utilities import LogLevel, console
 from ataraxis_time.time_helpers import extract_timestamp_from_bytes
 
-from .data_classes import SessionData, ProjectConfiguration
+from ..data_classes import SessionData, ProjectConfiguration
 from .transfer_tools import transfer_directory
 from .packaging_tools import calculate_directory_checksum
 
