@@ -16,7 +16,7 @@ from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
 
-from .configuration_data import SystemConfiguration, ExperimentConfiguration
+from .configuration_data import ExperimentConfiguration
 
 
 def replace_root_path(path: Path) -> None:
@@ -54,8 +54,8 @@ class ProjectConfiguration(YamlConfig):
     An instance of this class is generated and saved as a .yaml file in the 'configuration' directory of each project
     when it is created. After that, the stored data is reused for every runtime (training or experiment session) carried
     out for each animal of the project. Additionally, a copy of the most actual configuration file is saved inside each
-    runtime session's root folder, providing seamless integration between the managed data and various Sun lab (sl-)
-    libraries.
+    runtime session's 'raw_data' folder, providing seamless integration between the managed data and various Sun lab
+    (sl-) libraries.
 
     Notes:
         Together with SessionData, this class forms the entry point for all interactions with the data acquired in the
@@ -64,7 +64,8 @@ class ProjectConfiguration(YamlConfig):
 
         Most lab projects only need to adjust the "surgery_sheet_id" and "water_log_sheet_id" fields of the class. Most
         fields in this class are used by the sl-experiment library to generate the SessionData class instance for each
-        session and during experiment data acquisition, preprocessing, and processing.
+        session and during experiment data acquisition and preprocessing. Data processing pipelines use specialized
+        configuration files stored in other modules of this library.
 
         Although all path fields use str | Path datatype, they are always stored as Path objects. These fields are
         converted to strings only when the data is dumped as a .yaml file.
@@ -82,6 +83,20 @@ class ProjectConfiguration(YamlConfig):
     """The ID of the Google Sheet file that stores information about water restriction (and behavior tracker) 
     information for all animals participating in the managed project. This is used to synchronize the information 
     inside the water restriction log with the state of the animal at the end of each training or experiment session.
+    """
+    google_credentials_path: str | Path = Path("/media/Data/Experiments/sl-surgery-log-0f651e492767.json")
+    """
+    The path to the locally stored .JSON file that contains the service account credentials used to read and write 
+    Google Sheet data. This is used to access and work with the surgery log and the water restriction log files. 
+    Usually, the same service account is used across all projects.
+    """
+    server_credentials_path: str | Path = Path("/media/Data/Experiments/server_credentials.yaml")
+    """
+    The path to the locally stored .YAML file that contains the credentials for accessing the BioHPC server machine. 
+    While the filesystem of the server machine should already be mounted to the local machine via SMB or equivalent 
+    protocol, this data is used to establish SSH connection to the server and start newly acquired data processing 
+    after it is transferred to the server. This allows data acquisition, preprocessing, and processing to be controlled 
+    by the same runtime and prevents unprocessed data from piling up on the server.
     """
     local_root_directory: str | Path = Path("/media/Data/Experiments")
     """The absolute path to the directory where all projects are stored on the local host-machine (VRPC). Note, 
@@ -108,6 +123,40 @@ class ProjectConfiguration(YamlConfig):
     """The absolute path, relative to the BioHPC server root, to the directory where all projects are stored on the 
     fast (NVME) volume of the server. This path is used when running remote (server-side) jobs and, therefore, has to
     be relative to the server root."""
+    face_camera_index: int = 0
+    """The index of the face camera in the list of all available Harvester-managed cameras."""
+    left_camera_index: int = 0
+    """The index of the left body camera in the list of all available OpenCV-managed cameras."""
+    right_camera_index: int = 2
+    """The index of the right body camera in the list of all available OpenCV-managed cameras."""
+    harvesters_cti_path: str | Path = Path("/opt/mvIMPACT_Acquire/lib/x86_64/mvGenTLProducer.cti")
+    """The path to the GeniCam CTI file used to connect to Harvesters-managed cameras."""
+    actor_port: str = "/dev/ttyACM0"
+    """The USB port used by the Actor Microcontroller."""
+    sensor_port: str = "/dev/ttyACM1"
+    """The USB port used by the Sensor Microcontroller."""
+    encoder_port: str = "/dev/ttyACM2"
+    """The USB port used by the Encoder Microcontroller."""
+    headbar_port: str = "/dev/ttyUSB0"
+    """The USB port used by the HeadBar Zaber motor controllers (devices)."""
+    lickport_port: str = "/dev/ttyUSB1"
+    """The USB port used by the LickPort Zaber motor controllers (devices)."""
+    unity_ip: str = "127.0.0.1"
+    """The IP address of the MQTT broker used to communicate with the Unity game engine. This is only used during 
+    experiment runtimes. Training runtimes ignore this parameter."""
+    unity_port: int = 1883
+    """The port number of the MQTT broker used to communicate with the Unity game engine. This is only used during
+    experiment runtimes. Training runtimes ignore this parameter."""
+    valve_calibration_data: dict[int | float, int | float] | tuple[tuple[int | float, int | float], ...] = (
+        (15000, 1.8556),
+        (30000, 3.4844),
+        (45000, 7.1846),
+        (60000, 10.0854),
+    )
+    """A tuple of tuples that maps water delivery solenoid valve open times, in microseconds, to the dispensed volume 
+    of water, in microliters. During training and experiment runtimes, this data is used by the ValveModule to translate
+    the requested reward volumes into times the valve needs to be open to deliver the desired volume of water.
+    """
 
     @classmethod
     def load(cls, project_name: str, configuration_path: None | Path = None) -> "ProjectConfiguration":
@@ -171,13 +220,6 @@ class ProjectConfiguration(YamlConfig):
                 with open(path_file, "w") as f:
                     f.write(str(root_path))
 
-                # The first time 'root_path' is resolved, also dumps an instance of the SystemConfiguration class to the
-                # root path. All future runtimes will then use this instance to flexibly configure how VRPC interacts
-                # with other Mesoscope-VR components.
-                system_configuration_path = root_path.joinpath("system_configuration.yaml")
-                system_configuration = SystemConfiguration()
-                system_configuration.save(path=system_configuration_path)
-
             # Once the location of the path storage file is resolved, reads the root path from the file
             with open(path_file, "r") as f:
                 root_path = Path(f.read().strip())
@@ -213,15 +255,23 @@ class ProjectConfiguration(YamlConfig):
         # resolved configuration path or the manually provided path
         instance: ProjectConfiguration = cls.from_yaml(file_path=configuration_path)  # type: ignore
 
+        # Converts all paths loaded as strings to Path objects used inside the library
         instance.local_mesoscope_directory = Path(instance.local_mesoscope_directory)
         instance.local_nas_directory = Path(instance.local_nas_directory)
         instance.local_server_directory = Path(instance.local_server_directory)
         instance.local_server_working_directory = Path(instance.local_server_working_directory)
         instance.remote_storage_directory = Path(instance.remote_storage_directory)
         instance.remote_working_directory = Path(instance.remote_working_directory)
+        instance.google_credentials_path = Path(instance.google_credentials_path)
+        instance.server_credentials_path = Path(instance.server_credentials_path)
+        instance.harvesters_cti_path = Path(instance.harvesters_cti_path)
 
         # Local root path is always re-computed from the resolved configuration file's location
         instance.local_root_directory = Path(str(configuration_path.parents[2]))
+
+        # Converts valve_calibration data from dictionary to a tuple of tuples format
+        if not isinstance(instance.valve_calibration_data, tuple):
+            instance.valve_calibration_data = tuple((k, v) for k, v in instance.valve_calibration_data.items())
 
         # Partially verifies the loaded data. Most importantly, this step does not allow proceeding if the user did not
         # replace the surgery log and water restriction log placeholders with valid ID values.
@@ -257,6 +307,13 @@ class ProjectConfiguration(YamlConfig):
         original.local_server_working_directory = str(original.local_server_working_directory)
         original.remote_storage_directory = str(original.remote_storage_directory)
         original.remote_working_directory = str(original.remote_working_directory)
+        original.google_credentials_path = str(original.google_credentials_path)
+        original.server_credentials_path = str(original.server_credentials_path)
+        original.harvesters_cti_path = str(original.harvesters_cti_path)
+
+        # Converts valve calibration data into dictionary format
+        if isinstance(original.valve_calibration_data, tuple):
+            original.valve_calibration_data = {k: v for k, v in original.valve_calibration_data}
 
         # Saves the data to the YAML file
         original.to_yaml(file_path=path)
@@ -372,10 +429,6 @@ class RawData:
     """Stores the path to the ax_checksum.txt file. This file is generated as part of packaging the data for 
     transmission and stores the xxHash-128 checksum of the data. It is used to verify that the transmission did not 
     damage or otherwise alter the data."""
-    system_configuration_path: Path = Path()
-    """Stores the path to the system_configuration.yaml file. This file contains the parameters that control how 
-    VRPC interacts with various Mesoscope-VR system components. Additionally, it contains Mesoscope-VR configuration
-    data expected to change fairly frequently (unlike most such data, which is permanently hard-coded)."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -405,7 +458,6 @@ class RawData:
         self.window_screenshot_path = self.raw_data_path.joinpath("window_screenshot.png")
         self.telomere_path = self.raw_data_path.joinpath("telomere.bin")
         self.checksum_path = self.raw_data_path.joinpath("ax_checksum.txt")
-        self.system_configuration_path = self.raw_data_path.joinpath("system_configuration.yaml")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist."""
@@ -469,10 +521,6 @@ class ConfigurationData:
     """Stores the path to the project-specific configuration directory. This directory is used by all animals 
     and sessions of the project to store all pan-project configuration files. The configuration data is reused by all
     sessions in the project."""
-    system_configuration_path: Path = Path()
-    """Stores the path to the system_configuration.yaml file. This file contains the parameters that control how 
-    VRPC interacts with various Mesoscope-VR system components. Additionally, it contains Mesoscope-VR configuration 
-    data expected to change fairly frequently (unlike most such data, which is permanently hard-coded)."""
     experiment_configuration_path: Path = Path()
     """Stores the path to the experiment_configuration.yaml file. This file contains the snapshot of the 
     experiment runtime configuration used by the session. This file is only created for experiment session. It does not
@@ -490,7 +538,7 @@ class ConfigurationData:
     sl-suite2p-based registration pipelines used tot rack brain cells across multiple sessions."""
 
     def resolve_paths(
-        self, root_directory_path: Path, system_configuration_path: Path, experiment_name: str | None = None
+        self, root_directory_path: Path, experiment_name: str | None = None
     ) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
 
@@ -501,8 +549,6 @@ class ConfigurationData:
             root_directory_path: The path to the top-level directory of the local hierarchy. Depending on the managed
                 hierarchy, this has to point to a directory under the main /session, /animal, or /project directory of
                 the managed session.
-            system_configuration_path: The path to the system_configuration.yaml file. Typically, this file is stored
-                inside the root project directory (directory where all projects are stored) on the VRPC.
             experiment_name: Optionally specifies the name of the experiment executed as part of the managed session's
                 runtime. This is used to correctly configure the path to the specific ExperimentConfiguration data file.
                 If the managed session is not an Experiment session, this parameter should be set to None.
@@ -510,7 +556,6 @@ class ConfigurationData:
 
         # Generates the managed paths
         self.configuration_path = root_directory_path
-        self.system_configuration_path = system_configuration_path
         if experiment_name is None:
             self.experiment_configuration_path = self.configuration_path.joinpath("null")
         else:
@@ -990,7 +1035,6 @@ class SessionData(YamlConfig):
         configuration_data = ConfigurationData()
         configuration_data.resolve_paths(
             root_directory_path=vrpc_root.joinpath(project_name, "configuration"),
-            system_configuration_path=vrpc_root.joinpath("system_configuration.yaml"),
             experiment_name=experiment_name,
         )
         configuration_data.make_directories()
@@ -1054,10 +1098,6 @@ class SessionData(YamlConfig):
             src=instance.configuration_data.project_configuration_path,
             dst=instance.processed_data.project_configuration_path,
         )  # ProjectConfiguration and SessionData are saved to both raw and processed data folders.
-        sh.copy2(
-            src=instance.configuration_data.system_configuration_path,
-            dst=instance.raw_data.system_configuration_path,
-        )
         # Experiment Configuration, if the session type is Experiment.
         if experiment_name is not None:
             sh.copy2(
@@ -1138,7 +1178,6 @@ class SessionData(YamlConfig):
         new_root = local_root.joinpath(instance.project_name, "configuration")
         instance.configuration_data.resolve_paths(
             root_directory_path=new_root,
-            system_configuration_path=local_root.joinpath("system_configuration.yaml"),
             experiment_name=instance.experiment_name,
         )
 
