@@ -4,10 +4,8 @@ the running job status. All lab processing and analysis pipelines use this inter
 resources.
 """
 
-import re
 import time
 from pathlib import Path
-import datetime
 from dataclasses import dataclass
 
 import paramiko
@@ -18,6 +16,7 @@ from paramiko.client import SSHClient
 from ataraxis_base_utilities import LogLevel, console
 from ataraxis_data_structures import YamlConfig
 from .job import Job
+import tempfile
 
 
 def generate_server_credentials(
@@ -120,65 +119,82 @@ class Server:
         """If the instance is connected to the server, terminates the connection before the instance is destroyed."""
         self.close()
 
-    def submit_job(self, job: Job) -> str:
-        """Submits the input SLURM command to the managed BioHPC server via the shell script.
+    def submit_job(self, job: Job) -> Job:
+        """Submits the input job to the managed BioHPC server via SLURM job manager.
 
-        This method submits various commands for execution via SLURM-managed BioHPC cluster. As part of its runtime, the
-        method translates the Slurm object into the shell script, moves the script to the target working directory on
+        This method submits various jobs for execution via SLURM-managed BioHPC cluster. As part of its runtime, the
+        method translates the Job object into the shell script, moves the script to the target working directory on
         the server, and instructs the server to execute the shell script (via SLURM).
 
         Args:
-            slurm_command: The Slurm (command) object containing the job configuration and individual commands to run
-                as part of the processing pipeline.
-            working_directory: The path to the working directory on the server where the shell script is moved
-                and executed.
+            job: The Job object that contains all job data.
 
         Returns:
-            The job ID assigned to the job by SLURM manager if the command submission is successful.
+            The job object whose 'job_id' attribute had been modified with the job ID, if the job was successfully
+            submitted.
 
         Raises:
-            RuntimeError: If the command submission to the server fails.
+            RuntimeError: If job submission to the server fails.
         """
-        # Resolves the paths to the local and remote (server-side) .sh script files.
-        local_script_path = Path("temp_script.sh")
-        fixed_script_content = job.command
 
-        # Creates a temporary script file locally and dumps translated command data into the file
-        with open(local_script_path, "w") as f:
-            f.write(fixed_script_content)
+        # Generates a temporary shell script on the local machine. Uses tempfile to automatically remove the
+        # local script as soon as it is uploaded to the server.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            local_script_path = Path(temp_dir).joinpath(f"{job.job_name}.sh")
+            fixed_script_content = job.command_script
 
-        # Uploads the command script to the server
-        sftp = self._client.open_sftp()
-        sftp.put(localpath=local_script_path, remotepath=remote_script_path)
-        sftp.close()
+            # Creates a temporary script file locally and dumps translated command data into the file
+            with open(local_script_path, "w") as f:
+                f.write(fixed_script_content)
 
-        # Removes the temporary local .sh file
-        local_script_path.unlink()
+            # Uploads the command script to the server
+            sftp = self._client.open_sftp()
+            sftp.put(localpath=local_script_path, remotepath=job.remote_script_path)
+            sftp.close()
 
         # Makes the server-side script executable
-        self._client.exec_command(f"chmod +x {remote_script_path}")
+        self._client.exec_command(f"chmod +x {job.remote_script_path}")
 
-        # Submits the job to SLURM with sbatch and verifies submission state by returning either the ID of the job or
-        # None to indicate no job has been submitted.
-        job_output = self._client.exec_command(f"sbatch {remote_script_path}")[1].read().strip().decode()
-        if "Submitted batch job" in job_output:
-            return job_output.split()[-1]
-        else:
-            message = f"Failed to submit the {job_name} job to the BioHPC cluster."
+        # Submits the job to SLURM with sbatch and verifies submission state
+        job_output = self._client.exec_command(f"sbatch {job.remote_script_path}")[1].read().strip().decode()
+
+        # If batch_job is not in the output received from SLURM in response to issuing the submission command, raises an
+        # error.
+        if "Submitted batch job" not in job_output:
+            message = f"Failed to submit the {job.job_name} job to the BioHPC cluster."
             console.error(message, RuntimeError)
 
             # Fallback to appease mypy, should not be reachable
             raise RuntimeError(message)
 
-    def job_complete(self, job_id: str) -> bool:
-        """Returns True if the job with the given ID has been completed or terminated its runtime due to an error.
+        # Otherwise, extracts the job id assigned to the job by SLURM from the response and writes it to the processed
+        # Job object
+        job_id = job_output.split()[-1]
+        job.job_id = job_id
+        return job
+
+    def job_complete(self, job: Job) -> bool:
+        """Returns True if the job managed by the input Job instance has been completed or terminated its runtime due
+        to an error.
 
         If the job is still running or is waiting inside the execution queue, returns False.
 
         Args:
-            job_id: The numeric ID of the job to check, assigned by SLURM.
+            job: The Job object whose status needs to be checked.
+
+        Raises:
+            ValueError: If the input Job object does not contain a valid job_id, suggesting that it has not been
+                submitted to the server.
         """
-        if j_id not in self._client.exec_command(f"squeue -j {job_id}")[1].read().decode().strip():
+
+        if job.job_id is None:
+            message = (
+                f"The input Job object for the job {job.job_name} does not contain a valid job_id. This indicates that "
+                f"the job has not been submitted to the server."
+            )
+            console.error(message, ValueError)
+
+        if job.job_id not in self._client.exec_command(f"squeue -j {job.job_id}")[1].read().decode().strip():
             return True
         else:
             return False
@@ -200,34 +216,36 @@ if __name__ == "__main__":
     server = Server(credentials_path=cred_path)
 
     # Generates SLURM job header
-    slurm = server.generate_slurm_header(
+    job = Job(
         job_name="test_job",
         output_log=Path("/workdir/cbsuwsun/test_job_stdout.txt"),
         error_log=Path("/workdir/cbsuwsun/test_job_stderr.txt"),
+        working_directory=Path("/workdir/cbsuwsun/"),
+        conda_environment='base',
         cpus_to_use=1,
+        time_limit=5,
     )
 
     # Adds test runtime command
-    slurm.add_cmd("python --version > /workdir/cbsuwsun/mamba_version.txt")
+    job.add_command("python --version > /workdir/cbsuwsun/mamba_version.txt")
 
     # Submits the job to the server
-    j_id = server.submit_job(slurm_command=slurm, working_directory=Path("/workdir/cbsuwsun/"))
+    job = server.submit_job(job)
 
-    if j_id:
-        console.echo(f"Successfully submitted job with ID {j_id} to the server.", level=LogLevel.SUCCESS)
+    console.echo(f"Successfully submitted job with ID {job.job_id} to the server.", level=LogLevel.SUCCESS)
 
-        max_wait_time = 60  # Maximum wait time in seconds
-        wait_interval = 1  # Check every 1 second
-        elapsed_time = 0
+    max_wait_time = 60  # Maximum wait time in seconds
+    wait_interval = 1  # Check every 1 second
+    elapsed_time = 0
 
-        while elapsed_time < max_wait_time:
-            if server.job_complete(job_id=j_id):
-                console.echo("Job completed", level=LogLevel.SUCCESS)
-                break
+    while elapsed_time < max_wait_time:
+        if server.job_complete(job):
+            console.echo("Job completed", level=LogLevel.SUCCESS)
+            break
 
-            console.echo(f"Job still running. Waiting {wait_interval} seconds...", level=LogLevel.INFO)
-            time.sleep(wait_interval)
-            elapsed_time += wait_interval
+        console.echo(f"Job still running. Waiting {wait_interval} seconds...", level=LogLevel.INFO)
+        time.sleep(wait_interval)
+        elapsed_time += wait_interval
 
     # Close the connection
     server.close()
