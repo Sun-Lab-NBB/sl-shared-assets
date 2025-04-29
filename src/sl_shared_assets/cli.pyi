@@ -1,6 +1,6 @@
+from .tools import ascend_tyche_data as ascend_tyche_data
 from .server import generate_server_credentials as generate_server_credentials
 from .data_classes import replace_root_path as replace_root_path
-from .ascension_tools import ascend_tyche_data as ascend_tyche_data
 
 def replace_local_root_directory(path: str) -> None:
     """Replaces the root directory used to store all lab projects on the local PC with the specified directory.

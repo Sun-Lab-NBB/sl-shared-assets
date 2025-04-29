@@ -1,37 +1,58 @@
+from .tools import (
+    transfer_directory as transfer_directory,
+    calculate_directory_checksum as calculate_directory_checksum,
+)
 from .server import (
     Server as Server,
     ServerCredentials as ServerCredentials,
 )
-from .suite2p import Suite2PConfiguration as Suite2PConfiguration
+from .suite2p import (
+    MultiDayS2PConfiguration as MultiDayS2PConfiguration,
+    SingleDayS2PConfiguration as SingleDayS2PConfiguration,
+)
 from .data_classes import (
+    RawData as RawData,
     DrugData as DrugData,
     ImplantData as ImplantData,
     SessionData as SessionData,
     SubjectData as SubjectData,
     SurgeryData as SurgeryData,
     InjectionData as InjectionData,
+    MesoscopeData as MesoscopeData,
     ProcedureData as ProcedureData,
+    ProcessedData as ProcessedData,
+    DeepLabCutData as DeepLabCutData,
     ZaberPositions as ZaberPositions,
     ExperimentState as ExperimentState,
-    ProcessingTracker as ProcessingTracker,
+    VRPCDestinations as VRPCDestinations,
+    ConfigurationData as ConfigurationData,
     MesoscopePositions as MesoscopePositions,
+    VRPCPersistentData as VRPCPersistentData,
     ProjectConfiguration as ProjectConfiguration,
     HardwareConfiguration as HardwareConfiguration,
     RunTrainingDescriptor as RunTrainingDescriptor,
     LickTrainingDescriptor as LickTrainingDescriptor,
     ExperimentConfiguration as ExperimentConfiguration,
+    ScanImagePCPersistentData as ScanImagePCPersistentData,
     MesoscopeExperimentDescriptor as MesoscopeExperimentDescriptor,
 )
-from .transfer_tools import transfer_directory as transfer_directory
-from .packaging_tools import calculate_directory_checksum as calculate_directory_checksum
 
 __all__ = [
     "Server",
     "ServerCredentials",
-    "Suite2PConfiguration",
+    "SingleDayS2PConfiguration",
+    "MultiDayS2PConfiguration",
     "DrugData",
     "ImplantData",
     "SessionData",
+    "RawData",
+    "ProcessedData",
+    "ConfigurationData",
+    "DeepLabCutData",
+    "VRPCPersistentData",
+    "ScanImagePCPersistentData",
+    "MesoscopeData",
+    "VRPCDestinations",
     "SubjectData",
     "SurgeryData",
     "InjectionData",
@@ -45,7 +66,6 @@ __all__ = [
     "LickTrainingDescriptor",
     "ExperimentConfiguration",
     "MesoscopeExperimentDescriptor",
-    "ProcessingTracker",
     "transfer_directory",
     "calculate_directory_checksum",
 ]

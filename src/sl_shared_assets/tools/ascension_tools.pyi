@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from .data_classes import (
+from ..data_classes import (
     SessionData as SessionData,
     ProjectConfiguration as ProjectConfiguration,
 )

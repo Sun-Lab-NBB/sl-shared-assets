@@ -7,31 +7,35 @@ Authors: Ivan Kondratyev (Inkaros), Kushaan Gupta, Yuantao Deng
 
 from ataraxis_base_utilities import console
 
+from .tools import transfer_directory, calculate_directory_checksum
 from .server import Server, ServerCredentials
-from .suite2p import (
-    Suite2PConfiguration,
-)
+from .suite2p import MultiDayS2PConfiguration, SingleDayS2PConfiguration
 from .data_classes import (
+    RawData,
     DrugData,
     ImplantData,
     SessionData,
     SubjectData,
     SurgeryData,
     InjectionData,
+    MesoscopeData,
     ProcedureData,
+    ProcessedData,
+    DeepLabCutData,
     ZaberPositions,
     ExperimentState,
-    ProcessingTracker,
+    VRPCDestinations,
+    ConfigurationData,
     MesoscopePositions,
+    VRPCPersistentData,
     ProjectConfiguration,
     HardwareConfiguration,
     RunTrainingDescriptor,
     LickTrainingDescriptor,
     ExperimentConfiguration,
+    ScanImagePCPersistentData,
     MesoscopeExperimentDescriptor,
 )
-from .transfer_tools import transfer_directory
-from .packaging_tools import calculate_directory_checksum
 
 # Ensures console is enabled when this library is imported
 if not console.enabled:
@@ -41,12 +45,21 @@ __all__ = [
     # Server module
     "Server",
     "ServerCredentials",
-    # Suite2p module
-    "Suite2PConfiguration",
+    # Suite2p package
+    "SingleDayS2PConfiguration",
+    "MultiDayS2PConfiguration",
     # Data classes module
     "DrugData",
     "ImplantData",
     "SessionData",
+    "RawData",
+    "ProcessedData",
+    "ConfigurationData",
+    "DeepLabCutData",
+    "VRPCPersistentData",
+    "ScanImagePCPersistentData",
+    "MesoscopeData",
+    "VRPCDestinations",
     "SubjectData",
     "SurgeryData",
     "InjectionData",
@@ -60,7 +73,6 @@ __all__ = [
     "LickTrainingDescriptor",
     "ExperimentConfiguration",
     "MesoscopeExperimentDescriptor",
-    "ProcessingTracker",
     # Transfer tools module
     "transfer_directory",
     # Packaging tools module

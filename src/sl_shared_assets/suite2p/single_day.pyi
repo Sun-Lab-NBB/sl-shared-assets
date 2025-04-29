@@ -6,7 +6,7 @@ from ataraxis_data_structures import YamlConfig
 
 @dataclass
 class Main:
-    """Stores global settings used to broadly define the suite2p processing configuration."""
+    """Stores global parameters that broadly define the suite2p single-day processing configuration."""
 
     nplanes: int = ...
     nchannels: int = ...
@@ -23,7 +23,7 @@ class Main:
 
 @dataclass
 class FileIO:
-    """Stores I/O settings used to specify input data file locations, formats, and output storage options."""
+    """Stores general I/O parameters that specify input data location, format, and working and output directories."""
 
     fast_disk: list[str] = field(default_factory=list)
     delete_bin: bool = ...
@@ -43,7 +43,7 @@ class FileIO:
 
 @dataclass
 class Output:
-    """Stores I/O settings used to define the output format and organization of the processing results."""
+    """Stores I/O settings that specify the output format and organization of the data processing results."""
 
     preclassify: float = ...
     save_nwb: bool = ...
@@ -54,7 +54,7 @@ class Output:
 
 @dataclass
 class Registration:
-    """Stores rigid registration settings used for correcting motion artifacts between frames."""
+    """Stores parameters for rigid registration, which is used to correct motion artifacts between frames."""
 
     do_registration: bool = ...
     align_by_chan: int = ...
@@ -75,7 +75,8 @@ class Registration:
 
 @dataclass
 class OnePRegistration:
-    """Stores additional pre-registration processing settings used to improve the registration of 1-photon datasets."""
+    """Stores parameters for additional pre-registration processing used to improve the registration of 1-photon
+    datasets."""
 
     one_p_reg: bool = ...
     spatial_hp_reg: int = ...
@@ -84,7 +85,8 @@ class OnePRegistration:
 
 @dataclass
 class NonRigid:
-    """Stores non-rigid registration settings used to improve motion registration in complex datasets."""
+    """Stores parameters for non-rigid registration, which is used to improve motion registration in complex
+    datasets."""
 
     nonrigid: bool = ...
     block_size: list[int] = field(default_factory=Incomplete)
@@ -93,7 +95,7 @@ class NonRigid:
 
 @dataclass
 class ROIDetection:
-    """Stores ROI detection and extraction settings used to identify cells and their activity signals."""
+    """Stores parameters for cell ROI detection and extraction."""
 
     roidetect: bool = ...
     sparse_mode: bool = ...
@@ -110,7 +112,7 @@ class ROIDetection:
 
 @dataclass
 class CellposeDetection:
-    """Stores Cellpose algorithm settings used for cell detection."""
+    """Stores parameters for the Cellpose algorithm, which can optionally be used to improve cell ROI extraction."""
 
     anatomical_only: int = ...
     diameter: int = ...
@@ -121,7 +123,7 @@ class CellposeDetection:
 
 @dataclass
 class SignalExtraction:
-    """Stores settings used to extract fluorescence signals from ROIs and surrounding neuropil regions."""
+    """Stores parameters for extracting fluorescence signals from ROIs and surrounding neuropil regions."""
 
     neuropil_extract: bool = ...
     allow_overlap: bool = ...
@@ -131,7 +133,7 @@ class SignalExtraction:
 
 @dataclass
 class SpikeDeconvolution:
-    """Stores settings used to deconvolve calcium signals to infer spike trains."""
+    """Stores parameters for deconvolve fluorescence signals to infer spike trains."""
 
     spikedetect: bool = ...
     neucoeff: float = ...
@@ -142,7 +144,7 @@ class SpikeDeconvolution:
 
 @dataclass
 class Classification:
-    """Stores settings used to classify detected ROIs as real cells or artifacts."""
+    """Stores parameters for classifying detected ROIs as real cells or artifacts."""
 
     soma_crop: bool = ...
     use_builtin_classifier: bool = ...
@@ -150,18 +152,20 @@ class Classification:
 
 @dataclass
 class Channel2:
-    """Stores settings for processing the second channel in multichannel datasets."""
+    """Stores parameters for processing the second channel in multichannel datasets."""
 
     chan2_thres: float = ...
 
 @dataclass
-class Suite2PConfiguration(YamlConfig):
-    """Stores the user-addressable suite2p configuration parameters, organized into subsections.
+class SingleDayS2PConfiguration(YamlConfig):
+    """Stores the user-addressable suite2p configuration parameters for the single-day (original) pipeline, organized
+    into subsections.
 
-    This class is used during processing to instruct suite2p on how to process the data. Specifically, it provides a
-    user-friendly way of specifying all user-addressable parameters through a .YAML file. The sl-forgery library then
-    loads the data from .yaml file and uses it to configure the single-day suite2p pipeline and the multiday suite2p
-    pipeline.
+    This class is used during single-day processing to instruct suite2p on how to process the data. This class is based
+    on the 'default_ops' from the original suite2p package. As part of the suite2p refactoring performed in sl-suite2p
+    package, the 'default_ops' has been replaced with this class instance. Compared to 'original' ops, it allows saving
+    configuration parameters as a .YAML file, which offers a better way of viewing and editing the parameters and
+    running suite2p pipeline on remote compute servers.
 
     Notes:
         The .YAML file uses section names that match the suite2p documentation sections. This way, users can always

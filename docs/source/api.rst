@@ -21,29 +21,22 @@ Command Line Interfaces
    :prog: sl-ascend
    :nested: full
 
-Packaging Tools
-===============
-.. automodule:: sl_shared_assets.packaging_tools
+Tools
+=====
+.. automodule:: sl_shared_assets.tools
    :members:
    :undoc-members:
    :show-inheritance:
 
-Transfer Tools
-==============
-.. automodule:: sl_shared_assets.transfer_tools
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Suite2P Configuration Classes
-=============================
+Suite2P Configuration
+=====================
 .. automodule:: sl_shared_assets.suite2p
    :members:
    :undoc-members:
    :show-inheritance:
 
-General Configuration and Data Storage Classes
-==============================================
+General Data and Configuration Classes
+======================================
 .. automodule:: sl_shared_assets.data_classes
    :members:
    :undoc-members:
@@ -52,13 +45,6 @@ General Configuration and Data Storage Classes
 Compute Server Tools
 ====================
 .. automodule:: sl_shared_assets.server
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Ascension Tools
-===============
-.. automodule:: sl_shared_assets.ascension_tools
    :members:
    :undoc-members:
    :show-inheritance:
