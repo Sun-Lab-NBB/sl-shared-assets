@@ -6,6 +6,7 @@ resources.
 
 import time
 from pathlib import Path
+import tempfile
 from dataclasses import dataclass
 
 import paramiko
@@ -15,8 +16,8 @@ from simple_slurm import Slurm  # type: ignore
 from paramiko.client import SSHClient
 from ataraxis_base_utilities import LogLevel, console
 from ataraxis_data_structures import YamlConfig
+
 from .job import Job
-import tempfile
 
 
 def generate_server_credentials(
@@ -68,9 +69,9 @@ class Server:
         credentials_path: The path to the locally stored .yaml file that contains the server hostname and access
             credentials.
 
-        Attributes:
-            _open: Tracks whether the connection to the server is open or not.
-            _client: Stores the initialized SSHClient instance used to interface with the server.
+    Attributes:
+        _open: Tracks whether the connection to the server is open or not.
+        _client: Stores the initialized SSHClient instance used to interface with the server.
     """
 
     def __init__(self, credentials_path: Path) -> None:
@@ -194,6 +195,9 @@ class Server:
             )
             console.error(message, ValueError)
 
+            # This is here to appease mypy, it should not be reachable
+            raise ValueError(message)
+
         if job.job_id not in self._client.exec_command(f"squeue -j {job.job_id}")[1].read().decode().strip():
             return True
         else:
@@ -207,45 +211,3 @@ class Server:
         # Prevents closing already closed connections
         if self._open:
             self._client.close()
-
-
-if __name__ == "__main__":
-    # Creates SSHClient for server access
-    console.enable()
-    cred_path = Path("/home/cyberaxolotl/Desktop/test/server_credentials.yaml")
-    server = Server(credentials_path=cred_path)
-
-    # Generates SLURM job header
-    job = Job(
-        job_name="test_job",
-        output_log=Path("/workdir/cbsuwsun/test_job_stdout.txt"),
-        error_log=Path("/workdir/cbsuwsun/test_job_stderr.txt"),
-        working_directory=Path("/workdir/cbsuwsun/"),
-        conda_environment='base',
-        cpus_to_use=1,
-        time_limit=5,
-    )
-
-    # Adds test runtime command
-    job.add_command("python --version > /workdir/cbsuwsun/mamba_version.txt")
-
-    # Submits the job to the server
-    job = server.submit_job(job)
-
-    console.echo(f"Successfully submitted job with ID {job.job_id} to the server.", level=LogLevel.SUCCESS)
-
-    max_wait_time = 60  # Maximum wait time in seconds
-    wait_interval = 1  # Check every 1 second
-    elapsed_time = 0
-
-    while elapsed_time < max_wait_time:
-        if server.job_complete(job):
-            console.echo("Job completed", level=LogLevel.SUCCESS)
-            break
-
-        console.echo(f"Job still running. Waiting {wait_interval} seconds...", level=LogLevel.INFO)
-        time.sleep(wait_interval)
-        elapsed_time += wait_interval
-
-    # Close the connection
-    server.close()

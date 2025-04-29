@@ -1,14 +1,7 @@
-"""This module provides the core Job class, used as the starting point for all SLURM-managed job executed on lab compute
-server(s). Specifically, the Job class acts as a wrapper around the SLURM configuration and specific logic of each
-job. During runtime, Server class interacts with input job objects to manage their transfer and execution on the
-remote servers."""
-
-# noinspection PyProtectedMember
 from pathlib import Path
-import datetime
 
-from simple_slurm import Slurm  # type: ignore
-
+from _typeshed import Incomplete
+from simple_slurm import Slurm
 
 class Job:
     """Aggregates the data of a single SLURM-managed job to be executed on the Sun lab BioHPC cluster.
@@ -65,6 +58,10 @@ class Job:
         _command: Stores the managed SLURM command object.
     """
 
+    remote_script_path: Incomplete
+    job_id: str | None
+    job_name: str
+    _command: Slurm
     def __init__(
         self,
         job_name: str,
@@ -75,36 +72,9 @@ class Job:
         cpus_to_use: int = 10,
         ram_gb: int = 10,
         time_limit: int = 60,
-    ) -> None:
-        # Resolves the paths to the remote (server-side) .sh script file. This is the path where the job script
-        # will be stored on the server, once it is transferred by the Server class instance.
-        self.remote_script_path = str(working_directory.joinpath(f"{job_name}.sh"))
-
-        # Defines additional arguments used by the Server class that executed the job.
-        self.job_id: str | None = None  # This is set by the Server that submits the job.
-        self.job_name: str = job_name  # Also stores the job name to support more informative terminal prints
-
-        # Builds the slurm command object filled with configuration information
-        self._command: Slurm = Slurm(
-            cpus_per_task=cpus_to_use,
-            job_name=job_name,
-            output=str(output_log),
-            error=str(error_log),
-            mem=f"{ram_gb}G",
-            time=datetime.timedelta(minutes=time_limit),
-        )
-
-        # Conda shell initialization commands
-        self._command.add_cmd("eval $(conda shell.bash hook)")
-        self._command.add_cmd("conda init bash")
-
-        # Activates the target conda environment for the command.
-        self._command.add_cmd(f"conda activate {conda_environment}")
-
+    ) -> None: ...
     def __repr__(self) -> str:
         """Returns the string representation of the Job instance."""
-        return f"Job(name={self.job_name}, id={self.job_id})"
-
     def add_command(self, command: str) -> None:
         """Adds the input command string to the end of the managed SLURM job command list.
 
@@ -114,9 +84,6 @@ class Job:
         Args:
             command: The command string to add to the command list, e.g.: 'python main.py --input 1'.
         """
-
-        self._command.add_cmd(command)
-
     @property
     def command_script(self) -> str:
         """Translates the managed job data into a shell-script-writable string and returns it to caller.
@@ -125,16 +92,3 @@ class Job:
         executed on the remote compute server. Do not call this method manually unless you know what you are doing.
         The returned string is safe to dump into a .sh (shell script) file and move to the BioHPC server for execution.
         """
-
-        # Appends the command to clean up (remove) the temporary script file after processing runtime is over
-        self._command.add_cmd(f"rm -f {self.remote_script_path}")
-
-        # Translates the command to string format
-        script_content = str(self._command)
-
-        # Replaces escaped $ (/$) with $. This is essential, as without this correction, things like conda
-        # initialization would not work as expected.
-        fixed_script_content = script_content.replace("\\$", "$")
-
-        # Returns the script content to caller as a string
-        return fixed_script_content

@@ -537,9 +537,7 @@ class ConfigurationData:
     on the fast BioHPC server volume. This configuration file specifies the parameters for the 'multiday' 
     sl-suite2p-based registration pipelines used tot rack brain cells across multiple sessions."""
 
-    def resolve_paths(
-        self, root_directory_path: Path, experiment_name: str | None = None
-    ) -> None:
+    def resolve_paths(self, root_directory_path: Path, experiment_name: str | None = None) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
 
         This method is called each time the class is instantiated to regenerate the managed path hierarchy on any
