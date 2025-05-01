@@ -528,13 +528,13 @@ class ConfigurationData:
     project_configuration_path: Path = Path()
     """Stores the path to the project_configuration.yaml file. This file contains the snapshot of the configuration 
     parameters for the session's project."""
-    suite2p_configuration_path: Path = Path()
-    """Stores the path to the suite2p_configuration.yaml file stored inside the project's 'configuration' directory on
-    the fast BioHPC server volume. This configuration file specifies the parameters for the 'single day' suite2p 
-    registration pipeline, which is applied to each session that generates brain activity data."""
-    multiday_configuration_path: Path = Path()
-    """Stores the path to the multiday_configuration.yaml file stored inside the project's 'configuration' directory 
-    on the fast BioHPC server volume. This configuration file specifies the parameters for the 'multiday' 
+    single_day_s2p_configuration_path: Path = Path()
+    """Stores the path to the single_day_s2p_configuration.yaml file stored inside the project's 'configuration' 
+    directory on the fast BioHPC server volume. This configuration file specifies the parameters for the 'single day' 
+    suite2p registration pipeline, which is applied to each session that generates brain activity data."""
+    multi_day_s2p_configuration_path: Path = Path()
+    """Stores the path to the multi_day_s2p_configuration.yaml file stored inside the project's 'configuration' 
+    directory on the fast BioHPC server volume. This configuration file specifies the parameters for the 'multiday' 
     sl-suite2p-based registration pipelines used tot rack brain cells across multiple sessions."""
 
     def resolve_paths(self, root_directory_path: Path, experiment_name: str | None = None) -> None:
@@ -559,8 +559,8 @@ class ConfigurationData:
         else:
             self.experiment_configuration_path = self.configuration_path.joinpath(f"{experiment_name}.yaml")
         self.project_configuration_path = self.configuration_path.joinpath("project_configuration.yaml")
-        self.suite2p_configuration_path = self.configuration_path.joinpath("suite2p_configuration.yaml")
-        self.multiday_configuration_path = self.configuration_path.joinpath("multiday_configuration.yaml")
+        self.single_day_s2p_configuration_path = self.configuration_path.joinpath("single_day_s2p_configuration.yaml")
+        self.multi_day_s2p_configuration_path = self.configuration_path.joinpath("multi_day_s2p_configuration.yaml")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist."""
@@ -1162,6 +1162,7 @@ class SessionData(YamlConfig):
         # RAW DATA
         new_root = local_root.joinpath(instance.project_name, instance.animal_id, instance.session_name, "raw_data")
         instance.raw_data.resolve_paths(root_directory_path=new_root)
+        instance.raw_data.make_directories()
 
         # Uses the adjusted raw_data section to load the ProjectConfiguration instance. This is used below to resolve
         # all other SessionData sections, as it stores various required root directories.
@@ -1178,10 +1179,12 @@ class SessionData(YamlConfig):
             root_directory_path=new_root,
             experiment_name=instance.experiment_name,
         )
+        instance.configuration_data.make_directories()
 
         # DEEPLABCUT
         new_root = local_root.joinpath(instance.project_name, "deeplabcut")
         instance.deeplabcut_data.resolve_paths(root_directory_path=new_root)
+        instance.deeplabcut_data.make_directories()
 
         # Resolves the roots for all VRPC-specific sections that use the data from the ProjectConfiguration instance:
 
@@ -1239,6 +1242,7 @@ class SessionData(YamlConfig):
                 instance.project_name, instance.animal_id, instance.session_name, "processed_data"
             )
         )
+        instance.processed_data.make_directories()
 
         # Ensures that project configuration and session data classes are present in both raw_data and processed_data
         # directories. This ensures that all data of the session can always be traced to the parent project, animal,

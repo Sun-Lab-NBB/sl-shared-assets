@@ -54,7 +54,7 @@ class Main:
     """Determines the number of frames to process, if greater than zero. If negative (-1), the suite2p is configured
      to process all available frames."""
 
-    multiplane_parallel: bool = True
+    multiplane_parallel: bool = False
     """Determines whether to parallelize plane processing for multiplane data. Note, while enabling this option improves
     processing speeds, it also increases the memory (RAM) overhead resulting from processing all planes in-parallel.
     """
@@ -214,6 +214,16 @@ class Registration:
 
     pad_fft: bool = False
     """Determines whether to pad the image during the FFT portion of the registration to reduce edge effects."""
+
+    do_regmetrics: bool = True
+    """Determines whether to compute the registration quality metrics. This step is optional, registration metrics are 
+    NOT used by the suite2p processing pipeline. However, these metrics may be important for users to assess the 
+    registration quality. Note, computing the registration metrics takes approximately as long as computing the 
+    registration offsets, almost doubling the overall processing time for each plane."""
+
+    reg_metric_n_pc: int = 10
+    """The number of Principle Components (PCs) used to compute the registration metrics. Note, increasing this number
+    exponentially increases the metric computation time for each plane."""
 
 
 @dataclass
