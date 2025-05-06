@@ -5,6 +5,9 @@ is used as the first step of the multi-day brain activity processing pipeline us
 
 from typing import Any
 from dataclasses import field, asdict, dataclass
+from pathlib import Path
+import numpy as np
+from ataraxis_base_utilities import ensure_directory_exists
 
 from ataraxis_data_structures import YamlConfig
 
@@ -13,42 +16,44 @@ from ataraxis_data_structures import YamlConfig
 class Main:
     """Stores global parameters that broadly define the suite2p single-day processing configuration."""
 
-    nplanes: int = 3
-    """The number of imaging planes in each TIFF file sequence. For Mesoscope frames, this is the number of individual 
-    ROI boxes drawn over the cranial window."""
+    nplanes: int = 1
+    """The number of imaging planes, stored as a sequence inside each input TIFF file."""
 
     nchannels: int = 1
-    """The number of channels per imaging plane. Typically this is either 1 or 2."""
+    """The number of imaging channels per imaging plane. Typically, this is either 1 or 2. The algorithm expects images
+    from different channels of the same plane to be saved sequentially (e.g.: plane 1 ch1, plane 1 ch2, plane 2 ch1, 
+    etc.)."""
 
     functional_chan: int = 1
-    """The channel used for extracting functional ROIs (uses 1-based indexing, e.g., 1 means the first channel)."""
+    """The channel used for extracting functional ROIs (cells). Note, this parameter uses 1-based indexing, where '1' 
+    means the first channel and '2' means the second channel."""
 
     tau: float = 0.4
     """The timescale of the sensor, in seconds, used for computing the deconvolution kernel. The kernel is fixed to 
-    have this decay and is not fit to the data. Note, the default value is optimized for GCamp6f animals recorded with 
-    the Mesoscope."""
+    have this decay and is not fit to the data. Note, the default value is optimized for GCaMP6f animals recorded with 
+    the Mesoscope and likely needs to be increased for most other use cases."""
 
     force_sktiff: bool = True
-    """Determines whether to force the use of scikit-image for reading TIFF files. Generally, it is recommended to have 
-    this enabled as it forces suite2p to use tifffile library, which has better safety and compatibility than 
-    ScanImage tiff reader for certain types of tiff files."""
+    """Determines whether to force the use of scikit-image (tifffile) for reading TIFF files. Generally, it is 
+    recommended to have this enabled as it forces suite2p to use the tifffile library, which is compatible with more 
+    formats than ScanImage tiff reader. In the future, this option may be deprecated in favor of tifffile altogether."""
 
     fs: float = 10.0014
-    """The sampling rate per plane in Hertz. For instance, if you have a 10 plane recording acquired at 30Hz, then the 
+    """The sampling rate per plane in Hertz. For instance, if you have a 10-plane recording acquired at 30Hz, then the 
     sampling rate per plane is 3Hz, so set this to 3."""
 
     do_bidiphase: bool = False
-    """Determines whether to perform computation of bidirectional phase offset for misaligned line scanning 
-    (applies to two-photon recordings only). The suite2p estimates the bidirectional phase offset from 
-    ‘nimg_init’ frames if this is set to 1 (and ‘bidiphase’ to 0), and then applies this computed offset to all 
-    frames."""
+    """Determines whether to perform the computation of bidirectional phase offset for misaligned line scanning 
+    experiments (applies to two-photon recordings only)."""
 
     bidiphase: int = 0
     """The user-specified bidirectional phase offset for line scanning experiments. If set to any value besides 0, then 
-    this offset is used and applied to all frames in the recording."""
+    this offset is used and applied to all frames in the recording when 'do_bidiphase' is True. If set to 0, then the 
+    suite2p will estimate the bidirectional phase offset automatically from ‘nimg_init’ frames. The computed or 
+    user-defined offset is applied to all frames before the main processing pipeline."""
 
     bidi_corrected: bool = False
-    """Indicates whether bidirectional phase correction has been applied tot he registered dataset."""
+    """Tracks whether bidirectional phase correction has been applied to the registered dataset. This """
 
     frames_include: int = -1
     """Determines the number of frames to process, if greater than zero. If negative (-1), the suite2p is configured
@@ -433,7 +438,10 @@ class SingleDayS2PConfiguration(YamlConfig):
 
     Notes:
         The .YAML file uses section names that match the suite2p documentation sections. This way, users can always
-        consult the suite2p documentation for information on the purpose of each field inside every subsection.
+        consult the suite2p documentation for information on the purpose of each field inside every subsection. However,
+        additional parameters and sections were also added to the config during the refactoring process. Therefore, it
+        is encouraged to check both the original documentation and the API documentation of this class for information
+        on available parameters and sections.
     """
 
     # Define the instances of each nested settings class as fields
@@ -464,11 +472,49 @@ class SingleDayS2PConfiguration(YamlConfig):
     channel2: Channel2 = field(default_factory=Channel2)
     """Stores parameters for processing the second channel in multichannel datasets."""
 
+    def to_npy(self, output_directory: Path) -> None:
+        """Saves the managed configuration data as an 'ops.npy' file under the target directory.
+
+        This method is mostly called by internal sl-suite2p functions to translate the user-specified configuration
+        file into the format used by suite2p pipelines.
+
+        Notes:
+            If the target output directory does not exist when this method is called, it will be created.
+
+        Args:
+            output_directory: The path to the directory where the 'ops.npy' file should be saved.
+        """
+        ensure_directory_exists(output_directory)  # Creates the directory, if necessary
+        file_path = output_directory.joinpath("ops.npy")  # Computes the output path
+        np.save(file_path, self.to_ops(), allow_pickle=True)  # Dumps the configuration data to 'ops.npy' file.
+
+    def to_config(self, output_directory: Path) -> None:
+        """Saves the managed configuration data as a 'single_day_s2p_configuration.yaml' file under the target
+        directory.
+
+        This method is typically used to dump the 'default' configuration parameters to disk as a user-editable
+        .yaml file. The user is then expected to modify these parameters as needed, before the class data is loaded and
+        used by the suite2p pipeline.
+
+        Notes:
+            If the target output directory does not exist when this method is called, it will be created.
+
+        Args:
+            output_directory: The path to the directory where the 'single_day_s2p_configuration.yaml' file should be
+            saved.
+        """
+        ensure_directory_exists(output_directory)  # Creates the directory, if necessary
+        file_path = output_directory.joinpath("single_day_s2p_configuration.yaml")   # Computes the output path
+
+        # Note, this uses the same configuration name as the SessionData class, making it automatically compatible with
+        # Sun lab data structure.
+        self.to_yaml(file_path=file_path)  # Dumps the data to a 'yaml' file.
+
     def to_ops(self) -> dict[str, Any]:
         """Converts the class instance to a dictionary and returns it to caller.
 
-        This dictionary can be passed to suite2p functions either as an 'ops' or 'db' argument to control the
-        processing runtime.
+        This method is mostly called by internal sl-suite2p functions to translate the default configuration parameters
+        to the dictionary format used by suite2p pipelines.
         """
 
         # Creates an empty dictionary to store all keys and values
