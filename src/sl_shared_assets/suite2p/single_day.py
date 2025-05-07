@@ -53,123 +53,142 @@ class Main:
     user-defined offset is applied to all frames before the main processing pipeline."""
 
     bidi_corrected: bool = False
-    """Tracks whether bidirectional phase correction has been applied to the registered dataset. This """
+    """Tracks whether bidirectional phase correction has been applied to the registered dataset. This argument is 
+    generally not meant to be set by the user and is instead written automatically when the algorithm performs 
+    the bidirectional phase offset correction."""
 
     frames_include: int = -1
-    """Determines the number of frames to process, if greater than zero. If negative (-1), the suite2p is configured
-     to process all available frames."""
+    """Determines the number of frames of the session's movie to process for each plane. If set to 0, the suite2p will 
+    not do any processing. If negative (-1), the suite2p will process all available frames."""
 
     multiplane_parallel: bool = False
-    """Determines whether to parallelize plane processing for multiplane data. Note, while enabling this option improves
-    processing speeds, it also increases the memory (RAM) overhead resulting from processing all planes in-parallel.
-    """
+    """Determines whether to parallelize plane processing for multi-plane data. Note, plane processing contains some 
+    steps that are automatically parallelized to use all available cores and other that are sequential. Due to this 
+    mixture of steps, processing planes in parallel results in noticeably higher processing speeds, but also increases 
+    the memory (RAM) overhead and average CPU core utilization. Generally, it is recommended to enable this option on 
+    machines with sufficient RAM capacity and CPU core pool size."""
+
+    parallel_planes: int = 3
+    """Determines the maximum number of planes to process in parallel when 'multiplane_parallel' is True. Note, due to 
+    some processing steps being automatically parallelized, this parameter mostly controls the overall core utilization 
+    and RAM overhead. Each parallel plane task will at times try to use all available cores. There are diminishing 
+    returns when setting it to very high values. Most machines should have this set to a value between 3 and 9."""
 
     ignore_flyback: list[int] = field(default_factory=list)
-    """The list of plane indices to ignore as flyback planes that typically contain no valid imaging data."""
+    """The list of 'flyback' plane indices to ignore when processing the data. Flyback planes typically contain no valid
+    imaging data, so it is common to exclude them from processing."""
 
 
 @dataclass
 class FileIO:
     """Stores general I/O parameters that specify input data location, format, and working and output directories."""
 
-    fast_disk: list[str] = field(default_factory=list)
-    """Specifies the locations where to store the temporary binary files created during processing. If no directories 
-    are provided here, 'save_path0' is used to store the temporary files."""
+    fast_disk: str = ""
+    """The path to the root 'working' directory where to store the temporary binary files created during processing. 
+    This field allows optimizing processing on machines with slow storage drives and fast NVME 'work' drives by caching 
+    all data on the fast drive during runtime. Do not modify this field unless your use case specifically benefits 
+    from caching the data on a different drive than the one that stores the raw data. If this field is not modified, 
+    'save_path0' is used to store the temporary files."""
 
     delete_bin: bool = False
-    """Determines whether to delete the binary file created during the cell registration stage (registered cells .bin 
-    file). Since registered cell binaries are used by multi-day registration extension, this need to be False for all 
-    lab recordings."""
+    """Determines whether to delete the binary file(s) created during the frame registration stage (registered .bin 
+    file). Note, if the data produced by the 'single-day' pipeline is intended to be later processed as part of the 
+    'multi-day' pipeline, this has to be False. The multi-day pipeline reuses the registered binary files to extract 
+    the fluorescence of cells tracked across days."""
 
     mesoscan: bool = True
-    """Indicates whether the input file is a ScanImage Mesoscope recording. For our data, this is always True and all 
-    other formats are False."""
+    """Indicates whether the data submitted to the pipeline are ScanImage Mesoscope multi-page TIFFs."""
 
     bruker: bool = False
-    """Indicates whether the provided TIFF files are single-page BRUKER TIFFs."""
+    """Indicates whether the data submitted to the pipeline are single-page BRUKER TIFFs."""
 
     bruker_bidirectional: bool = False
-    """Specifies whether BRUKER files are bidirectional multiplane recordings."""
+    """Indicates whether BRUKER files contain bidirectional multiplane recordings."""
 
     h5py: list[str] = field(default_factory=list)
-    """The list of paths to h5py files that will be used as inputs. If provided, these paths overwrite the 'data_path' 
-    field."""
+    """The list of paths to h5py (.hdf / .h5) files to use as pipeline inputs, if the input data uses .h5 format. If 
+    provided, these paths overwrite the 'data_path' field."""
 
     h5py_key: str = "data"
-    """The key used to access the data array in an h5py file. This should only be provided if 'h5py' is not set to 
-    an empty list."""
+    """The key used to access the frame data array inside each input file specified by 'h5py' field paths. This should 
+    only be provided if 'h5py' is not set to an empty list."""
 
     nwb_file: str = ""
-    """Specifies the path to the NWB file to use as an input."""
+    """The path to the NWB file to use as pipeline input."""
 
     nwb_driver: str = ""
-    """The location or name of the driver for reading the NWB file."""
+    """The location or name of the driver to use for reading the NWB file."""
 
     nwb_series: str = ""
-    """The name of the TwoPhotonSeries in the NWB file to retrieve data from."""
+    """The name of the TwoPhotonSeries in the NWB file from which to retrieve the data."""
 
-    save_path0: list[str] = field(default_factory=list)
-    """Lists directory paths where the pipeline results should be saved. Typically, this is defined as a single-item 
-    list that stores the path to the output folder used by the processed session's data."""
+    save_path0: str = ""
+    """The path to the root output directory where the pipeline results should be saved. Note, the pipeline generates 
+    the 'save_folder' under the root directory specified by this argument and output all data to the generated save 
+    folder."""
 
-    save_folder: list[str] = field(default_factory=list)
-    """Lists folder names under which the results should be stored. If this is not provided, the pipeline defaults to 
-    using 'suite2p' as the root folder, created under the path specified by save_path0. Note, if the data produced by 
-    the 'single-day' pipeline is also processed using sl-suite2p 'multi-day' pipeline, do not modify this field. The 
-    multi-day pipeline expects the save_folder to be 'suite2p' (default)."""
+    save_folder: str = "suite2p"
+    """The name of the folder under which the pipeline results should be stored. If this is not provided, the pipeline 
+    defaults to using 'suite2p' as the save directory, created under the root directory specified by 'save_path0'. Note,
+    if the data produced by the 'single-day' pipeline is intended to be later processed as part of the 'multi-day' 
+    pipeline, do NOT modify this field. The multi-day pipeline expects the save_folder to be 'suite2p' (default)."""
+
+    data_path: list[str] = field(default_factory=list)
+    """The list of paths to the directories where to search for the input TIFF files. This is used during the initial 
+    conversion of the raw data (expected to be .tiff / .tif) to the binary file format used by the suite2p pipeline."""
 
     look_one_level_down: bool = False
-    """Determines whether to search for TIFF files in the subfolders when searching for Tiff files. If this is True, 
-    the list of evaluated subfolders have to be defined via the 'subfolders' field."""
+    """Determines whether to search for TIFF files in the subfolders of the directories provided as 'data_path' field. 
+    If True, the 'subfolders' field has to be set to a valid list of subfolder names to search."""
 
     subfolders: list[str] = field(default_factory=list)
-    """The list of specific subfolder names to search through for TIFF files."""
+    """Stores specific subfolder names to search through for TIFF files. All subfolders must be stored under the 
+    one or more directories specified by 'data_path'."""
 
     move_bin: bool = False
-    """Determines whether to move the binary file to the save directory after processing, if 'fast_disk' differs from 
-    the 'save_path0'."""
+    """Determines whether to move the binary file(s) to the save directory after processing, if 'fast_disk' differs 
+    from the 'save_path0'. Note, if using non-default 'save_folder' name, enabling this option will move the binary 
+    files from the temporary 'suite2p' folder to the 'save_folder'. Otherwise, if the save folder and the temporary 
+    folder are both 'suite2p', the binaries are automatically created and stored inside the 'save_folder'."""
 
 
 @dataclass
 class Output:
-    """Stores I/O settings that specify the output format and organization of the data processing results."""
-
-    preclassify: float = 0.5
-    """The probability threshold for pre-classification of cells to use before signal extraction. If this is set to 
-    0.0, then all detected ROIs are kept and signals are computed."""
+    """Stores parameters for aggregating and saving the processing results of each plane as a unified directory or
+    file."""
 
     save_nwb: bool = False
-    """Determines whether to save the output as an NWB file."""
+    """Determines whether to save the single-session pipeline output as an NWB file."""
 
     save_mat: bool = False
-    """Determines whether to save the results in MATLAB format (e.g., Fall.mat)."""
+    """Determines whether to save the single-session pipeline output as a MATLAB file (e.g., Fall.mat)."""
 
     combined: bool = True
-    """Determines whether to combine results across planes into a separate 'combined' folder at the end of 
-    processing."""
+    """Determines whether to combine results across planes into a 'combined' folder at the end of processing. If the 
+    results of the single-day pipeline are intended to be later processed as part of the multi-day pipeline, this has 
+    to be True. This option is safe to use even with single-plane data."""
 
     aspect: float = 0.666666666
-    """The pixel-to-micron ratio (X:Y) for correctly displaying the image aspect ratio in the GUI (not used in headless
-    processing)."""
-
-    report_time: bool = False
-    """Determines whether to return a dictionary reporting the processing time for each plane."""
+    """The pixel-to-micron ratio (X:Y) used in the GUI to ensure all images are displayed correctly. This field is not 
+    used during headless processing."""
 
 
 @dataclass
 class Registration:
-    """Stores parameters for rigid registration, which is used to correct motion artifacts between frames."""
+    """Stores parameters for rigid registration, which is used to correct motion artifacts between frames by
+    counter-shifting the entire frame."""
 
     do_registration: bool = True
-    """Determines whether to run the motion registration."""
+    """Determines whether to run the non-rigid motion registration."""
 
     align_by_chan: int = 1
-    """The channel to use for alignment (uses 1-based indexing, so 1 means 1st channel and 2 means 2nd channel). If the
-    recording features both a functional and non-functional channels, it may be better to use the non-functional 
-    channel for this purpose."""
+    """The channel to use for frame alignment (registration). This field uses 1-based indexing, so 1 means 1st channel 
+    and 2 means 2nd channel. If the recording features both a functional and non-functional channels, it is recommended 
+    to use the non-functional channel for this purpose."""
 
     nimg_init: int = 500
-    """The number of frames to use to compute the reference image for registration."""
+    """The number of frames to use to compute the reference image. During registration, each frame is registered to the
+    reference image to remove motion artifacts."""
 
     batch_size: int = 100
     """The number of frames to register simultaneously in each batch. When processing data on fast (NVME) drives, 
@@ -179,11 +198,12 @@ class Registration:
 
     maxregshift: float = 0.1
     """The maximum allowed shift during registration, given as a fraction of the frame size, in pixels
-    (e.g., 0.1 indicates 10%)."""
+    (e.g., 0.1 indicates 10%). This determines how much the algorithm is allowed to shift the entire frame to align it 
+    to the reference image."""
 
     smooth_sigma: float = 1.15
-    """The standard deviation (in pixels) of the Gaussian used to smooth the phase correlation between the reference
-    image and the current frame."""
+    """The standard deviation (in pixels) of the Gaussian filter used to smooth the phase correlation between the 
+    reference image and the current frame."""
 
     smooth_sigma_time: float = 0.0
     """The standard deviation (in frames) of the Gaussian used to temporally smooth the data before computing 
@@ -192,43 +212,46 @@ class Registration:
     keep_movie_raw: bool = False
     """Determines whether to keep the binary file of the raw (non-registered) frames. This is desirable when initially 
     configuring the suite2p parameters, as it allows visually comparing registered frames to non-registered frames in 
-    the GUI. For well-calibrated runtime, it is advised to have this set to False."""
+    the GUI. For well-calibrated runtimes, it is advised to have this set to False."""
 
     two_step_registration: bool = False
-    """Determines whether to perform a two-step registration (initial registration followed by refinement registration).
-    This may be necessary for low signal-to-noise data. This requires 'keep_movie_raw' to be set to True."""
+    """Determines whether to perform a two-step registration. This process consists of the initial registration 
+    (first step) followed by refinement (second step) registration. This procedure is helpful when working with low 
+    signal-to-noise data and requires 'keep_movie_raw' to be set to True."""
 
     reg_tif: bool = False
-    """Determines whether to write the registered binary data to TIFF files."""
+    """Determines whether to write the registered binary data to TIFF files, in addition to keeping it as the .bin 
+    (binary) suite2p files."""
 
     reg_tif_chan2: bool = False
-    """Determines whether to generate TIFF files for the registered non-functional (channel 2) data."""
-
-    subpixel: int = 10
-    """The precision for the subpixel registration (1/subpixel steps)."""
+    """Determines whether to generate TIFF files for the registered channel 2 data, if processed data contains two 
+    channels."""
 
     th_badframes: float = 1.0
-    """The threshold for excluding poor-quality frames when performing cropping. Setting this to a smaller value 
-    excludes more frames."""
+    """The threshold for excluding poor-quality frames when performing cropping. Primarily, this is used during two-step
+    registration to exclude frames with excessive motion from the refinement registration step. Setting this to a 
+    smaller value excludes more frames."""
 
     norm_frames: bool = True
     """Determines whether to normalize frames during shift detection to improve registration accuracy."""
 
     force_refImg: bool = False
-    """Determines whether to force the use of a pre-stored reference image for registration."""
+    """Determines whether to force the use of a pre-stored reference image for registration, instead of recomputing the 
+    image during runtime."""
 
     pad_fft: bool = False
     """Determines whether to pad the image during the FFT portion of the registration to reduce edge effects."""
 
     do_regmetrics: bool = True
     """Determines whether to compute the registration quality metrics. This step is optional, registration metrics are 
-    NOT used by the suite2p processing pipeline. However, these metrics may be important for users to assess the 
-    registration quality. Note, computing the registration metrics takes approximately as long as computing the 
-    registration offsets, almost doubling the overall processing time for each plane."""
+    NOT used by the suite2p processing pipeline. However, these metrics are important for assessing the registration 
+    quality via the GUI. Note, computing the registration metrics is a fairly expensive operation, sometimes taking as 
+    much time as computing the registration offsets."""
 
     reg_metric_n_pc: int = 10
-    """The number of Principle Components (PCs) used to compute the registration metrics. Note, increasing this number
-    exponentially increases the metric computation time for each plane."""
+    """The number of Principle Components (PCs) used to compute the registration metrics. Note, the time to compute 
+    the registration metrics scales with the number of computed PCs, so it is recommended to keep the number as low 
+    as feasible for each use case."""
 
 
 @dataclass
@@ -238,14 +261,14 @@ class OnePRegistration:
 
     one_p_reg: bool = False
     """Determines whether to perform high-pass spatial filtering and tapering to improve one-photon image 
-    registration. For 2-photon datasets, this should be set to False."""
+    registration. For two-photon datasets, this should be set to False."""
 
     spatial_hp_reg: int = 42
-    """The window size, in pixels, for spatial high-pass filtering performed before registration."""
+    """The spatial high-pass filter window size, in pixels."""
 
     pre_smooth: float = 0.0
-    """The standard deviation for Gaussian smoothing applied before spatial high-pass filtering 
-    (applied only if > 0)."""
+    """The standard deviation for Gaussian smoothing applied before spatial high-pass filtering. The smoothing will 
+    only be applied if this field is greater than 0.0."""
 
     spatial_taper: float = 40.0
     """The number of pixels to ignore at the image edges to reduce edge artifacts during registration."""
@@ -254,15 +277,17 @@ class OnePRegistration:
 @dataclass
 class NonRigid:
     """Stores parameters for non-rigid registration, which is used to improve motion registration in complex
-    datasets."""
+    datasets by dividing frames into subregions and shifting each subregion independently of other subregions."""
 
     nonrigid: bool = True
-    """Determines whether to perform non-rigid registration to correct for local motion and deformation. This is used 
-    for correcting non-uniform motion."""
+    """Determines whether to perform non-rigid registration to correct for local motion and deformation. This is 
+    primarily used for correcting non-uniform motion."""
 
     block_size: list[int] = field(default_factory=lambda: [128, 128])
     """The block size, in pixels, for non-rigid registration, defining the dimensions of subregions used in 
-    the correction. It is recommended to keep this size a power of 2 and / or 3 for more efficient FFT computation."""
+    the correction. It is recommended to keep this size a power of 2 and / or 3 for more efficient FFT computation. 
+    During processing, each frame will be split into sub-regions with these dimensions and the registration will then be
+    applied to each region."""
 
     snr_thresh: float = 1.2
     """The signal-to-noise ratio threshold. The phase correlation peak must be this many times higher than the 
@@ -274,19 +299,24 @@ class NonRigid:
 
 @dataclass
 class ROIDetection:
-    """Stores parameters for cell ROI detection and extraction."""
+    """Stores parameters for cell ROI detection."""
+
+    preclassify: float = 0.5
+    """The classifier probability threshold used to pre-filter the cells before signal extraction. This is the minimum 
+    classifier confidence value (that the classified ROI is a cell) for the ROI to be processed further. If this is set 
+    to 0.0, then all detected ROIs (cells) are kept."""
 
     roidetect: bool = True
-    """Determines whether to perform ROI detection and subsequent signal extraction."""
+    """Determines whether to perform ROI detection and classification."""
 
     sparse_mode: bool = True
     """Determines whether to use the sparse mode for cell detection, which is well-suited for data with sparse 
     signals."""
 
     spatial_scale: int = 0
-    """The optimal spatial scale, in pixels, of the recording. This is used to adjust detection sensitivity. A value of
-    0 means automatic detection based on the recording's spatial scale. Values above 0 are applied in increments of 6 
-    pixels (1 -> 6 pixels, 2-> 12 pixels, etc.)."""
+    """The optimal spatial scale, in pixels, for the processed data. This is used to adjust detection sensitivity. A 
+    value of 0 means automatic detection based on the data's spatial scale. Values above 0 are applied in increments of 
+    6 pixels (1 -> 6 pixels, 2-> 12 pixels, etc.)."""
 
     connected: bool = True
     """Determines whether to require the detected ROIs to be fully connected regions."""
@@ -304,13 +334,14 @@ class ROIDetection:
     discarded."""
 
     high_pass: int = 100
-    """The window size, in frames, for running mean subtraction over time to remove low-frequency drift."""
+    """The window size, in frames, for running mean subtraction over time to remove low-frequency ROI drift."""
 
     smooth_masks: bool = True
     """Determines whether to smooth the ROI masks in the final pass of cell detection."""
 
     max_iterations: int = 50
-    """The maximum number of iterations allowed for cell extraction."""
+    """The maximum number of iterations allowed for cell extraction. Generally, more iterations lead to more accurate 
+    cell detection, but having the value too high may be detrimental."""
 
     nbinned: int = 5000
     """The maximum number of binned frames to use for ROI detection. Settings this value to a higher number leads to 
@@ -335,14 +366,14 @@ class CellposeDetection:
     """
 
     diameter: int = 0
-    """Specifies the diameter, in pixels, of cells to look for. If set to 0, Cellpose estimates the diameter 
-    automatically.."""
+    """Specifies the diameter, in pixels, to look for when finding cell ROIs. If set to 0, Cellpose estimates the 
+    diameter automatically.."""
 
     cellprob_threshold: float = 0.0
-    """The threshold for cell detection, used to filter out low-confidence detections."""
+    """The threshold for cell detection, used to filter out low-confidence ROIs."""
 
     flow_threshold: float = 1.5
-    """The flow threshold, used to control the sensitivity to cell boundaries."""
+    """The flow threshold, used to control the algorithm's sensitivity to cell boundaries."""
 
     spatial_hp_cp: int = 0
     """The window size, in pixels, for spatial high-pass filtering applied to the image before Cellpose processing."""
@@ -357,7 +388,8 @@ class SignalExtraction:
     """Stores parameters for extracting fluorescence signals from ROIs and surrounding neuropil regions."""
 
     neuropil_extract: bool = True
-    """Determines whether to extract neuropil signals."""
+    """Determines whether to extract neuropil signals. Typically, this is set to True to support later 
+    delta-fluorescence-over-fluorescence (dff) analysis."""
 
     allow_overlap: bool = False
     """Determines whether to allow overlap pixels (pixels shared by multiple ROIs) to be used in the signal extraction. 
@@ -370,7 +402,10 @@ class SignalExtraction:
     """The number of pixels to keep between the ROI and the surrounding neuropil region to avoid signal bleed-over."""
 
     lam_percentile: int = 50
-    """The percentile of Lambda within area to ignore when excluding the brightest pixels during neuropil extraction."""
+    """The percentile of Lambda within area to ignore when excluding the brightest pixels during neuropil extraction.
+    Specifically, pixels with relative brightness above this threshold are excluded from neuropil signal to filter 
+    out bright speckle outliers.
+    """
 
 
 @dataclass
@@ -378,18 +413,19 @@ class SpikeDeconvolution:
     """Stores parameters for deconvolve fluorescence signals to infer spike trains."""
 
     spikedetect: bool = True
-    """Determines whether to perform spike deconvolution."""
+    """Determines whether to perform fluorescence spike deconvolution."""
 
     neucoeff: float = 0.7
-    """The neuropil coefficient applied for signal correction before deconvolution."""
+    """The neuropil coefficient applied for signal correction before deconvolution. Specifically, the neuropil signal
+    is scaled by this coefficient before it is subtracted from the ROI signal when computing df/f values."""
 
     baseline: str = "maximin"
-    """Specifies the method to compute the baseline of each trace. This baseline is then subtracted from each cell. 
-    ‘maximin’ computes a moving baseline by filtering the data with a Gaussian of width 'sig_baseline' * 'fs', and then 
-    minimum filtering with a window of 'win_baseline' * 'fs', and then maximum filtering with the same window. 
-    ‘constant’ computes a constant baseline by filtering with a Gaussian of width 'sig_baseline' * 'fs' and then taking 
-    the minimum value of this filtered trace. ‘constant_percentile’ computes a constant baseline by taking the 
-    'prctile_baseline' percentile of the trace."""
+    """Specifies the method to compute the baseline of each trace. This baseline is then subtracted from each cell's 
+    fluorescence. ‘maximin’ computes a moving baseline by filtering the data with a Gaussian of width 
+    'sig_baseline' * 'fs', and then minimum filtering with a window of 'win_baseline' * 'fs', and then maximum 
+    filtering with the same window. ‘constant’ computes a constant baseline by filtering with a Gaussian of width 
+    'sig_baseline' * 'fs' and then taking the minimum value of this filtered trace. ‘constant_percentile’ computes a 
+    constant baseline by taking the 'prctile_baseline' percentile of the trace."""
 
     win_baseline: float = 60.0
     """The time window, in seconds, over which to compute the baseline filter."""
@@ -422,26 +458,21 @@ class Channel2:
     """Stores parameters for processing the second channel in multichannel datasets."""
 
     chan2_thres: float = 0.65
-    """The threshold for considering an ROI registered in one channel as detected in the second channel."""
+    """The threshold for considering an ROI detected in one channel as detected (present) in the second channel. 
+    This threshold specifies the ratio of channel 1 pixels to channel 2 pixels for the ROI to be considered present in 
+    both channels."""
 
 
 @dataclass
 class SingleDayS2PConfiguration(YamlConfig):
-    """Stores the user-addressable suite2p configuration parameters for the single-day (original) pipeline, organized
-    into subsections.
+    """Aggregates all user-addressable parameters of the single-day suite2p pipeline used to discover cell ROIs and
+    extract their fluorescence data.
 
     This class is used during single-day processing to instruct suite2p on how to process the data. This class is based
     on the 'default_ops' from the original suite2p package. As part of the suite2p refactoring performed in sl-suite2p
-    package, the 'default_ops' has been replaced with this class instance. Compared to 'original' ops, it allows saving
-    configuration parameters as a .YAML file, which offers a better way of viewing and editing the parameters and
+    package, the 'default_ops' has been replaced with this class instance. Compared to the 'original' ops, it allows
+    saving configuration parameters as a .YAML file, which offers a better way of viewing and editing the parameters and
     running suite2p pipeline on remote compute servers.
-
-    Notes:
-        The .YAML file uses section names that match the suite2p documentation sections. This way, users can always
-        consult the suite2p documentation for information on the purpose of each field inside every subsection. However,
-        additional parameters and sections were also added to the config during the refactoring process. Therefore, it
-        is encouraged to check both the original documentation and the API documentation of this class for information
-        on available parameters and sections.
     """
 
     # Define the instances of each nested settings class as fields
@@ -450,9 +481,11 @@ class SingleDayS2PConfiguration(YamlConfig):
     file_io: FileIO = field(default_factory=FileIO)
     """Stores general I/O parameters that specify input data location, format, and working and output directories."""
     output: Output = field(default_factory=Output)
-    """Stores I/O settings that specify the output format and organization of the data processing results."""
+    """Stores parameters for aggregating and saving the processing results of each plane as a unified directory or
+    file."""
     registration: Registration = field(default_factory=Registration)
-    """Stores parameters for rigid registration, which is used to correct motion artifacts between frames."""
+    """Stores parameters for rigid registration, which is used to correct motion artifacts between frames by
+    counter-shifting the entire frame."""
     one_p_registration: OnePRegistration = field(default_factory=OnePRegistration)
     """Stores parameters for additional pre-registration processing used to improve the registration of 1-photon
     datasets."""
@@ -525,11 +558,6 @@ class SingleDayS2PConfiguration(YamlConfig):
         for section_name, section in asdict(self).items():
             # Adds all keys and values from each section to the combined dictionary
             if isinstance(section, dict):
-                # Since some keys in the original suite2p configuration file use 'unconventional' names, we opted to use
-                # conventional names in our configuration file. To make the 'ops' version of this file fully compatible
-                # with suite2p, we need to translate all such modified keys back to values expected by suite2p.
-                if "one_p_reg" in section.keys():
-                    section["1Preg"] = section.pop("one_p_reg")
                 combined_ops.update(section)
 
         return combined_ops
