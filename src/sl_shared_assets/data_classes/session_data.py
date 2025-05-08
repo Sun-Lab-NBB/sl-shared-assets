@@ -1333,6 +1333,9 @@ class SessionData(YamlConfig):
             match = re.search(pattern, content)
             if match:
                 fields_to_keep[key] = match.group(1).strip()
+                # Solves a bug with how animal_id field is stored, where it contains both sets of quotes. May be helpful
+                # to solve potential future issues with other fields too
+                fields_to_keep[key] = fields_to_keep[key].replace("'", "")
             else:
                 if key == "experiment_name":
                     fields_to_keep[key] = "null"  # Default for experiment_name
