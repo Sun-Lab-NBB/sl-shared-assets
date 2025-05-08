@@ -3,11 +3,11 @@ extends the original suite2p code to support tracking the same objects (cells) a
 (original) and multi-day (extended) pipelines are available as part of the Sun lab maintained sl-suite2p package."""
 
 from typing import Any
-from dataclasses import field, asdict, dataclass
 from pathlib import Path
+from dataclasses import field, asdict, dataclass
+
 import numpy as np
 from ataraxis_base_utilities import ensure_directory_exists
-
 from ataraxis_data_structures import YamlConfig
 
 
@@ -60,8 +60,7 @@ class Hardware:
 
 @dataclass()
 class CellDetection:
-    """Stores parameters for selecting single-day-registered cells (ROIs) to be tracked across multiple sessions (days).
-    """
+    """Stores parameters for selecting single-day-registered cells (ROIs) to be tracked across multiple sessions (days)."""
 
     probability_threshold: float = 0.85
     """The minimum required probability score assigned to the cell (ROI) by the single-day suite2p classifier. Cells 
@@ -85,8 +84,7 @@ class CellDetection:
 
 @dataclass()
 class Registration:
-    """Stores parameters for aligning (registering) the sessions from multiple days to the same visual (sampling) space.
-    """
+    """Stores parameters for aligning (registering) the sessions from multiple days to the same visual (sampling) space."""
 
     image_type: str = "enhanced"
     """The type of suite2p-generated reference image to use for across-day registration. Supported options are 
@@ -192,7 +190,8 @@ class MultiDayS2PConfiguration(YamlConfig):
         """
         ensure_directory_exists(output_directory)  # Creates the directory, if necessary
         file_path = output_directory.joinpath("ops.npy")  # Computes the output path
-        np.save(file_path, self.to_ops(), allow_pickle=True)  # Dumps the configuration data to 'ops.npy' file.
+        # Dumps the configuration data to 'ops.npy' file.
+        np.save(file_path, self.to_ops(), allow_pickle=True)  # type: ignore
 
     def to_config(self, output_directory: Path) -> None:
         """Saves the managed configuration data as a 'multi_day_s2p_configuration.yaml' file under the target
@@ -210,7 +209,7 @@ class MultiDayS2PConfiguration(YamlConfig):
             saved.
         """
         ensure_directory_exists(output_directory)  # Creates the directory, if necessary
-        file_path = output_directory.joinpath("multi_day_s2p_configuration.yaml")   # Computes the output path
+        file_path = output_directory.joinpath("multi_day_s2p_configuration.yaml")  # Computes the output path
 
         # Note, this uses the same configuration name as the SessionData class, making it automatically compatible with
         # Sun lab data structure.

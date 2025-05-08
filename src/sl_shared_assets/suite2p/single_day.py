@@ -4,11 +4,11 @@ is used as the first step of the multi-day brain activity processing pipeline us
 (original) and multi-day (extended) pipelines are available as part of the Sun lab maintained sl-suite2p package."""
 
 from typing import Any
-from dataclasses import field, asdict, dataclass
 from pathlib import Path
+from dataclasses import field, asdict, dataclass
+
 import numpy as np
 from ataraxis_base_utilities import ensure_directory_exists
-
 from ataraxis_data_structures import YamlConfig
 
 
@@ -519,7 +519,8 @@ class SingleDayS2PConfiguration(YamlConfig):
         """
         ensure_directory_exists(output_directory)  # Creates the directory, if necessary
         file_path = output_directory.joinpath("ops.npy")  # Computes the output path
-        np.save(file_path, self.to_ops(), allow_pickle=True)  # Dumps the configuration data to 'ops.npy' file.
+        # Dumps the configuration data to 'ops.npy' file.
+        np.save(file_path, self.to_ops(), allow_pickle=True)  # type: ignore
 
     def to_config(self, output_directory: Path) -> None:
         """Saves the managed configuration data as a 'single_day_s2p_configuration.yaml' file under the target
@@ -537,7 +538,7 @@ class SingleDayS2PConfiguration(YamlConfig):
             saved.
         """
         ensure_directory_exists(output_directory)  # Creates the directory, if necessary
-        file_path = output_directory.joinpath("single_day_s2p_configuration.yaml")   # Computes the output path
+        file_path = output_directory.joinpath("single_day_s2p_configuration.yaml")  # Computes the output path
 
         # Note, this uses the same configuration name as the SessionData class, making it automatically compatible with
         # Sun lab data structure.

@@ -90,6 +90,10 @@ class LickTrainingDescriptor(YamlConfig):
     """Stores the maximum volume of water the system is allowed to dispense during training."""
     maximum_training_time_m: int
     """Stores the maximum time, in minutes, the system is allowed to run the training for."""
+    maximum_unconsumed_rewards: int = 3
+    """Stores the maximum number of consecutive rewards that can be delivered without the animal consuming them. If 
+    the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal 
+    consumes the rewards."""
     experimenter_notes: str = "Replace this with your notes."
     """This field is not set during runtime. It is expected that each experimenter replaces this field with their 
     notes made during runtime."""
@@ -137,6 +141,14 @@ class RunTrainingDescriptor(YamlConfig):
     """Stores the maximum volume of water the system is allowed to dispense during training."""
     maximum_training_time_m: int
     """Stores the maximum time, in minutes, the system is allowed to run the training for."""
+    maximum_unconsumed_rewards: int = 3
+    """Stores the maximum number of consecutive rewards that can be delivered without the animal consuming them. If 
+    the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal 
+    consumes the rewards."""
+    maximum_idle_time_s: float = 0.0
+    """Stores the maximum time, in seconds, the animal can dip below the running speed threshold to still receive the 
+    reward. This allows animals that 'run' by taking a series of large steps, briefly dipping below speed threshold at 
+    the end of each step, to still get water rewards."""
     experimenter_notes: str = "Replace this with your notes."
     """This field is not set during runtime. It is expected that each experimenter will replace this field with their 
     notes made during runtime."""

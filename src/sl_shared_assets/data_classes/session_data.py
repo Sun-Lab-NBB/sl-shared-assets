@@ -11,11 +11,11 @@ import shutil as sh
 from pathlib import Path
 from dataclasses import field, dataclass
 
+import dacite
 import appdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
-import dacite
 
 from .configuration_data import ExperimentConfiguration
 
@@ -1313,7 +1313,7 @@ class SessionData(YamlConfig):
         """
 
         # Reads the file content without using the YAML parsing methods.
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             content = f.read()
 
         # Extracts the necessary fields using regex
@@ -1321,11 +1321,11 @@ class SessionData(YamlConfig):
 
         # Defines the field patterns for each field to extract
         patterns = {
-            "project_name": r'project_name:\s*(.+?)(?=\n\w|\n$)',
-            "animal_id": r'animal_id:\s*(.+?)(?=\n\w|\n$)',
-            "session_name": r'session_name:\s*(.+?)(?=\n\w|\n$)',
-            "session_type": r'session_type:\s*(.+?)(?=\n\w|\n$)',
-            "experiment_name": r'experiment_name:\s*(.+?)(?=\n\w|\n$)'
+            "project_name": r"project_name:\s*(.+?)(?=\n\w|\n$)",
+            "animal_id": r"animal_id:\s*(.+?)(?=\n\w|\n$)",
+            "session_name": r"session_name:\s*(.+?)(?=\n\w|\n$)",
+            "session_type": r"session_type:\s*(.+?)(?=\n\w|\n$)",
+            "experiment_name": r"experiment_name:\s*(.+?)(?=\n\w|\n$)",
         }
 
         # Extracts each field
@@ -1343,5 +1343,5 @@ class SessionData(YamlConfig):
                     fields_to_keep[key] = ""  # Default for other fields
 
         # Returns the data to caller
-        return dacite.from_dict(data_class=cls, data=fields_to_keep)  # type: ignore
-
+        # noinspection PyTypeChecker
+        return dacite.from_dict(data_class=cls, data=fields_to_keep)
