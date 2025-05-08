@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 # Project metdata section. Provides the genral ID information about the project.
 [project]
 name = "sl-shared-assets"
-version = "1.0.0rc18"
+version = "1.0.0rc19"
 description = "Stores assets shared between multiple Sun (NeuroAI) lab data pipelines."
 readme = "README.md"
 license = { file = "LICENSE" }
