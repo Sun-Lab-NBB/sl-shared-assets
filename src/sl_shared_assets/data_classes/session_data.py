@@ -1274,6 +1274,20 @@ class SessionData(YamlConfig):
         create() method runtime.
         """
 
+        origin = copy.deepcopy(self)
+
+        # Resets all path fields to null. These fields are not loaded from disk when the instance is loaded, so setting
+        # them to null has no negative consequences. Conversely, keeping these fields with Path objects prevents the
+        # SessionData instance from being loaded from disk.
+        origin.raw_data = None  # type: ignore
+        origin.processed_data = None  # type: ignore
+        origin.configuration_data = None  # type: ignore
+        origin.deeplabcut_data = None  # type: ignore
+        origin.vrpc_persistent_data = None  # type: ignore
+        origin.scanimagepc_persistent_data = None  # type: ignore
+        origin.mesoscope_data = None  # type: ignore
+        origin.destinations = None  # type: ignore
+
         # Saves instance data as a .YAML file
         self.to_yaml(file_path=self.raw_data.session_data_path)
         self.to_yaml(file_path=self.processed_data.session_data_path)
