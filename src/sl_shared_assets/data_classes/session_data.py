@@ -15,6 +15,7 @@ import appdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
+import dacite
 
 from .configuration_data import ExperimentConfiguration
 
@@ -1111,6 +1112,7 @@ class SessionData(YamlConfig):
         cls,
         session_path: Path,
         on_server: bool,
+        make_directories: bool = True,
     ) -> "SessionData":
         """Loads the SessionData instance from the target session's session_data.yaml file.
 
@@ -1131,6 +1133,10 @@ class SessionData(YamlConfig):
                 a non-server machine. Note, non-server runtimes use the same 'root' directory to store raw_data and
                 processed_data subfolders. BioHPC server runtimes use different volumes (drives) to store these
                 subfolders.
+            make_directories: Determines whether to attempt creating any missing directories. Generally, this option
+                is safe to be True for all destinations other than some specific BioHPC server runtimes, where some
+                data is 'owned' by a general lab account and not the user account. These cases are only present for the
+                sl-forgery library and are resolved by that library.
 
         Returns:
             An initialized SessionData instance for the session whose data is stored at the provided path.
@@ -1151,7 +1157,7 @@ class SessionData(YamlConfig):
             console.error(message=message, error=FileNotFoundError)
 
         # Loads class data from .yaml file
-        instance: SessionData = cls.from_yaml(file_path=session_data_path)  # type: ignore
+        instance: SessionData = cls._safe_load(path=session_data_path)
 
         # The method assumes that the 'donor' .yaml file is always stored inside the raw_data directory of the session
         # to be processed. Since the directory itself might have moved (between or even within the same PC) relative to
@@ -1162,7 +1168,6 @@ class SessionData(YamlConfig):
         # RAW DATA
         new_root = local_root.joinpath(instance.project_name, instance.animal_id, instance.session_name, "raw_data")
         instance.raw_data.resolve_paths(root_directory_path=new_root)
-        instance.raw_data.make_directories()
 
         # Uses the adjusted raw_data section to load the ProjectConfiguration instance. This is used below to resolve
         # all other SessionData sections, as it stores various required root directories.
@@ -1179,12 +1184,10 @@ class SessionData(YamlConfig):
             root_directory_path=new_root,
             experiment_name=instance.experiment_name,
         )
-        instance.configuration_data.make_directories()
 
         # DEEPLABCUT
         new_root = local_root.joinpath(instance.project_name, "deeplabcut")
         instance.deeplabcut_data.resolve_paths(root_directory_path=new_root)
-        instance.deeplabcut_data.make_directories()
 
         # Resolves the roots for all VRPC-specific sections that use the data from the ProjectConfiguration instance:
 
@@ -1242,25 +1245,26 @@ class SessionData(YamlConfig):
                 instance.project_name, instance.animal_id, instance.session_name, "processed_data"
             )
         )
-        instance.processed_data.make_directories()
-
-        # Ensures that project configuration and session data classes are present in both raw_data and processed_data
-        # directories. This ensures that all data of the session can always be traced to the parent project, animal,
-        # and session.
-        sh.copy2(
-            src=instance.raw_data.session_data_path,
-            dst=instance.processed_data.session_data_path,
-        )
-        sh.copy2(
-            src=instance.raw_data.project_configuration_path,
-            dst=instance.processed_data.project_configuration_path,
-        )
 
         # Generates data directory hierarchies that may be missing on the local machine
-        instance.raw_data.make_directories()
-        instance.configuration_data.make_directories()
-        instance.deeplabcut_data.make_directories()
-        instance.processed_data.make_directories()
+        if make_directories:
+            instance.raw_data.make_directories()
+            instance.configuration_data.make_directories()
+            instance.deeplabcut_data.make_directories()
+            instance.processed_data.make_directories()
+            instance.processed_data.make_directories()
+
+            # Ensures that project configuration and session data classes are present in both raw_data and
+            # processed_data directories. This ensures that all data of the session can always be traced to the parent
+            # project, animal, and session.
+            sh.copy2(
+                src=instance.raw_data.session_data_path,
+                dst=instance.processed_data.session_data_path,
+            )
+            sh.copy2(
+                src=instance.raw_data.project_configuration_path,
+                dst=instance.processed_data.project_configuration_path,
+            )
 
         # Returns the initialized SessionData instance to caller
         return instance
@@ -1274,6 +1278,8 @@ class SessionData(YamlConfig):
         create() method runtime.
         """
 
+        # Generates a copy of the original class to avoid modifying the instance that will be used for further
+        # processing
         origin = copy.deepcopy(self)
 
         # Resets all path fields to null. These fields are not loaded from disk when the instance is loaded, so setting
@@ -1289,5 +1295,50 @@ class SessionData(YamlConfig):
         origin.destinations = None  # type: ignore
 
         # Saves instance data as a .YAML file
-        self.to_yaml(file_path=self.raw_data.session_data_path)
-        self.to_yaml(file_path=self.processed_data.session_data_path)
+        origin.to_yaml(file_path=self.raw_data.session_data_path)
+        origin.to_yaml(file_path=self.processed_data.session_data_path)
+
+    @classmethod
+    def _safe_load(cls, path: Path) -> "SessionData":
+        """Loads a SessionData class instance into memory in a way that avoids collisions with outdated SessionData
+        formats.
+
+        This method is used instead of the default method inherited from the YamlConfig class. Primarily, this is used
+        to avoid errors with old SessionData class formats that contain some data that is either no longer present or
+        cannot be loaded from YAML. Using this custom method ensures we can load any SessionData class, provided it
+        contains the required header fields.
+
+        Returns:
+            The SessionData instance initialized using the resolved header data.
+        """
+
+        # Reads the file content without using the YAML parsing methods.
+        with open(path, 'r') as f:
+            content = f.read()
+
+        # Extracts the necessary fields using regex
+        fields_to_keep = {}
+
+        # Defines the field patterns for each field to extract
+        patterns = {
+            "project_name": r'project_name:\s*(.+?)(?=\n\w|\n$)',
+            "animal_id": r'animal_id:\s*(.+?)(?=\n\w|\n$)',
+            "session_name": r'session_name:\s*(.+?)(?=\n\w|\n$)',
+            "session_type": r'session_type:\s*(.+?)(?=\n\w|\n$)',
+            "experiment_name": r'experiment_name:\s*(.+?)(?=\n\w|\n$)'
+        }
+
+        # Extracts each field
+        for key, pattern in patterns.items():
+            match = re.search(pattern, content)
+            if match:
+                fields_to_keep[key] = match.group(1).strip()
+            else:
+                if key == "experiment_name":
+                    fields_to_keep[key] = "null"  # Default for experiment_name
+                else:
+                    fields_to_keep[key] = ""  # Default for other fields
+
+        # Returns the data to caller
+        return dacite.from_dict(data_class=cls, data=fields_to_keep)  # type: ignore
+

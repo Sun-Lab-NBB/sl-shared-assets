@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 # Project metdata section. Provides the genral ID information about the project.
 [project]
 name = "sl-shared-assets"
-version = "1.0.0rc17"
+version = "1.0.0rc18"
 description = "Stores assets shared between multiple Sun (NeuroAI) lab data pipelines."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -50,6 +50,7 @@ dependencies = [
     "paramiko>=3.5.1, <4",
     "simple-slurm>=0,<1",
     "click>=8,<9",
+    "dacite>=1,<2",
 ]
 
 [project.urls]
@@ -68,6 +69,7 @@ condarun = [
     "tqdm>=4,<5",
     "paramiko>=3.5.1,<4",
     "click>=8,<9",
+    "dacite>=1,<2",
 ]
 
 # Dependencies known to be installable with conda for all development platforms (OSX ARM64, WIN AMD64, LIN AMD64).
@@ -93,7 +95,7 @@ conda = [
     # Types:
     "types-appdirs>=1,<2",
     "types-tqdm>=4,<5",
-    "types-paramiko>=3,<4"
+    "types-paramiko>=3,<4",
 ]
 
 # Dependencies known to not be installable with conda for at least one supported development platform
