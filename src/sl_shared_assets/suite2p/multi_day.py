@@ -30,7 +30,7 @@ class IO:
 
 @dataclass()
 class Hardware:
-    """Stores parameters that control how the suite2p interacts with the hardware of the host-computer to accelerate
+    """Stores parameters that control how the suite2p interacts with the hardware of the host-computer to speed up
     processing speed."""
 
     parallelize_registration: bool = True
@@ -60,7 +60,8 @@ class Hardware:
 
 @dataclass()
 class CellDetection:
-    """Stores parameters for selecting single-day-registered cells (ROIs) to be tracked across multiple sessions (days)."""
+    """Stores parameters for selecting single-day-registered cells (ROIs) to be tracked across multiple sessions
+    (days)."""
 
     probability_threshold: float = 0.85
     """The minimum required probability score assigned to the cell (ROI) by the single-day suite2p classifier. Cells 
@@ -84,7 +85,8 @@ class CellDetection:
 
 @dataclass()
 class Registration:
-    """Stores parameters for aligning (registering) the sessions from multiple days to the same visual (sampling) space."""
+    """Stores parameters for aligning (registering) the sessions from multiple days to the same visual (sampling)
+    space."""
 
     image_type: str = "enhanced"
     """The type of suite2p-generated reference image to use for across-day registration. Supported options are 
@@ -136,9 +138,10 @@ class Clustering:
     blocks and then processes one (or more) blocks at a time."""
 
     bin_size: int = 50
-    """Specifies the size of bins used to discover cell masks within blocks during clustering. To avoid edge cases, the 
-    algorithm clusters the cell masks within the region defined by the center-point of each cell +- bin_size. This works
-    on top of pre-sorting cells into spatial blocks defined by 'step_sizes'."""
+    """Specifies the additional length, in pixels, the algorithm is allowed to extend into the neighboring regions when 
+    segmenting cells into grid bins. Before clustering cells across sessions, the algorithms pre-segments them into 
+    grid bins using 'step_sizes'. Additionally, it uses +- 'bin_size' to extend into neighboring regions to better 
+    cluster the cells around grid borders."""
 
     maximum_distance: int = 20
     """Specifies the maximum distance, in pixels, that can separate masks across multiple sessions. The clustering 
