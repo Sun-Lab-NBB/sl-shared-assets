@@ -415,6 +415,9 @@ class SpikeDeconvolution:
     spikedetect: bool = True
     """Determines whether to perform fluorescence spike deconvolution."""
 
+    demix: bool = False
+    """Determines whether to demix signals from overlapping cells."""
+
     neucoeff: float = 0.7
     """The neuropil coefficient applied for signal correction before deconvolution. Specifically, the neuropil signal
     is scaled by this coefficient before it is subtracted from the ROI signal when computing df/f values."""
