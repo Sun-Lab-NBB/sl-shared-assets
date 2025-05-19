@@ -1,5 +1,5 @@
 """This module provides classes to store animal surgery data. This is used to store the data extracted from the Sun lab
-surgery log, so that subject surgery data is always kept together with training and experiment data."""
+surgery log, so that subject (animal) surgery data is always kept together with training and experiment data."""
 
 from dataclasses import dataclass
 
@@ -130,10 +130,10 @@ class DrugData:
 
 @dataclass
 class SurgeryData(YamlConfig):
-    """Stores the data about a single mouse surgical intervention.
+    """Stores the data about a single animal surgical intervention.
 
     This class aggregates other dataclass instances that store specific data about the surgical procedure. Primarily, it
-    is used to save the data as a .yaml file to every session's raw_data directory of each animal used in every lab
+    is used to save the data as a .yaml file to every session's 'raw_data' directory of each animal used in every lab
     project. This way, the surgery data is always stored alongside the behavior and brain activity data collected
     during the session.
     """

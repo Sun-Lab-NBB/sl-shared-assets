@@ -1,6 +1,7 @@
 """This module provides classes used to store the training and experiment data acquired by the sl-experiment library.
 Some classes from this library store raw data later processed by Sun lab data processing pipelines. Others are used to
-restore the Mesoscope-VR system to the same state across training or experiment sessions of the same animal.
+restore the data acquisition and runtime management system to the same state across training or experiment sessions for
+the same animal.
 """
 
 from dataclasses import dataclass
@@ -9,11 +10,13 @@ from ataraxis_data_structures import YamlConfig
 
 
 @dataclass()
-class HardwareConfiguration(YamlConfig):
-    """This class is used to save the runtime hardware configuration parameters as a .yaml file.
+class MesoscopeHardwareState(YamlConfig):
+    """Stores values that indirectly capture the configuration state of the Mesoscope-VR system hardware.
 
     This information is used to read and decode the data saved to the .npz log files during runtime as part of data
-    processing.
+    processing. Note, this class stores 'static' Mesoscope-VR system configuration that does not change during
+    experiment or training session runtime. This is in contrast to MesoscopeExperimentState class, which reflects the
+    'dynamic' state of the Mesoscope-VR system.
 
     Notes:
         All fields in this dataclass initialize to None. During log processing, any log associated with a hardware
@@ -21,7 +24,7 @@ class HardwareConfiguration(YamlConfig):
         any field in this dataclass to None also functions as a flag for whether to parse the log associated with the
         module that provides this field's information.
 
-        This class is automatically configured by MesoscopeExperiment and BehaviorTraining classes from sl-experiment
+        This class is automatically configured by _MesoscopeExperiment and _BehaviorTraining classes from sl-experiment
         library to facilitate log parsing.
     """
 
@@ -66,15 +69,7 @@ class HardwareConfiguration(YamlConfig):
 
 @dataclass()
 class LickTrainingDescriptor(YamlConfig):
-    """This class is used to save the description information specific to lick training sessions as a .yaml file.
-
-    The information stored in this class instance is filled in two steps. The main runtime function fills most fields
-    of the class, before it is saved as a .yaml file. After runtime, the experimenter manually fills leftover fields,
-    such as 'experimenter_notes,' before the class instance is transferred to the long-term storage destination.
-
-    The fully filled instance data is also used during preprocessing to write the water restriction log entry for the
-    trained animal.
-    """
+    """Stores the task and outcome information specific to lick training sessions."""
 
     experimenter: str
     """The ID of the experimenter running the session."""
@@ -90,7 +85,7 @@ class LickTrainingDescriptor(YamlConfig):
     """Stores the maximum volume of water the system is allowed to dispense during training."""
     maximum_training_time_m: int
     """Stores the maximum time, in minutes, the system is allowed to run the training for."""
-    maximum_unconsumed_rewards: int = 3
+    maximum_unconsumed_rewards: int = 1
     """Stores the maximum number of consecutive rewards that can be delivered without the animal consuming them. If 
     the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal 
     consumes the rewards."""
@@ -104,15 +99,7 @@ class LickTrainingDescriptor(YamlConfig):
 
 @dataclass()
 class RunTrainingDescriptor(YamlConfig):
-    """This class is used to save the description information specific to run training sessions as a .yaml file.
-
-    The information stored in this class instance is filled in two steps. The main runtime function fills most fields
-    of the class, before it is saved as a .yaml file. After runtime, the experimenter manually fills leftover fields,
-    such as 'experimenter_notes,' before the class instance is transferred to the long-term storage destination.
-
-    The fully filled instance data is also used during preprocessing to write the water restriction log entry for the
-    trained animal.
-    """
+    """Stores the task and outcome information specific to run training sessions."""
 
     experimenter: str
     """The ID of the experimenter running the session."""
@@ -141,7 +128,7 @@ class RunTrainingDescriptor(YamlConfig):
     """Stores the maximum volume of water the system is allowed to dispense during training."""
     maximum_training_time_m: int
     """Stores the maximum time, in minutes, the system is allowed to run the training for."""
-    maximum_unconsumed_rewards: int = 3
+    maximum_unconsumed_rewards: int = 1
     """Stores the maximum number of consecutive rewards that can be delivered without the animal consuming them. If 
     the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal 
     consumes the rewards."""
@@ -159,15 +146,7 @@ class RunTrainingDescriptor(YamlConfig):
 
 @dataclass()
 class MesoscopeExperimentDescriptor(YamlConfig):
-    """This class is used to save the description information specific to experiment sessions as a .yaml file.
-
-    The information stored in this class instance is filled in two steps. The main runtime function fills most fields
-    of the class, before it is saved as a .yaml file. After runtime, the experimenter manually fills leftover fields,
-    such as 'experimenter_notes,' before the class instance is transferred to the long-term storage destination.
-
-    The fully filled instance data is also used during preprocessing to write the water restriction log entry for the
-    animal participating in the experiment runtime.
-    """
+    """Stores the task and outcome information specific to sessions that use the Mesoscope-VR system."""
 
     experimenter: str
     """The ID of the experimenter running the session."""
@@ -185,13 +164,19 @@ class MesoscopeExperimentDescriptor(YamlConfig):
 
 @dataclass()
 class ZaberPositions(YamlConfig):
-    """This class is used to save Zaber motor positions as a .yaml file to reuse them between sessions.
+    """Stores Zaber motor positions reused between experiment sessions.
 
     The class is specifically designed to store, save, and load the positions of the LickPort and HeadBar motors
     (axes). It is used to both store Zaber motor positions for each session for future analysis and to restore the same
     Zaber motor positions across consecutive runtimes for the same project and animal combination.
 
     Notes:
+        This class is only used by the Mesoscope-VR system.
+
+        The HeadBar axis (connection) also manages the motor that moves the running wheel along the x-axis. While the
+        motor itself is not part of the HeadBar assembly, it is related to positioning the mouse in the VR system. This
+        is in contrast to the LickPort group, which is related to positioning the lick tube relative to the mouse.
+
         All positions are saved using native motor units. All class fields initialize to default placeholders that are
         likely NOT safe to apply to the VR system. Do not apply the positions loaded from the file unless you are
         certain they are safe to use.
@@ -207,6 +192,9 @@ class ZaberPositions(YamlConfig):
     """The absolute position, in native motor units, of the HeadBar pitch-axis motor."""
     headbar_roll: int = 0
     """The absolute position, in native motor units, of the HeadBar roll-axis motor."""
+    wheel_x: int = 0
+    """The absolute position, in native motor units, of the running wheel platform x-axis motor. Although this motor is
+    not itself part of the HeadBar assembly, it is controlled through the HeadBar controller port."""
     lickport_z: int = 0
     """The absolute position, in native motor units, of the LickPort z-axis motor."""
     lickport_x: int = 0
@@ -217,29 +205,30 @@ class ZaberPositions(YamlConfig):
 
 @dataclass()
 class MesoscopePositions(YamlConfig):
-    """This class is used to save the real and virtual Mesoscope objective positions as a .yaml file to reuse it
-    between experiment sessions.
+    """Stores real and virtual Mesoscope objective positions reused between experiment sessions.
 
     Primarily, the class is used to help the experimenter to position the Mesoscope at the same position across
     multiple imaging sessions. It stores both the physical (real) position of the objective along the motorized
     X, Y, Z, and Roll axes and the virtual (ScanImage software) tip, tilt, and fastZ focus axes.
 
     Notes:
+        This class is only used by runtimes that use the Mesoscope-VR system.
+
         Since the API to read and write these positions automatically is currently not available, this class relies on
         the experimenter manually entering all positions and setting the mesoscope to these positions when necessary.
     """
 
-    mesoscope_x_position: float = 0.0
+    mesoscope_x: float = 0.0
     """The X-axis position, in centimeters, of the Mesoscope objective used during session runtime."""
-    mesoscope_y_position: float = 0.0
+    mesoscope_y: float = 0.0
     """The Y-axis position, in centimeters, of the Mesoscope objective used during session runtime."""
-    mesoscope_roll_position: float = 0.0
+    mesoscope_roll: float = 0.0
     """The Roll-axis position, in degrees, of the Mesoscope objective used during session runtime."""
-    mesoscope_z_position: float = 0.0
+    mesoscope_z: float = 0.0
     """The Z-axis position, in centimeters, of the Mesoscope objective used during session runtime."""
-    mesoscope_fast_z_position: float = 0.0
+    mesoscope_fast_z: float = 0.0
     """The Fast-Z-axis position, in micrometers, of the Mesoscope objective used during session runtime."""
-    mesoscope_tip_position: float = 0.0
+    mesoscope_tip: float = 0.0
     """The Tilt-axis position, in degrees, of the Mesoscope objective used during session runtime."""
-    mesoscope_tilt_position: float = 0.0
+    mesoscope_tilt: float = 0.0
     """The Tip-axis position, in degrees, of the Mesoscope objective used during session runtime."""
