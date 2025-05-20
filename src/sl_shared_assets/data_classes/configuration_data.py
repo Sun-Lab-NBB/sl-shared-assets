@@ -1,6 +1,6 @@
 """This module provides classes used to configure data acquisition and processing runtimes in the Sun lab. All lab
-projects use classes from this library to configure experiment runtimes and determine how to interact with the
-particular data acquisition and runtime management system used by the project."""
+projects use classes from this module to configure experiment runtimes and determine how to interact with the
+particular data acquisition and runtime management system (hardware) they run on."""
 
 import copy
 from pathlib import Path
@@ -11,74 +11,16 @@ from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 
 
-def replace_configuration_path(path: Path) -> None:
-    """Replaces the path to the acquisition system configuration file used by all data acquisition pipelines that run on
-    the local machine.
-
-    The first time a data acquisition runtime starts on a new machine, it asks the user to provide the path to the
-    system configuration parameters stored as a .yaml file. This path is then stored inside the default user data
-    directory as .txt file to be reused for all future runtimes. Specifically, all future runtimes check the user data
-    directory and, if it contains the path to the system configuration file(s), load the system configuration data from
-    that file. To support replacing this path without searching for the user data directory, which is usually hidden,
-    this function finds and updates the contents of the .txt file.
-
-    Args:
-        path: The path to the new directory where to store the system configuration .yaml file.
-    """
-    # Resolves the path to the static .txt file used to store the local path to the system configuration files
-    app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
-    path_file = app_dir.joinpath("configuration_directory.txt")
-
-    # In case this function is called before the app directory is created, ensures the app directory exists
-    ensure_directory_exists(path_file)
-
-    # Ensures that the input root directory exists
-    ensure_directory_exists(path)
-
-    # Replaces the contents of the configuration_directory.txt file with the provided path
-    with open(path_file, "w") as f:
-        f.write(str(path))
-
-
-def _get_configuration_path() -> Path:
-    """Resolves and returns the path to the local sun lab system configuration directory.
-
-    If the directory does not exist, creates the directory at the path specified by the user.
-    """
-    # Uses appdirs to locate the user data directory and resolve the path to the configuration directory
-    app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
-    path_file = app_dir.joinpath("configuration_directory.txt")
-
-    # If the configuration directory path file does not exist, prompts the user to designate a configuration directory.
-    if not path_file.exists():
-        # Uses console input prompt to ask the user for the configuration directory path
-        message = (
-            "Unable to resolve the path to the local system configuration directory. Provide the absolute path to the "
-            "directory that stores all Sun lab system configuration files, such as mesoscope_system_configuration.yaml."
-        )
-        # noinspection PyTypeChecker
-        console.echo(message=message, level=LogLevel.WARNING)
-        config_path = Path(input("System configuration directory path: "))
-
-        # Generates the 'configuration_directory.txt' file and saves the user-provided path to that file
-        replace_configuration_path(path=config_path)
-
-    # Once the location of the path storage file is resolved, reads the root path from the file
-    with open(path_file, "r") as f:
-        configuration_directory = Path(f.read().strip())
-    return configuration_directory
-
-
 @dataclass()
 class ExperimentState:
     """Encapsulates the information used to set and maintain the desired experiment and system state.
 
-    Broadly, each experiment runtime can be conceptualized as two state-systems. The first state is that of the
+    Broadly, each experiment runtime can be conceptualized as a two state-system. The first state is that of the
     experimental task, which reflects the behavior goal, the rules for achieving the goal, and the reward for
     achieving the goal. The second state is that of the data acquisition and experiment control system, which is a
     snapshot of all hardware module states that make up the system that acquires the data and controls the task
-    environment. In simpler words, experiment state is about 'what the animal is doing', while the system state is
-    about 'what the hardware is doing'.
+    environment. Overall, experiment state is about 'what the animal is doing', while the system state is about
+    'what the hardware is doing'.
 
     Note:
         This class is acquisition-system-agnostic. It can be used to define the ExperimentConfiguration class for any
@@ -102,7 +44,7 @@ class ExperimentState:
 # noinspection PyArgumentList
 @dataclass()
 class MesoscopeExperimentConfiguration(YamlConfig):
-    """Stores the configuration of a single experiment runtime that uses the Mesoscope_VR system.
+    """Stores the configuration of a single experiment runtime that uses the Mesoscope_VR data acquisition system.
 
     Primarily, this includes the sequence of experiment and system states that defines the flow of the experiment
     runtime. During runtime, the main runtime control function traverses the sequence of states stored in this class
@@ -112,11 +54,11 @@ class MesoscopeExperimentConfiguration(YamlConfig):
 
     Each project should define one or more experiment configurations and save them as .yaml files inside the project
     'configuration' folder. The name for each configuration file is defined by the user and is used to identify and load
-    the experiment configuration when 'sl-run-experiment' CLI command exposed by the sl-experiment library is executed.
+    the experiment configuration when 'sl-experiment' CLI command exposed by the sl-experiment library is executed.
 
     Notes:
         This class is designed exclusively for the Mesoscope-VR system. Any other system needs to define a separate
-        ExperimentConfiguration class to specify its experiment runtimes.
+        ExperimentConfiguration class to specify its experiment runtimes and additional data.
     """
 
     cue_map: dict[int, float] = field(default_factory=lambda: {0: 30.0, 1: 30.0, 2: 30.0, 3: 30.0, 4: 30.0})
@@ -135,24 +77,8 @@ class MesoscopeExperimentConfiguration(YamlConfig):
 
 
 @dataclass()
-class MesoscopeSystemConfiguration(YamlConfig):
-    """Stores the hardware and filesystem configuration parameters for the Mesoscope-VR data acquisition system used in
-    the Sun lab.
-
-    This class is specifically designed to encapsulate the configuration parameters for the Mesoscope-VR system. It
-    expects the system to be configured according to the specifications available from the sl_experiment repository
-    (https://github.com/Sun-Lab-NBB/sl-experiment) and should be used exclusively on the VRPC.
-
-    Notes:
-        This class stores most, but not all configuration parameters of the Mesoscope-VR system components. Some
-        parameters are hardcoded in the sl-experiment library code and should only be changed by experienced users
-        who understand the source code of all software and firmware components that make up the Mesoscope-VR system.
-
-        Each SystemConfiguration class is uniquely tied to a specific hardware configuration used in the lab. This
-        class will only work with the Mesoscope-VR system. Any other data acquisition and runtime management system in
-        the lab should define its own SystemConfiguration class to specify its own hardware and filesystem configuration
-        parameters.
-    """
+class MesoscopePaths:
+    """Stores the filesystem configuration parameters for the Mesoscope-VR data acquisition system."""
 
     server_credentials_path: Path = Path("/media/Data/Experiments/server_credentials.yaml")
     """
@@ -185,6 +111,12 @@ class MesoscopeSystemConfiguration(YamlConfig):
     sharing protocol, such as SMB."""
     harvesters_cti_path: Path = Path("/opt/mvIMPACT_Acquire/lib/x86_64/mvGenTLProducer.cti")
     """The path to the GeniCam CTI file used to connect to Harvesters-managed cameras."""
+
+
+@dataclass()
+class MesoscopeCameras:
+    """Stores the configuration parameters for the cameras used by the Mesoscope-VR system to record behavior videos."""
+
     face_camera_index: int = 0
     """The index of the face camera in the list of all available Harvester-managed cameras."""
     left_camera_index: int = 0
@@ -193,28 +125,30 @@ class MesoscopeSystemConfiguration(YamlConfig):
     right_camera_index: int = 2
     """The index of the right body camera (from animal's perspective) in the list of all available OpenCV-managed
      cameras."""
+    quantization_parameter: int = 15
+    """The quantization parameter used by all cameras to encode acquired frames as video files. This controls how much
+    data is discarded when encoding each video frame, directly contributing to the encoding speed, resultant video file
+    size and video quality."""
+
+
+@dataclass()
+class MesoscopeMicroControllers:
+    """Stores the configuration parameters for the microcontrollers used by the Mesoscope-VR system."""
+
     actor_port: str = "/dev/ttyACM0"
     """The USB port used by the Actor Microcontroller."""
     sensor_port: str = "/dev/ttyACM1"
     """The USB port used by the Sensor Microcontroller."""
     encoder_port: str = "/dev/ttyACM2"
     """The USB port used by the Encoder Microcontroller."""
-    headbar_port: str = "/dev/ttyUSB0"
-    """The USB port used by the HeadBar Zaber motor controllers (devices)."""
-    lickport_port: str = "/dev/ttyUSB1"
-    """The USB port used by the LickPort Zaber motor controllers (devices)."""
-    unity_ip: str = "127.0.0.1"
-    """The IP address of the MQTT broker used to communicate with the Unity game engine. This is only used during 
-    experiment runtimes. Training runtimes ignore this parameter."""
-    unity_port: int = 1883
-    """The port number of the MQTT broker used to communicate with the Unity game engine. This is only used during
-    experiment runtimes. Training runtimes ignore this parameter."""
     mesoscope_start_ttl_module_id: int = 1
     """The unique byte-code ID of the TTL module instance used to send mesoscope frame acquisition start trigger 
     signals to the ScanImagePC."""
     mesoscope_stop_ttl_module_id: int = 2
     """The unique byte-code ID of the TTL module instance used to send mesoscope frame acquisition stop trigger 
     signals to the ScanImagePC."""
+    mesoscope_ttl_pulse_duration_ms: int = 10
+    """The duration of the HIGH phase of all outgoing mesoscope TTL pulses, in milliseconds."""
     minimum_break_strength_g_cm: float = 43.2047
     """The minimum torque applied by the running wheel break in gram centimeter. This is the torque the break delivers 
     at minimum voltage (break is disabled)."""
@@ -227,6 +161,15 @@ class MesoscopeSystemConfiguration(YamlConfig):
     """The threshold voltage, in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC), interpreted 
     as the animal's tongue contacting the sensor. Note, 12-bit ADC only supports values between 0 and 4095, so setting 
     the threshold above 4095 will result in no licks being reported to Unity."""
+    lick_signal_threshold_adc: int = 300
+    """The minimum voltage, in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC), reported to the
+    PC as a non-zero value. Voltages below this level are interpreted as 'no-lick' noise and are always pulled to 0."""
+    lick_delta_threshold_adc: int = 300
+    """The minimum absolute difference in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC) for 
+    the change to be reported to the PC. This is used to prevent reporting repeated non-lick or lick readouts to the 
+    PC, conserving communication bandwidth."""
+    lick_averaging_pool_size: int = 10
+    """The number of lick sensor readouts to average together to produce the final lick sensor readout value."""
     torque_baseline_voltage_adc: int = 2046
     """The voltage level, in raw analog units measured by 3.3v Analog-to-Digital-Converter (ADC) at 12-bit resolution 
     after the AD620 amplifier, that corresponds to no (0) torque readout. Usually, for a 3.3v ADC, this would be 
@@ -237,16 +180,49 @@ class MesoscopeSystemConfiguration(YamlConfig):
     this value can be 4095 (~3.3 V)."""
     torque_sensor_capacity_g_cm: float = 720.0779
     """The maximum torque detectable by the sensor, in grams centimeter (g cm)."""
+    torque_report_cw: bool = True
+    """Determines whether the sensor should report torque in the Clockwise (CW) direction. This direction corresponds 
+    to the animal trying to move the wheel backward."""
+    torque_report_ccw: bool = True
+    """Determines whether the sensor should report torque in the Counter-Clockwise (CCW) direction. This direction 
+    corresponds to the animal trying to move the wheel forward."""
+    torque_signal_threshold_adc: int = 300
+    """The minimum voltage, in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC), reported to the
+    PC as a non-zero value. Voltages below this level are interpreted as noise and are always pulled to 0."""
+    torque_delta_threshold_adc: int = 300
+    """The minimum absolute difference in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC) for 
+    the change to be reported to the PC. This is used to prevent reporting repeated static torque readouts to the 
+    PC, conserving communication bandwidth."""
+    torque_averaging_pool_size: int = 10
+    """The number of torque sensor readouts to average together to produce the final torque sensor readout value."""
     wheel_encoder_ppr = 8192
     """The resolution of the managed quadrature encoder, in Pulses Per Revolution (PPR). This is the number of 
     quadrature pulses the encoder emits per full 360-degree rotation."""
+    wheel_encoder_report_cw: bool = False
+    """Determines whether to report encoder rotation in the CW (negative) direction. This corresponds to the animal 
+    moving backward on the wheel."""
+    wheel_encoder_report_ccw: bool = True
+    """Determines whether to report encoder rotation in the CCW (positive) direction. This corresponds to the animal 
+    moving forward on the wheel."""
+    wheel_encoder_delta_threshold_pulse: int = 15
+    """The minimum difference, in encoder pulse counts, between two encoder readouts for the change to be reported to 
+    the PC. This is used to prevent reporting idle readouts and filter out sub-threshold noise."""
+    wheel_encoder_polling_delay_us = 500
+    """The delay, in microseconds, between any two successive encoder state readouts."""
     cm_per_unity_unit = 10.0
     """The length of each Unity 'unit' in real-world centimeters recorded by the running wheel encoder."""
+    screen_trigger_pulse_duration_ms: int = 500
+    """The duration of the HIGH phase of the TTL pulse used to toggle the VR screens between ON and OFF states."""
     auditory_tone_duration_ms: int = 300
     """The time, in milliseconds, to sound the auditory tone when water rewards are delivered to the animal."""
-    system_revision: str = "1.0.0"
-    """Stores the revision version of the Mesoscope-VR system. This value is manually modified by lab engineers to track
-    changes to the system's hardware and software components."""
+    valve_calibration_pulse_count: int = 200
+    """The number of times to cycle opening and closing (pulsing) the valve during each calibration runtime. This 
+    determines how many reward deliveries are used at each calibrated time-interval to produce the average dispensed 
+    water volume readout used to calibrate the valve."""
+    sensor_polling_delay_ms: int = 1
+    """The delay, in milliseconds, between any two successive readouts of any sensor other than the encoder. Note, the 
+    encoder uses a dedicated parameter, as the encoder needs to be sampled at a higher frequency than all other sensors.
+    """
     valve_calibration_data: dict[int | float, int | float] | tuple[tuple[int | float, int | float], ...] = (
         (15000, 1.75),
         (30000, 3.85),
@@ -258,77 +234,76 @@ class MesoscopeSystemConfiguration(YamlConfig):
     the requested reward volumes into times the valve needs to be open to deliver the desired volume of water.
     """
 
-    @classmethod
-    def load(cls) -> "MesoscopeSystemConfiguration":
-        """Loads the Mesoscope-VR system configuration parameters from the 'mesoscope_system_configuration.yaml' file.
 
-        This method is called by all training or experiment session runtimes to configure the Mesoscope-VR system for
-        data acquisition. When this method is called for the first time on a new machine, it asks the user to provide
-        the path to the default configuration directory, where all system configuration files will be cached in the
-        future.
+@dataclass()
+class MesoscopeAdditionalFirmware:
+    """Stores the configuration parameters for all firmware and hardware components not assembled in the Sun lab."""
 
-        Notes:
-            To replace the default configuration file directory, use the `sl-reconfigure' CLI command.
+    headbar_port: str = "/dev/ttyUSB0"
+    """The USB port used by the HeadBar Zaber motor controllers (devices). Note, this motor group also includes the 
+    running wheel x-axis motor."""
+    lickport_port: str = "/dev/ttyUSB1"
+    """The USB port used by the LickPort Zaber motor controllers (devices)."""
+    unity_ip: str = "127.0.0.1"
+    """The IP address of the MQTT broker used to communicate with the Unity game engine."""
+    unity_port: int = 1883
+    """The port number of the MQTT broker used to communicate with the Unity game engine."""
 
-        Returns:
-            The initialized MesoscopeSystemConfiguration instance that stores the loaded Mesoscope-VR system
-            configuration data.
-        """
 
-        # Resolves the path to the configuration directory
-        configuration_directory = _get_configuration_path()
+@dataclass()
+class MesoscopeSystemConfiguration(YamlConfig):
+    """Stores the hardware and filesystem configuration parameters for the Mesoscope-VR data acquisition system used in
+    the Sun lab.
 
-        # Resolves the path to the configuration file
-        configuration_path = configuration_directory.joinpath("mesoscope_system_configuration.yaml")
+    This class is specifically designed to encapsulate the configuration parameters for the Mesoscope-VR system. It
+    expects the system to be configured according to the specifications available from the sl_experiment repository
+    (https://github.com/Sun-Lab-NBB/sl-experiment) and should be used exclusively by the VRPC machine
+    (main Mesoscope-VR PC).
 
-        # If the configuration file does not exist creates the configuration file using default configuration
-        # parameters. THis would only be the case the first time any configuration class is loaded on a new machine or
-        # after changing the root configuration directory.
-        if not configuration_path.exists():
-            message = (
-                f"Unable to load Mesoscope-VR system configuration data from disk as no "
-                f"'mesoscope_system_configuration.yaml' file is found inside the root configuration directory"
-                f"({configuration_directory}). Generating a precursor (default) configuration file under the "
-                f"configuration directory. Edit the file to adjust the Mesoscope-VR system configuration as necessary "
-                f"before proceeding further to avoid runtime errors and unexpected behavior."
-            )
-            # noinspection PyTypeChecker
-            console.echo(message=message, level=LogLevel.WARNING)
+    Notes:
+        Each SystemConfiguration class is uniquely tied to a specific hardware configuration used in the lab. This
+        class will only work with the Mesoscope-VR system. Any other data acquisition and runtime management system in
+        the lab should define its own SystemConfiguration class to specify its own hardware and filesystem configuration
+        parameters.
+    """
 
-            # Generates the default configuration class instance and dumps it as a .yaml file.
-            precursor = MesoscopeSystemConfiguration()
-            precursor.save(path=configuration_path)
+    name: str = "Mesoscope-VR"
+    """Stores the descriptive name of the data acquisition system."""
+    paths: MesoscopePaths = field(default_factory=MesoscopePaths)
+    """Stores the filesystem configuration parameters for the Mesoscope-VR data acquisition system."""
+    cameras: MesoscopeCameras = field(default_factory=MesoscopeCameras)
+    """Stores the configuration parameters for the cameras used by the Mesoscope-VR system to record behavior videos."""
+    microcontrollers: MesoscopeMicroControllers = field(default_factory=MesoscopeMicroControllers)
+    """Stores the configuration parameters for the microcontrollers used by the Mesoscope-VR system."""
+    additional_firmware: MesoscopeAdditionalFirmware = field(default_factory=MesoscopeAdditionalFirmware)
+    """Stores the configuration parameters for all firmware and hardware components not assembled in the Sun lab."""
 
-            # Waits for the user to manually configure the newly created file.
-            input(f"Enter anything to continue: ")
-
-        # Loads the data from the YAML file and initializes the class instance.
-        instance: MesoscopeSystemConfiguration = cls.from_yaml(file_path=configuration_path)  # type: ignore
+    def __post_init__(self):
+        """Ensures that variables converted to different types for storage purposes are always set to expected types
+        upon class instantiation."""
 
         # Converts all paths loaded as strings to Path objects used inside the library
-        instance.server_credentials_path = Path(instance.server_credentials_path)
-        instance.google_credentials_path = Path(instance.google_credentials_path)
-        instance.root_directory = Path(instance.root_directory)
-        instance.server_storage_directory = Path(instance.server_storage_directory)
-        instance.server_working_directory = Path(instance.server_working_directory)
-        instance.nas_directory = Path(instance.nas_directory)
-        instance.mesoscope_directory = Path(instance.mesoscope_directory)
-        instance.harvesters_cti_path = Path(instance.harvesters_cti_path)
+        self.paths.server_credentials_path = Path(self.paths.server_credentials_path)
+        self.paths.google_credentials_path = Path(self.paths.google_credentials_path)
+        self.paths.root_directory = Path(self.paths.root_directory)
+        self.paths.server_storage_directory = Path(self.paths.server_storage_directory)
+        self.paths.server_working_directory = Path(self.paths.server_working_directory)
+        self.paths.nas_directory = Path(self.paths.nas_directory)
+        self.paths.mesoscope_directory = Path(self.paths.mesoscope_directory)
+        self.paths.harvesters_cti_path = Path(self.paths.harvesters_cti_path)
 
         # Converts valve_calibration data from dictionary to a tuple of tuples format
-        if not isinstance(instance.valve_calibration_data, tuple):
-            instance.valve_calibration_data = tuple((k, v) for k, v in instance.valve_calibration_data.items())
-
-        # Returns the initialized class instance to caller
-        return instance
+        if not isinstance(self.microcontrollers.valve_calibration_data, tuple):
+            self.microcontrollers.valve_calibration_data = tuple(
+                (k, v) for k, v in self.microcontrollers.valve_calibration_data.items()
+            )
 
     def save(self, path: Path) -> None:
         """Saves class instance data to disk as a 'mesoscope_system_configuration.yaml' file.
 
-        This method is automatically used by the 'load' class method the first time a MesoscopeSystemConfiguration
-        class is instantiated on a new machine. It saves the 'precursor' configuration class instance to the
-        Sun lab configuration directory as a .yaml file. This method is also used by the SessionData class to save
-        a snapshot of the acquisition system configuration to the 'raw_data' directory of each newly created session.
+        This method converts certain class variables to yaml-safe types (for example, Path objects -> strings) and
+        saves class data to disk as a .yaml file. The method is intended to be used solely by the
+        set_system_configuration_file() function and should not be called from any other context.
 
         Args:
             path: The path to the .yaml file to save the data to.
@@ -339,18 +314,132 @@ class MesoscopeSystemConfiguration(YamlConfig):
 
         # Converts all Path objects to strings before dumping the data, as .yaml encoder does not properly recognize
         # Path objects
-        original.server_credentials_path = str(original.server_credentials_path)  # type: ignore
-        original.google_credentials_path = str(original.google_credentials_path)  # type: ignore
-        original.root_directory = str(original.root_directory)  # type: ignore
-        original.server_storage_directory = str(original.server_storage_directory)  # type: ignore
-        original.server_working_directory = str(original.server_working_directory)  # type: ignore
-        original.nas_directory = str(original.nas_directory)  # type: ignore
-        original.mesoscope_directory = str(original.mesoscope_directory)  # type: ignore
-        original.harvesters_cti_path = str(original.harvesters_cti_path)  # type: ignore
+        original.paths.server_credentials_path = str(original.paths.server_credentials_path)  # type: ignore
+        original.paths.google_credentials_path = str(original.paths.google_credentials_path)  # type: ignore
+        original.paths.root_directory = str(original.paths.root_directory)  # type: ignore
+        original.paths.server_storage_directory = str(original.paths.server_storage_directory)  # type: ignore
+        original.paths.server_working_directory = str(original.paths.server_working_directory)  # type: ignore
+        original.paths.nas_directory = str(original.paths.nas_directory)  # type: ignore
+        original.paths.mesoscope_directory = str(original.paths.mesoscope_directory)  # type: ignore
+        original.paths.harvesters_cti_path = str(original.paths.harvesters_cti_path)  # type: ignore
 
         # Converts valve calibration data into dictionary format
-        if isinstance(original.valve_calibration_data, tuple):
-            original.valve_calibration_data = {k: v for k, v in original.valve_calibration_data}
+        if isinstance(original.microcontrollers.valve_calibration_data, tuple):
+            original.microcontrollers.valve_calibration_data = {
+                k: v for k, v in original.microcontrollers.valve_calibration_data
+            }
 
         # Saves the data to the YAML file
         original.to_yaml(file_path=path)
+
+
+# A dictionary that maps the file names for supported data acquisition systems to their configuration classes. This
+# dictionary always contains all data acquisition systems used in the lab.
+_supported_configuration_files = {"mesoscope_system_configuration.yaml": MesoscopeSystemConfiguration}
+
+
+def set_system_configuration_file(path: Path) -> None:
+    """Sets the system configuration .yaml file specified by the input path as the default system configuration file for
+    the managed machine (PC).
+
+    This function is used to initially configure or override the existing configuration of any data acquisition system
+    used in the lab. The path to the configuration file is stored inside the user's data directory, so that all
+    Sun lab libraries can automatically access that information during every runtime. Since the storage directory is
+    typically hidden and varies between OSes and machines, this function provides a convenient way for setting that
+    path without manually editing the storage cache.
+
+    Notes:
+        If the input path does not point to an existing file, but the file name and extension are correct, the function
+        will automatically generate a default SystemConfiguration class instance and save it under the specified path.
+
+        A data acquisition system can include multiple machines (PCs). However, the configuration file is typically
+        only present on the 'main' machine that manages all runtimes.
+
+    Args:
+        path: The path to the new system configuration file to be used by the local data acquisition system (PC).
+
+    Raises:
+        ValueError: If the input path is not a valid system configuration file or does not use a supported data
+            acquisition system name.
+    """
+
+    # Prevents setting the path to an invalid file.
+    if path.suffix != ".yaml" and path.name not in _supported_configuration_files.keys():
+        message = (
+            f"Unable to set the input path {path} as the default system configuration file path. The input path has "
+            f"to point to a configuration file ending with a '.yaml' extension and using one of the supported system "
+            f"names: {', '.join(_supported_configuration_files.keys())}."
+        )
+        console.error(message=message, error=ValueError)
+
+    # If the configuration file specified by the 'path' does not exist, generates a default SystemConfiguration instance
+    # and saves it to the specified path.
+    if not path.exists():
+        precursor = _supported_configuration_files[f"{path.name}{path.suffix}"]()  # Instantiates default class instance
+        precursor.save(path=path)
+        message = (
+            f"The file specified by the input system configuration path {path} does not exist. Generating and saving "
+            f"the default system configuration class instance to the specified path."
+        )
+        console.echo(message=message, level=LogLevel.WARNING)
+
+    # Resolves the path to the static .txt file used to store the path to the system configuration file
+    app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
+    path_file = app_dir.joinpath("configuration_path.txt")
+
+    # In case this function is called before the app directory is created, ensures the app directory exists
+    ensure_directory_exists(path_file)
+
+    # Ensures that the input path's directory exists
+    ensure_directory_exists(path)
+
+    # Replaces the contents of the configuration_path.txt file with the provided path
+    with open(path_file, "w") as f:
+        f.write(str(path))
+
+
+def get_system_configuration_data() -> MesoscopeSystemConfiguration:
+    """Resolves the path to the local system configuration file and loads the system configuration data.
+
+    This service function is used by all Sun lab data acquisition runtimes to load the system configuration data from
+    the shared configuration file. It supports resolving and returning the data for all data acquisition systems used
+    in the lab.
+
+    Returns:
+        The initialized SystemConfiguration class instance for the local acquisition system that stores the loaded
+        configuration parameters.
+
+    Raises:
+        FileNotFoundError: If the local machine does not have the Sun lab data directory, or the system configuration
+            file does not exist.
+    """
+    # Uses appdirs to locate the user data directory and resolve the path to the configuration file
+    app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
+    path_file = app_dir.joinpath("configuration_path.txt")
+
+    # If the cache file or the Sun lab data directory do not exist, aborts with an error
+    if not path_file.exists():
+        message = (
+            "Unable to resolve the path to the local system configuration file, as local machine does not have the "
+            "Sun lab data directory. Generate the local configuration file and Sun lab data directory by calling the "
+            "'sl-config' CLI command and rerun the command that produced this error."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    # Once the location of the path storage file is resolved, reads the file path from the file
+    with open(path_file, "r") as f:
+        configuration_file = Path(f.read().strip())
+
+    # If the configuration file does not exist, also aborts with an error
+    if not configuration_file.exists():
+        message = (
+            "Unable to resolve the path to the local system configuration file, as the file pointed by the path stored "
+            "in Sun lab data directory does not exist. Generate a new local configuration file by calling the "
+            "'sl-config' CLI command and rerun the command that produced this error."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    # Loads the data stored inside the .yaml file into the class instance that matches the file name and returns the
+    # instantiated class to caller
+    file_name = f"{configuration_file.name}{configuration_file.suffix}"
+    return _supported_configuration_files[file_name].from_yaml(file_path=configuration_file)  # type: ignore

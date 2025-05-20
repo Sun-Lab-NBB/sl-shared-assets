@@ -6,9 +6,9 @@ to be saved to disk as .yaml files and restored from the .yaml files as needed."
 from .runtime_data import (
     ZaberPositions,
     MesoscopePositions,
-    MesoscopeHardwareState,
     RunTrainingDescriptor,
     LickTrainingDescriptor,
+    MesoscopeHardwareState,
     MesoscopeExperimentDescriptor,
 )
 from .session_data import (
@@ -26,10 +26,15 @@ from .surgery_data import (
     ProcedureData,
 )
 from .configuration_data import (
+    MesoscopePaths,
     ExperimentState,
+    MesoscopeCameras,
+    MesoscopeMicroControllers,
+    MesoscopeAdditionalFirmware,
     MesoscopeSystemConfiguration,
     MesoscopeExperimentConfiguration,
-    replace_configuration_path,
+    get_system_configuration_data,
+    set_system_configuration_file,
 )
 
 __all__ = [
@@ -52,5 +57,10 @@ __all__ = [
     "MesoscopeExperimentConfiguration",
     "MesoscopeExperimentDescriptor",
     "MesoscopeSystemConfiguration",
-    "replace_configuration_path",
+    "set_system_configuration_file",
+    "get_system_configuration_data",
+    "MesoscopePaths",
+    "MesoscopeCameras",
+    "MesoscopeMicroControllers",
+    "MesoscopeAdditionalFirmware",
 ]

@@ -11,12 +11,23 @@ from ataraxis_data_structures import YamlConfig
 
 @dataclass()
 class MesoscopeHardwareState(YamlConfig):
-    """Stores values that indirectly capture the configuration state of the Mesoscope-VR system hardware.
+    """Stores configuration parameters (states) of the Mesoscope-VR system hardware modules used during training or
+    experiment runtime.
 
     This information is used to read and decode the data saved to the .npz log files during runtime as part of data
-    processing. Note, this class stores 'static' Mesoscope-VR system configuration that does not change during
-    experiment or training session runtime. This is in contrast to MesoscopeExperimentState class, which reflects the
-    'dynamic' state of the Mesoscope-VR system.
+    processing.
+
+    Notes:
+        This class stores 'static' Mesoscope-VR system configuration that does not change during experiment or training
+        session runtime. This is in contrast to MesoscopeExperimentState class, which reflects the 'dynamic' state of
+        the Mesoscope-VR system.
+
+        This class partially overlaps with the MesoscopeSystemConfiguration class, which is also stored in the
+        raw_data folder of each session. The primary reason to keep both classes is to ensure that the math (rounding)
+        used during runtime matches the math (rounding) used during data processing. MesoscopeSystemConfiguration does
+        not do any rounding or otherwise attempt to be repeatable, which is in contrast to hardware module that read
+        those parameters. Reading values from this class guarantees the read value exactly matches the value used
+        during runtime.
 
     Notes:
         All fields in this dataclass initialize to None. During log processing, any log associated with a hardware
@@ -69,7 +80,7 @@ class MesoscopeHardwareState(YamlConfig):
 
 @dataclass()
 class LickTrainingDescriptor(YamlConfig):
-    """Stores the task and outcome information specific to lick training sessions."""
+    """Stores the task and outcome information specific to lick training sessions that use the Mesoscope-VR system."""
 
     experimenter: str
     """The ID of the experimenter running the session."""
@@ -99,7 +110,7 @@ class LickTrainingDescriptor(YamlConfig):
 
 @dataclass()
 class RunTrainingDescriptor(YamlConfig):
-    """Stores the task and outcome information specific to run training sessions."""
+    """Stores the task and outcome information specific to run training sessions that use the Mesoscope-VR system."""
 
     experimenter: str
     """The ID of the experimenter running the session."""
@@ -146,7 +157,7 @@ class RunTrainingDescriptor(YamlConfig):
 
 @dataclass()
 class MesoscopeExperimentDescriptor(YamlConfig):
-    """Stores the task and outcome information specific to sessions that use the Mesoscope-VR system."""
+    """Stores the task and outcome information specific to experiment sessions that use the Mesoscope-VR system."""
 
     experimenter: str
     """The ID of the experimenter running the session."""
@@ -164,15 +175,13 @@ class MesoscopeExperimentDescriptor(YamlConfig):
 
 @dataclass()
 class ZaberPositions(YamlConfig):
-    """Stores Zaber motor positions reused between experiment sessions.
+    """Stores Zaber motor positions reused between experiment sessions that use the Mesoscope-VR system.
 
     The class is specifically designed to store, save, and load the positions of the LickPort and HeadBar motors
     (axes). It is used to both store Zaber motor positions for each session for future analysis and to restore the same
     Zaber motor positions across consecutive runtimes for the same project and animal combination.
 
     Notes:
-        This class is only used by the Mesoscope-VR system.
-
         The HeadBar axis (connection) also manages the motor that moves the running wheel along the x-axis. While the
         motor itself is not part of the HeadBar assembly, it is related to positioning the mouse in the VR system. This
         is in contrast to the LickPort group, which is related to positioning the lick tube relative to the mouse.
@@ -205,15 +214,14 @@ class ZaberPositions(YamlConfig):
 
 @dataclass()
 class MesoscopePositions(YamlConfig):
-    """Stores real and virtual Mesoscope objective positions reused between experiment sessions.
+    """Stores real and virtual Mesoscope objective positions reused between experiment sessions that use the
+    Mesoscope-VR system.
 
     Primarily, the class is used to help the experimenter to position the Mesoscope at the same position across
     multiple imaging sessions. It stores both the physical (real) position of the objective along the motorized
     X, Y, Z, and Roll axes and the virtual (ScanImage software) tip, tilt, and fastZ focus axes.
 
     Notes:
-        This class is only used by runtimes that use the Mesoscope-VR system.
-
         Since the API to read and write these positions automatically is currently not available, this class relies on
         the experimenter manually entering all positions and setting the mesoscope to these positions when necessary.
     """
