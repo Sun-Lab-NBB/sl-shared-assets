@@ -50,7 +50,9 @@ dependencies = [
     "paramiko>=3.5.1, <4",
     "simple-slurm>=0,<1",
     "click>=8,<9",
-    "dacite>=1,<2",
+    "natsort>=8,<9",
+    "polars>=1,<2",
+    "pyarrow>=20,<21",
 ]
 
 [project.urls]
@@ -69,7 +71,9 @@ condarun = [
     "tqdm>=4,<5",
     "paramiko>=3.5.1,<4",
     "click>=8,<9",
-    "dacite>=1,<2",
+    "natsort>=8,<9",
+    "polars>=1,<2",
+    "pyarrow>=20,<21",
 ]
 
 # Dependencies known to be installable with conda for all development platforms (OSX ARM64, WIN AMD64, LIN AMD64).

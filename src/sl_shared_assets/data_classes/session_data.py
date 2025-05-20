@@ -203,6 +203,11 @@ class RawData:
     system_configuration_path: Path = Path()
     """Stores the path to the system_configuration.yaml file. This file contains the exact snapshot of the data 
     acquisition and runtime management system configuration parameters used to acquire session data."""
+    telomere_path: Path = Path()
+    """Stores the path to the telomere.bin file. This file is statically generated at the end of the session's data 
+    acquisition based on experimenter feedback to mark sessions that ran in-full with no issues. Sessions without a 
+    telomere.bin file are considered 'incomplete' and are excluded from all automated processing, as they may contain 
+    corrupted, incomplete, or otherwise unusable data."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -232,6 +237,7 @@ class RawData:
         self.window_screenshot_path = self.raw_data_path.joinpath("window_screenshot.png")
         self.checksum_path = self.raw_data_path.joinpath("ax_checksum.txt")
         self.system_configuration_path = self.raw_data_path.joinpath("system_configuration.yaml")
+        self.telomere_path = self.raw_data_path.joinpath("telomere.bin")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
@@ -268,6 +274,18 @@ class ProcessedData:
     server-side data processing pipeline runtimes. This directory is primarily used when running data processing jobs 
     on the remote server. However, it is possible to configure local runtimes to also redirect log data to files 
     stored in this directory (by editing ataraxis-base-utilities 'console' variable)."""
+    suite2p_bin_path: Path = Path()
+    """Stores the path to the suite2p.bin file. This file is created by our single-day suite2p data processing pipeline
+    to mark sessions that have been successfully processed with the single-day sl-suite2p library pipeline. Note, the 
+    file is removed each time the session is (re)processed with the suite2p pipeline."""
+    behavior_bin_path: Path = Path()
+    """Stores the path to the behavior.bin file. This file is created by our behavior data extraction pipeline
+    to mark sessions that have been successfully processed with the sl-behavior library pipeline. Note, the 
+    file is removed each time the session is (re)processed with the behavior pipeline."""
+    dlc_bin_path: Path = Path()
+    """Stores the path to the dlc.bin file. This file is created by our DeepLabCut-based pose tracking pipeline
+    to mark sessions that have been successfully processed with the sl-dlc library pipeline. Note, the 
+    file is removed each time the session is (re)processed with the dlc pipeline."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -286,6 +304,9 @@ class ProcessedData:
         self.mesoscope_data_path = self.processed_data_path.joinpath("mesoscope_data")
         self.behavior_data_path = self.processed_data_path.joinpath("behavior_data")
         self.job_logs_path = self.processed_data_path.joinpath("job_logs")
+        self.suite2p_bin_path = self.processed_data_path.joinpath("suite2p.bin")
+        self.behavior_bin_path = self.processed_data_path.joinpath("behavior.bin")
+        self.dlc_bin_path = self.processed_data_path.joinpath("dlc.bin")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
