@@ -525,7 +525,7 @@ class SessionData(YamlConfig):
             console.error(message=message, error=FileNotFoundError)
 
         # Loads class data from .yaml file
-        instance: SessionData = cls.from_yaml(file_path=session_data_path)
+        instance: SessionData = cls.from_yaml(file_path=session_data_path)  # type: ignore
 
         # The method assumes that the 'donor' .yaml file is always stored inside the raw_data directory of the session
         # to be processed. Since the directory itself might have moved (between or even within the same PC) relative to

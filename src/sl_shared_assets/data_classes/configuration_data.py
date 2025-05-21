@@ -278,7 +278,7 @@ class MesoscopeSystemConfiguration(YamlConfig):
     additional_firmware: MesoscopeAdditionalFirmware = field(default_factory=MesoscopeAdditionalFirmware)
     """Stores the configuration parameters for all firmware and hardware components not assembled in the Sun lab."""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Ensures that variables converted to different types for storage purposes are always set to expected types
         upon class instantiation."""
 
