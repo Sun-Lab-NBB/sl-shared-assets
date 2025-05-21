@@ -37,7 +37,7 @@ def generate_project_manifest(
     session_directories = [directory.parent for directory in raw_project_directory.rglob("raw_data")]
 
     # Precreates the 'manifest' dictionary structure
-    manifest: dict[str, list] = {
+    manifest: dict[str, list[str | bool]] = {
         "animal": [],  # Animal IDs.
         "session": [],  # Session names.
         "type": [],  # Type of the session (e.g., Experiment, Training, etc.).
@@ -63,8 +63,8 @@ def generate_project_manifest(
         manifest["animal"].append(session_data.animal_id)
         manifest["session"].append(session_data.session_name)
         manifest["type"].append(session_data.session_type)
-        manifest["raw_data"].append(session_data.raw_data.raw_data_path)
-        manifest["processed_data"].append(session_data.processed_data.processed_data_path)
+        manifest["raw_data"].append(str(session_data.raw_data.raw_data_path))
+        manifest["processed_data"].append(str(session_data.processed_data.processed_data_path))
 
         # If the session raw_data folder contains the telomere.bin file, marks the session as complete.
         manifest["complete"].append(session_data.raw_data.telomere_path.exists())
