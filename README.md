@@ -30,6 +30,7 @@ acquisition and processing and provides the API for accessing the lab’s main c
 
 - [Dependencies](#dependencies)
 - [Installation](#installation)
+- [Usage](#usage)
 - [API Documentation](#api-documentation)
 - [Versioning](#versioning)
 - [Authors](#authors)
@@ -60,10 +61,21 @@ Use the following command to install the library using pip: ```pip install sl-sh
 
 ---
 
+## Usage
+
+All library components are intended to be used via other Sun lab libraries. Developers should study the API and CLI 
+documentation below to learn how to use library components in other Sun lab libraries.
+
+---
+
 ## API Documentation
 
 See the [API documentation](https://sl-shared-assets-api-docs.netlify.app/) for the
 detailed description of the methods and classes exposed by components of this library.
+
+**Note!** The API documentation includes important information about Command-Line-Interfaces (CLIs) exposed by this 
+library as part of installation into a Python environment. All users are highly encouraged to study the CLI 
+documentation to learn how to use library components via the terminal.
 
 ___
 
@@ -79,6 +91,7 @@ We use [semantic versioning](https://semver.org/) for this project. For the vers
 - Ivan Kondratyev ([Inkaros](https://github.com/Inkaros))
 - Kushaan Gupta ([kushaangupta](https://github.com/kushaangupta))
 - Yuantao Deng ([YuantaoDeng](https://github.com/YuantaoDeng))
+- Natalie Yeung
 
 ___
 

@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 # Project metdata section. Provides the genral ID information about the project.
 [project]
 name = "sl-shared-assets"
-version = "1.0.0rc20"
+version = "1.0.0"
 description = "Stores assets shared between multiple Sun (NeuroAI) lab data pipelines."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -16,7 +16,8 @@ requires-python = ">=3.11"
 authors = [
     {name = "Ivan Kondratyev"},
     {name = "Kushaan Gupta"},
-    {name = "Yuantao Deng"}
+    {name = "Yuantao Deng"},
+    {name = "Natalie Yeung"}
 ]
 maintainers = [
     {name = "Ivan Kondratyev", email = "ik278@cornell.edu"},
@@ -130,9 +131,13 @@ dev = [
 
 # Exports CLIs upon library installation into an environment
 [project.scripts]
-sl-replace-root = "sl_shared_assets.cli:replace_local_root_directory"
-sl-generate-credentials = "sl_shared_assets.cli:generate_server_credentials_file"
-sl-ascend = "sl_shared_assets.cli:ascend_tyche_directory"
+sl-verify-session = "sl_shared_assets.cli:verify_session_integrity"
+sl-project-manifest = "sl_shared_assets.cli:generate_project_manifest_file"
+sl-create-system-config = "sl_shared_assets.cli:generate_system_configuration_file"
+sl-create-server-credentials = "sl_shared_assets.cli:generate_server_credentials_file"
+sl-create-project = "sl_shared_assets.cli:generate_project_configuration_file"
+sl-create-experiment = "sl_shared_assets.cli:generate_experiment_configuration_file"
+sl-ascend-tyche = "sl_shared_assets.cli:ascend_tyche_directory"
 
 # Specifies files that should not be included in the source-code distribution but are also not part of gitignore.
 [tool.hatch.build.targets.sdist]

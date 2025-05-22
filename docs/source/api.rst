@@ -9,16 +9,32 @@ Command Line Interfaces
    :undoc-members:
    :show-inheritance:
 
-.. click:: sl_shared_assets.cli:replace_local_root_directory
-   :prog: sl-replace-root
+.. click:: sl_shared_assets.cli:verify_session_integrity
+   :prog: sl-verify-session
+   :nested: full
+
+.. click:: sl_shared_assets.cli:generate_project_manifest_file
+   :prog: sl-project-manifest
+   :nested: full
+
+.. click:: sl_shared_assets.cli:generate_system_configuration_file
+   :prog: sl-create-system-config
    :nested: full
 
 .. click:: sl_shared_assets.cli:generate_server_credentials_file
-   :prog: sl-generate-credentials
+   :prog: sl-create-server-credentials
+   :nested: full
+
+.. click:: sl_shared_assets.cli:generate_project_configuration_file
+   :prog: sl-create-project
+   :nested: full
+
+.. click:: sl_shared_assets.cli:generate_experiment_configuration_file
+   :prog: sl-create-experiment
    :nested: full
 
 .. click:: sl_shared_assets.cli:ascend_tyche_directory
-   :prog: sl-ascend
+   :prog: sl-ascend-tyche
    :nested: full
 
 Tools
@@ -28,22 +44,15 @@ Tools
    :undoc-members:
    :show-inheritance:
 
-Suite2P Configuration
-=====================
-.. automodule:: sl_shared_assets.suite2p
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-General Data and Configuration Classes
-======================================
+Data and Configuration Classes
+==============================
 .. automodule:: sl_shared_assets.data_classes
    :members:
    :undoc-members:
    :show-inheritance:
 
-Compute Server Tools
-====================
+Server
+======
 .. automodule:: sl_shared_assets.server
    :members:
    :undoc-members:

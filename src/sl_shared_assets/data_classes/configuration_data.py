@@ -35,7 +35,7 @@ class ExperimentState:
     while maintaining the same experiment state."""
     system_state_code: int
     """One of the supported system state-codes. Note, the meaning of each system state code depends on the specific 
-    data acquisition and experiment control system used by the project. For example, projects using the Mesoscope-VR 
+    data acquisition and experiment control system used by the project. For example, projects using the 'mesoscope-vr' 
     system currently support two system state codes: REST (1) and RUN (2)."""
     state_duration_s: float
     """The time, in seconds, to maintain the current combination of the experiment and system states."""
@@ -267,7 +267,7 @@ class MesoscopeSystemConfiguration(YamlConfig):
         parameters.
     """
 
-    name: str = "Mesoscope-VR"
+    name: str = "mesoscope-vr"
     """Stores the descriptive name of the data acquisition system."""
     paths: MesoscopePaths = field(default_factory=MesoscopePaths)
     """Stores the filesystem configuration parameters for the Mesoscope-VR data acquisition system."""

@@ -106,6 +106,9 @@ class LickTrainingDescriptor(YamlConfig):
     experimenter_given_water_volume_ml: float = 0.0
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the session.
     """
+    incomplete: bool = False
+    """If this field is set to True, the session is marked as 'incomplete' and automatically excluded from all further 
+    Sun lab automated processing and analysis."""
 
 
 @dataclass()
@@ -153,6 +156,9 @@ class RunTrainingDescriptor(YamlConfig):
     experimenter_given_water_volume_ml: float = 0.0
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the session.
     """
+    incomplete: bool = False
+    """If this field is set to True, the session is marked as 'incomplete' and automatically excluded from all further 
+    Sun lab automated processing and analysis."""
 
 
 @dataclass()
@@ -171,6 +177,9 @@ class MesoscopeExperimentDescriptor(YamlConfig):
     experimenter_given_water_volume_ml: float = 0.0
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the session.
     """
+    incomplete: bool = False
+    """If this field is set to True, the session is marked as 'incomplete' and automatically excluded from all further 
+    Sun lab automated processing and analysis."""
 
 
 @dataclass()

@@ -17,6 +17,9 @@ from ataraxis_time.time_helpers import get_timestamp
 
 from .configuration_data import get_system_configuration_data
 
+# Stores all supported input for SessionData class 'session_type' fields.
+_valid_session_types = {"lick training", "run training", "mesoscope experiment", "window checking"}
+
 
 @dataclass()
 class ProjectConfiguration(YamlConfig):
@@ -196,18 +199,24 @@ class RawData:
     cranial window and the red-dot alignment windows. This is used to generate a visual snapshot of the cranial window
     alignment and appearance for each experiment session. This file is only created for sessions that use the 
     Mesoscope-VR system to acquire brain activity data."""
+    system_configuration_path: Path = Path()
+    """Stores the path to the system_configuration.yaml file. This file contains the exact snapshot of the data 
+    acquisition and runtime management system configuration parameters used to acquire session data."""
     checksum_path: Path = Path()
     """Stores the path to the ax_checksum.txt file. This file is generated as part of packaging the data for 
     transmission and stores the xxHash-128 checksum of the data. It is used to verify that the transmission did not 
     damage or otherwise alter the data."""
-    system_configuration_path: Path = Path()
-    """Stores the path to the system_configuration.yaml file. This file contains the exact snapshot of the data 
-    acquisition and runtime management system configuration parameters used to acquire session data."""
     telomere_path: Path = Path()
     """Stores the path to the telomere.bin file. This file is statically generated at the end of the session's data 
     acquisition based on experimenter feedback to mark sessions that ran in-full with no issues. Sessions without a 
     telomere.bin file are considered 'incomplete' and are excluded from all automated processing, as they may contain 
     corrupted, incomplete, or otherwise unusable data."""
+    ubiquitin_path: Path = Path()
+    """Stores the path to the ubiquitin.bin file. This file is primarily used by the sl-experiment libraries to mark 
+    local session data directories for deletion (purging). Typically, it is created once the data is safely moved to 
+    the long-term storage destinations (NAS and Server) and the integrity of the moved data is verified on at least one 
+    destination. During 'purge' sl-experiment runtimes, the library discovers and removes all session data marked with 
+    'ubiquitin.bin' files from the machine that runs the code."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -238,6 +247,7 @@ class RawData:
         self.checksum_path = self.raw_data_path.joinpath("ax_checksum.txt")
         self.system_configuration_path = self.raw_data_path.joinpath("system_configuration.yaml")
         self.telomere_path = self.raw_data_path.joinpath("telomere.bin")
+        self.ubiquitin_path = self.raw_data_path.joinpath("ubiquitin.bin")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
@@ -274,18 +284,24 @@ class ProcessedData:
     server-side data processing pipeline runtimes. This directory is primarily used when running data processing jobs 
     on the remote server. However, it is possible to configure local runtimes to also redirect log data to files 
     stored in this directory (by editing ataraxis-base-utilities 'console' variable)."""
-    suite2p_bin_path: Path = Path()
-    """Stores the path to the suite2p.bin file. This file is created by our single-day suite2p data processing pipeline
-    to mark sessions that have been successfully processed with the single-day sl-suite2p library pipeline. Note, the 
-    file is removed each time the session is (re)processed with the suite2p pipeline."""
+    single_day_suite2p_bin_path: Path = Path()
+    """Stores the path to the single_day_suite2p.bin file. This file is created by our single-day suite2p data 
+    processing pipeline to mark sessions that have been successfully processed with the single-day sl-suite2p library 
+    pipeline. Note, the file is removed at the beginning of the suite2p pipeline, so its presence always indicates 
+    successful processing runtime completion."""
+    multi_day_suite2p_bin_path: Path = Path()
+    """Same as single_day_suite2p_bin_path, but tracks whether the session has been successfully processed with the 
+    multi-day suite2p pipeline."""
     behavior_bin_path: Path = Path()
     """Stores the path to the behavior.bin file. This file is created by our behavior data extraction pipeline
     to mark sessions that have been successfully processed with the sl-behavior library pipeline. Note, the 
-    file is removed each time the session is (re)processed with the behavior pipeline."""
+    file is removed at the beginning of the behavior data extraction pipeline, so its presence always indicates 
+    successful processing runtime completion."""
     dlc_bin_path: Path = Path()
     """Stores the path to the dlc.bin file. This file is created by our DeepLabCut-based pose tracking pipeline
     to mark sessions that have been successfully processed with the sl-dlc library pipeline. Note, the 
-    file is removed each time the session is (re)processed with the dlc pipeline."""
+    file is removed at the beginning of the DeepLabCut pipeline, so its presence always indicates successful processing 
+    runtime completion."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -304,7 +320,8 @@ class ProcessedData:
         self.mesoscope_data_path = self.processed_data_path.joinpath("mesoscope_data")
         self.behavior_data_path = self.processed_data_path.joinpath("behavior_data")
         self.job_logs_path = self.processed_data_path.joinpath("job_logs")
-        self.suite2p_bin_path = self.processed_data_path.joinpath("suite2p.bin")
+        self.single_day_suite2p_bin_path = self.processed_data_path.joinpath("single_day_suite2p.bin")
+        self.multi_day_suite2p_bin_path = self.processed_data_path.joinpath("multi_day_suite2p.bin")
         self.behavior_bin_path = self.processed_data_path.joinpath("behavior.bin")
         self.dlc_bin_path = self.processed_data_path.joinpath("dlc.bin")
 
@@ -347,8 +364,8 @@ class SessionData(YamlConfig):
     """Stores the name (timestamp-based ID) of the managed session."""
     session_type: str
     """Stores the type of the session. Primarily, this determines how to read the session_descriptor.yaml file. Has 
-    to be set to one of the supported types: 'Lick training', 'Run training', 'Window checking' or 
-    'Mesoscope experiment'.
+    to be set to one of the supported types: 'lick training', 'run training', 'window checking' or 
+    'mesoscope experiment'.
     """
     acquisition_system: str
     """Stores the name of the data acquisition and runtime management system that acquired the data."""
@@ -403,6 +420,13 @@ class SessionData(YamlConfig):
             An initialized SessionData instance that stores the layout of the newly created session's data.
         """
 
+        if session_type.lower() not in _valid_session_types:
+            message = (
+                f"Invalid session type '{session_type.lower()}' encountered when creating a new SessionData instance. "
+                f"Use one of the supported session types: {_valid_session_types}"
+            )
+            console.error(message=message, error=ValueError)
+
         # Acquires the UTC timestamp to use as the session name, unless a name override is provided
         if session_name is None:
             session_name = str(get_timestamp(time_separator="-"))
@@ -446,7 +470,7 @@ class SessionData(YamlConfig):
             project_name=project_name,
             animal_id=animal_id,
             session_name=session_name,
-            session_type=session_type,
+            session_type=session_type.lower(),
             acquisition_system=acquisition_system.name,
             raw_data=raw_data,
             processed_data=processed_data,

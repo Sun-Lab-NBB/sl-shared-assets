@@ -10,6 +10,19 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 import xxhash
 
+# Defines a 'blacklist' set of files. Primarily, this lit contains the service files that may change after the session
+# data has been acquired. Therefore, it does not make sense to include them in the checksum, as they do not reflect the
+# data that should remain permanently unchanged. Note, make sure all service files are added to this set!
+_excluded_files = {
+    "ax_checksum.txt",
+    "ubiquitin.bin",
+    "telomere.bin",
+    "single_day_suite2p.bin",
+    "multi_day_suite2p.bin",
+    "behavior.bin",
+    "dlc.bin",
+}
+
 
 def _calculate_file_checksum(base_directory: Path, file_path: Path) -> tuple[str, bytes]:
     """Calculates xxHash3-128 checksum for a single file and its path relative to the base directory.
@@ -89,7 +102,7 @@ def calculate_directory_checksum(
     files = sorted(
         path
         for path in directory.rglob("*")
-        if path.is_file() and path.stem != "ax_checksum" and path.suffix != ".txt"  # Excludes checksum files
+        if path.is_file() and f"{path.stem}{path.suffix}" not in _excluded_files  # Excludes service files
     )
 
     # Precreates the directory checksum

@@ -5,7 +5,6 @@ up a given project."""
 from pathlib import Path
 
 import polars as pl
-from ataraxis_base_utilities import console
 
 from ..data_classes import SessionData
 from .packaging_tools import calculate_directory_checksum
@@ -18,7 +17,8 @@ def generate_project_manifest(
 
     This function evaluates the input project directory and builds the 'manifest' file for the project. The file
     includes the descriptive information about every session stored inside the input project folder and the state of
-    session's data processing (which processing pipelines have been applied to each session).
+    session's data processing (which processing pipelines have been applied to each session). The file will be created
+    under the 'output_path' directory and use the following name pattern: {ProjectName}}_manifest.feather.
 
     Notes:
         The manifest file is primarily used to capture and move project state information between machines, typically
@@ -44,7 +44,8 @@ def generate_project_manifest(
         "raw_data": [],  # Server-side raw_data folder path.
         "processed_data": [],  # Server-side processed_data folder path.
         "complete": [],  # Determines if the session data is complete. Incomplete sessions are excluded from processing.
-        "suite2p": [],  # Determines whether the session has been processed with the single-day suite2p pipeline.
+        "single_day_suite2p": [],  # Determines whether the session has been processed with the single-day s2p pipeline.
+        "multi_day_suite2p": [],  # Determines whether the session has been processed with the multi-day s2p pipeline.
         "behavior": [],  # Determines whether the session has been processed with the behavior extraction pipeline.
         "dlc": [],  # Determines whether the session has been processed with the DeepLabCut pipeline.
     }
@@ -72,14 +73,19 @@ def generate_project_manifest(
         # If the session is incomplete, marks all processing steps as FALSE, as automatic processing is disabled for
         # incomplete sessions.
         if not manifest["complete"][-1]:
-            manifest["suite2p"].append(False)
+            manifest["single_day_suite2p"].append(False)
+            manifest["multi_day_suite2p"].append(False)
             manifest["behavior"].append(False)
             manifest["dlc"].append(False)
             continue  # Cycles to the next session
 
-        # If the session processed_data folder contains the suite2p.bin file, marks the suite2p processing step as
-        # complete.
-        manifest["suite2p"].append(session_data.processed_data.suite2p_bin_path.exists())
+        # If the session processed_data folder contains the single-day suite2p.bin file, marks the single-day suite2p
+        # processing step as complete.
+        manifest["single_day_suite2p"].append(session_data.processed_data.single_day_suite2p_bin_path.exists())
+
+        # If the session processed_data folder contains the multi-day suite2p.bin file, marks the multi-day suite2p
+        # processing step as complete.
+        manifest["multi_day_suite2p"].append(session_data.processed_data.multi_day_suite2p_bin_path.exists())
 
         # If the session processed_data folder contains the behavior.bin file, marks the behavior processing step as
         # complete.
@@ -97,7 +103,8 @@ def generate_project_manifest(
         "processed_data": pl.String,
         "type": pl.String,
         "complete": pl.Boolean,
-        "suite2p": pl.Boolean,
+        "single_day_suite2p": pl.Boolean,
+        "multi_day_suite2p": pl.Boolean,
         "behavior": pl.Boolean,
         "dlc": pl.Boolean,
     }
@@ -113,21 +120,24 @@ def generate_project_manifest(
     )
 
 
-def verify_session_checksum(session_path: Path) -> None:
+def verify_session_checksum(session_path: Path) -> bool:
     """Verifies the integrity of the session's raw data by generating the checksum of the raw_data directory and
     comparing it against the checksum stored in the ax_checksum.txt file.
 
     Primarily, this function is used to verify data integrity after transferring it from a local PC to the remote
-    server for long-term storage. This function is designed to do nothing if the checksum matches and to raise an
-    error if the checksum does not match, indicating data corruption.
+    server for long-term storage. This function is designed to do nothing if the checksum matches and to remove the
+    'telomere.bin' marker file if it does not.
+
+    Notes:
+        Removing the telomere.bin marker file from session's raw_data folder marks the session as incomplete, excluding
+        it from all further automatic processing.
 
     Args:
         session_path: The path to the session directory to be verified. Note, the input session directory must contain
             the 'raw_data' subdirectory.
 
-    Raises:
-        ValueError: If the stored checksum file does not match the checksum calculated for the current state of the
-            session's raw_data folder.
+    Returns:
+        True if the checksum matches, False otherwise.
     """
 
     # Loads session data layout
@@ -144,8 +154,11 @@ def verify_session_checksum(session_path: Path) -> None:
 
     # If the two checksums do not match, this likely indicates data corruption.
     if stored_checksum != calculated_checksum:
-        message = (
-            f"Calculated checksum and ax_checksum.txt do not match. Stored checksum: {stored_checksum}. Calculated "
-            f"checksum: {calculated_checksum}. This indicates potential session data corruption during transmission."
-        )
-        console.error(message=message, error=ValueError)
+        # If the telomere.bin file exists, removes this file. This automatically marks the session as incomplete for
+        # all other Sun lab runtimes. The presence of the telomere.bin file after integrity verification is used as a
+        # heuristic for determining whether the session has passed the verification process.
+        if session_data.raw_data.telomere_path.exists():
+            session_data.raw_data.telomere_path.unlink()
+        return False
+
+    return True

@@ -5,13 +5,12 @@ an example for how to convert other data formats to match use the Sun lab data s
 
 from pathlib import Path
 import datetime
-import tempfile
 
 import numpy as np
-from ataraxis_base_utilities import LogLevel, console
+from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_time.time_helpers import extract_timestamp_from_bytes
 
-from ..data_classes import SessionData, ProjectConfiguration
+from ..data_classes import SessionData, ProjectConfiguration, get_system_configuration_data
 from .transfer_tools import transfer_directory
 from .packaging_tools import calculate_directory_checksum
 
@@ -170,7 +169,7 @@ def _reorganize_data(session_data: SessionData, source_root: Path) -> bool:
         return True
 
 
-def ascend_tyche_data(root_directory: Path, output_root_directory: Path, server_root_directory: Path) -> None:
+def ascend_tyche_data(root_directory: Path) -> None:
     """Reformats the old Tyche data to use the modern Sun lab layout and metadata files.
 
     This function is used to convert old Tyche data to the modern data management standard. This is used to make the
@@ -188,30 +187,24 @@ def ascend_tyche_data(root_directory: Path, output_root_directory: Path, server_
         this function for a large number of sessions will result in a long processing time due to the network data
         transfer.
 
+        Since SessionData can only be created on a PC that has a valid acquisition system config, this function will
+        only work on a machine that is part of an active Sun lab acquisition system.
+
     Args:
         root_directory: The directory that stores one or more Tyche animal folders. This can be conceptualized as the
             root directory for the Tyche project.
-        output_root_directory: The path to the local directory where to generate the converted Tyche project hierarchy.
-            Typically, this is the 'root' directory where all other Sun lab projects are stored.
-        server_root_directory: The path to the local filesystem-mounted BioHPC server storage directory. Note, this
-            directory hs to be mapped to the local filesystem via the SMB or equivalent protocol.
     """
     # Generates a (shared) project configuration file.
     project_configuration = ProjectConfiguration()
 
-    # Generates a temporary directory for NAS and Mesoscope paths. Since Tyche data is already backed up on the NAS and
-    # we are not generating new data, these root paths are not needed, but have to be created as part of the pipeline.
-    # Redirecting them to local temporary directories allows avoiding extra steps to manually remove these redundant
-    # directories after runtime.
-    temp_nas_dir = Path(tempfile.mkdtemp(prefix="nas_temp_"))
-    temp_mesoscope_dir = Path(tempfile.mkdtemp(prefix="mesoscope_temp_"))
+    # The acquisition system config resolves most paths and filesystem configuration arguments
+    acquisition_system = get_system_configuration_data()
+    output_root_directory = acquisition_system.paths.root_directory
+    server_root_directory = acquisition_system.paths.server_storage_directory
 
     # Statically defines project name and local root paths
-    project_configuration.project_name = "Tyche"
-    project_configuration.local_root_directory = output_root_directory
-    project_configuration.local_server_directory = server_root_directory
-    project_configuration.local_nas_directory = temp_nas_dir
-    project_configuration.local_mesoscope_directory = temp_mesoscope_dir
+    project_name = "Tyche"
+    project_configuration.project_name = project_name
 
     # Uses nonsensical google sheet IDs. Tyche project did not use Google Sheet processing like our modern projects do.
     project_configuration.water_log_sheet_id = "1xFh9Q2zT7pL3mVkJdR8bN6yXoE4wS5aG0cHu2Kf7D3v"
@@ -219,6 +212,7 @@ def ascend_tyche_data(root_directory: Path, output_root_directory: Path, server_
 
     # Dumps project configuration into the 'configuration' subfolder of the Tyche project.
     configuration_path = output_root_directory.joinpath("Tyche", "configuration", "project_configuration.yaml")
+    ensure_directory_exists(configuration_path)
     project_configuration.save(path=configuration_path)
 
     # Assumes that root directory stores all animal folders to be processed
@@ -240,11 +234,11 @@ def ascend_tyche_data(root_directory: Path, output_root_directory: Path, server_
                 # session data hierarchy using the output root. This generates a 'standard' Sun lab directory structure
                 # for the Tyche data.
                 session_data = SessionData.create(
+                    project_name=project_configuration.project_name,
                     session_name=session_name,
                     animal_id=animal_name,
-                    project_configuration=project_configuration,
-                    session_type="Experiment",
-                    experiment_name=None,  # Has to be none, otherwise the system tries to copy a configuration file.
+                    session_type="mesoscope experiment",
+                    experiment_name=None,
                 )
 
                 # Moves the data from the old hierarchy to the new hierarchy. If the process runs as expected, and
@@ -259,15 +253,22 @@ def ascend_tyche_data(root_directory: Path, output_root_directory: Path, server_
                     # noinspection PyTypeChecker
                     console.echo(message=message, level=LogLevel.WARNING)
                 else:
-                    # If the transfer process was successful, generates a new checksum for the moved data
+                    # Generates the telomere.bin file to mark the session as 'complete'
+                    session_data.raw_data.telomere_path.touch()
+
+                    # If the local transfer process was successful, generates a new checksum for the moved data
                     calculate_directory_checksum(directory=Path(session_data.raw_data.raw_data_path))
+
                     # Next, copies the data to the BioHPC server for further processing
                     transfer_directory(
                         source=Path(session_data.raw_data.raw_data_path),
-                        destination=Path(session_data.destinations.server_raw_data_path),
+                        destination=Path(
+                            server_root_directory.joinpath(project_name, animal_name, session_name, "raw_data")
+                        ),
                         verify_integrity=False,
                     )
-                    # Finally, removes the now-empty old session data directory.
+
+                    # Removes the now-empty old session data directory.
                     acquisition_folder.rmdir()
 
             # If the loop above removed all acquisition folders, all data for that day has been successfully converted
