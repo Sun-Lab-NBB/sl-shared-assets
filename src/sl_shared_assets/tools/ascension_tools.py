@@ -219,7 +219,7 @@ def ascend_tyche_data(root_directory: Path) -> None:
     for animal_folder in root_directory.iterdir():
         # Each animal folder is named to include project name and a static animal ID, e.g.: Tyche-A7. This extracts each
         # animal ID.
-        animal_name = animal_folder.name.split(sep="-")[1]
+        animal_name = animal_folder.stem.split(sep="-")[1]
 
         # Under each animal root folder, there are day folders that use YYYY-MM-DD timestamps
         for session_folder in animal_folder.iterdir():

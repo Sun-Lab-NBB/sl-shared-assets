@@ -116,7 +116,7 @@ def generate_project_manifest(
 
     # Saves the generated manifest to the project-specific manifest .feather file for further processing.
     sorted_df.write_ipc(
-        file=output_directory.joinpath(f"{raw_project_directory.name}_manifest.feather"), compression="lz4"
+        file=output_directory.joinpath(f"{raw_project_directory.stem}_manifest.feather"), compression="lz4"
     )
 
 

@@ -53,7 +53,7 @@ def generate_server_credentials_file(output_directory: str, host: str, username:
     lab data processing libraries.
     """
 
-def generate_project_configuration_file(project_name: str, surgery_log_id: str, water_restriction_log_id: str) -> None:
+def generate_project_configuration_file(project: str, surgery_log_id: str, water_restriction_log_id: str) -> None:
     """Generates a new project directory hierarchy and writes its configuration as a project_configuration.yaml file.
 
     This command creates new Sun lab projects. Until a project is created in this fashion, all data-acquisition and
@@ -63,7 +63,7 @@ def generate_project_configuration_file(project_name: str, surgery_log_id: str, 
     acquisition system configuration .yaml file.
     """
 
-def generate_experiment_configuration_file(project_name: str, experiment_name: str, state_count: int) -> None:
+def generate_experiment_configuration_file(project: str, experiment: str, state_count: int) -> None:
     """Generates a precursor experiment configuration .yaml file for the target experiment inside the project's
     configuration folder.
 

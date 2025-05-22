@@ -364,7 +364,7 @@ def set_system_configuration_file(path: Path) -> None:
     """
 
     # Prevents setting the path to an invalid file.
-    if path.suffix != ".yaml" and path.name not in _supported_configuration_files.keys():
+    if path.name not in _supported_configuration_files.keys():
         message = (
             f"Unable to set the input path {path} as the default system configuration file path. The input path has "
             f"to point to a configuration file ending with a '.yaml' extension and using one of the supported system "
@@ -375,7 +375,7 @@ def set_system_configuration_file(path: Path) -> None:
     # If the configuration file specified by the 'path' does not exist, generates a default SystemConfiguration instance
     # and saves it to the specified path.
     if not path.exists():
-        precursor = _supported_configuration_files[f"{path.name}{path.suffix}"]()  # Instantiates default class instance
+        precursor = _supported_configuration_files[path.name]()  # Instantiates default class instance
         precursor.save(path=path)
         message = (
             f"The file specified by the input system configuration path {path} does not exist. Generating and saving "
@@ -441,5 +441,5 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
 
     # Loads the data stored inside the .yaml file into the class instance that matches the file name and returns the
     # instantiated class to caller
-    file_name = f"{configuration_file.name}{configuration_file.suffix}"
+    file_name = configuration_file.name
     return _supported_configuration_files[file_name].from_yaml(file_path=configuration_file)  # type: ignore

@@ -36,9 +36,9 @@ def verify_session_integrity(session_path: str) -> None:
     """
     session = Path(session_path)
     if verify_session_checksum(session):
-        console.echo(message=f"Session {session.name} raw data integrity: verified.", level=LogLevel.SUCCESS)
+        console.echo(message=f"Session {session.stem} raw data integrity: verified.", level=LogLevel.SUCCESS)
     else:
-        console.echo(message=f"Session {session.name} raw data integrity: compromised!", level=LogLevel.ERROR)
+        console.echo(message=f"Session {session.stem} raw data integrity: compromised!", level=LogLevel.ERROR)
 
 
 @click.command()
@@ -82,7 +82,7 @@ def generate_project_manifest_file(
         output_directory=Path(output_directory),
         processed_project_directory=Path(project_processed_path) if project_processed_path else None,
     )
-    console.echo(message=f"Project {Path(project_path).name} data manifest file: generated.", level=LogLevel.SUCCESS)
+    console.echo(message=f"Project {Path(project_path).stem} data manifest file: generated.", level=LogLevel.SUCCESS)
 
 
 @click.command()
@@ -221,7 +221,7 @@ def generate_server_credentials_file(output_directory: str, host: str, username:
     required=True,
     help="The 44-symbol alpha-numeric ID code used by the project's water restriction log Google sheet.",
 )
-def generate_project_configuration_file(project_name: str, surgery_log_id: str, water_restriction_log_id: str) -> None:
+def generate_project_configuration_file(project: str, surgery_log_id: str, water_restriction_log_id: str) -> None:
     """Generates a new project directory hierarchy and writes its configuration as a project_configuration.yaml file.
 
     This command creates new Sun lab projects. Until a project is created in this fashion, all data-acquisition and
@@ -235,7 +235,7 @@ def generate_project_configuration_file(project_name: str, surgery_log_id: str, 
     # directory where all projects are stored on the local machine.
     system_configuration = get_system_configuration_data()
     file_path = system_configuration.paths.root_directory.joinpath(
-        project_name, "configuration", "project_configuration.yaml"
+        project, "configuration", "project_configuration.yaml"
     )
 
     # Generates the initial project directory hierarchy
@@ -243,12 +243,10 @@ def generate_project_configuration_file(project_name: str, surgery_log_id: str, 
 
     # Saves project configuration data as a .yaml file to the 'configuration' directory of the created project
     configuration = ProjectConfiguration(
-        project_name=project_name, surgery_sheet_id=surgery_log_id, water_log_sheet_id=water_restriction_log_id
+        project_name=project, surgery_sheet_id=surgery_log_id, water_log_sheet_id=water_restriction_log_id
     )
     configuration.save(path=file_path.joinpath())
-    console.echo(
-        message=f"Project {project_name} data structure and configuration file: generated.", level=LogLevel.SUCCESS
-    )
+    console.echo(message=f"Project {project} data structure and configuration file: generated.", level=LogLevel.SUCCESS)
 
 
 @click.command()
@@ -273,7 +271,7 @@ def generate_project_configuration_file(project_name: str, surgery_log_id: str, 
     required=True,
     help="The total number of experiment and acquisition system state combinations in the experiment.",
 )
-def generate_experiment_configuration_file(project_name: str, experiment_name: str, state_count: int) -> None:
+def generate_experiment_configuration_file(project: str, experiment: str, state_count: int) -> None:
     """Generates a precursor experiment configuration .yaml file for the target experiment inside the project's
     configuration folder.
 
@@ -288,9 +286,7 @@ def generate_experiment_configuration_file(project_name: str, experiment_name: s
     # Resolves the acquisition system configuration. Uses the path to the local project directory and the project name
     # to determine where to save the experiment configuration file
     acquisition_system = get_system_configuration_data()
-    file_path = acquisition_system.paths.root_directory.joinpath(
-        project_name, "configuration", f"{experiment_name}.yaml"
-    )
+    file_path = acquisition_system.paths.root_directory.joinpath(project, "configuration", f"{experiment}.yaml")
 
     # Loops over the number of requested states and, for each, generates a precursor experiment state field inside the
     # 'states' dictionary.
@@ -309,7 +305,7 @@ def generate_experiment_configuration_file(project_name: str, experiment_name: s
 
     else:
         message = (
-            f"Unable to generate the experiment {experiment_name} configuration file for the project {project_name}. "
+            f"Unable to generate the experiment {experiment} configuration file for the project {project}. "
             f"The data acquisition system of the local machine (PC) is not supported (not recognized). Currently, only "
             f"the following acquisition systems are supported: mesoscope-vr."
         )
@@ -317,7 +313,7 @@ def generate_experiment_configuration_file(project_name: str, experiment_name: s
         raise ValueError(message)  # Fall-back to appease mypy, should not be reachable
 
     experiment_configuration.to_yaml(file_path=file_path)
-    console.echo(message=f"Experiment {experiment_name} configuration file: generated.", level=LogLevel.SUCCESS)
+    console.echo(message=f"Experiment {experiment} configuration file: generated.", level=LogLevel.SUCCESS)
 
 
 @click.command()
