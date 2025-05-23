@@ -125,10 +125,17 @@ class MesoscopeCameras:
     right_camera_index: int = 2
     """The index of the right body camera (from animal's perspective) in the list of all available OpenCV-managed
      cameras."""
-    quantization_parameter: int = 15
-    """The quantization parameter used by all cameras to encode acquired frames as video files. This controls how much
-    data is discarded when encoding each video frame, directly contributing to the encoding speed, resultant video file
-    size and video quality."""
+    face_camera_quantization_parameter: int = 15
+    """The quantization parameter used by the face camera to encode acquired frames as video files. This controls how
+    much data is discarded when encoding each video frame, directly contributing to the encoding speed, resultant video 
+    file size and video quality."""
+    body_camera_quantization_parameter: int = 15
+    """SThe quantization parameter used by the left and right body cameras to encode acquired frames as video files.
+    See 'face_camera_quantization_parameter' field for more information on what this parameter does."""
+    display_face_camera_frames: bool = True
+    """Determines whether to display the frames grabbed from the face camera during runtime."""
+    display_body_camera_frames: bool = True
+    """Determines whether to display the frames grabbed from the left and right body cameras during runtime."""
 
 
 @dataclass()
@@ -141,14 +148,13 @@ class MesoscopeMicroControllers:
     """The USB port used by the Sensor Microcontroller."""
     encoder_port: str = "/dev/ttyACM2"
     """The USB port used by the Encoder Microcontroller."""
-    mesoscope_start_ttl_module_id: int = 1
-    """The unique byte-code ID of the TTL module instance used to send mesoscope frame acquisition start trigger 
-    signals to the ScanImagePC."""
-    mesoscope_stop_ttl_module_id: int = 2
-    """The unique byte-code ID of the TTL module instance used to send mesoscope frame acquisition stop trigger 
-    signals to the ScanImagePC."""
+    debug: bool = False
+    """Determines whether to run the managed acquisition system in the 'debug mode'. This mode should be disabled 
+    during most runtimes. It is used during initial system calibration and testing and prints a lot of generally 
+    redundant information into the terminal."""
     mesoscope_ttl_pulse_duration_ms: int = 10
-    """The duration of the HIGH phase of all outgoing mesoscope TTL pulses, in milliseconds."""
+    """The duration of the HIGH phase of all outgoing TTL pulses that target the Mesoscope (enable or disable mesoscope
+    frame acquisition), in milliseconds."""
     minimum_break_strength_g_cm: float = 43.2047
     """The minimum torque applied by the running wheel break in gram centimeter. This is the torque the break delivers 
     at minimum voltage (break is disabled)."""
@@ -298,6 +304,23 @@ class MesoscopeSystemConfiguration(YamlConfig):
             self.microcontrollers.valve_calibration_data = tuple(
                 (k, v) for k, v in self.microcontrollers.valve_calibration_data.items()
             )
+
+        # Verifies the contents of the valve calibration data loaded from the config file.
+        valve_calibration_data = self.microcontrollers.valve_calibration_data
+        if not all(
+            isinstance(item, tuple)
+            and len(item) == 2
+            and isinstance(item[0], (int, float))
+            and isinstance(item[1], (int, float))
+            for item in valve_calibration_data
+        ):
+            message = (
+                f"Unable to initialize the MesoscopeSystemConfiguration class. Expected each item under the "
+                f"'valve_calibration_data' field of the Mesoscope-VR acquisition system configuration .yaml file to be "
+                f"a tuple of two integer or float values, but instead encountered {valve_calibration_data} with at "
+                f"least one incompatible element."
+            )
+            console.error(message=message, error=TypeError)
 
     def save(self, path: Path) -> None:
         """Saves class instance data to disk as a 'mesoscope_system_configuration.yaml' file.
