@@ -8,6 +8,7 @@ import polars as pl
 
 from ..data_classes import SessionData
 from .packaging_tools import calculate_directory_checksum
+from ataraxis_base_utilities import console
 
 
 def generate_project_manifest(
@@ -33,8 +34,24 @@ def generate_project_manifest(
             is different from the 'raw_project_directory'. Typically, this would be the case on remote compute server(s)
             and not on local machines.
     """
+
+    if not raw_project_directory.exists():
+        message = (
+            f"Unable to generate the project manifest file for the requested project {raw_project_directory.stem}. The "
+            f"specified project directory does not exist."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
     # Finds all raw data directories
     session_directories = [directory.parent for directory in raw_project_directory.rglob("raw_data")]
+
+    if len(session_directories) == 0:
+        message = (
+            f"Unable to generate the project manifest file for the requested project {raw_project_directory.stem}. The "
+            f"project does not contain any raw session data. To generate the manifest file, the project must contain "
+            f"at least one valid experiment or training session."
+        )
+        console.error(message=message, error=FileNotFoundError)
 
     # Precreates the 'manifest' dictionary structure
     manifest: dict[str, list[str | bool]] = {

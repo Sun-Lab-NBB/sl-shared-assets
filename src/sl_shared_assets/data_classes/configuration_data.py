@@ -240,10 +240,11 @@ class MesoscopeAdditionalFirmware:
     """Stores the configuration parameters for all firmware and hardware components not assembled in the Sun lab."""
 
     headbar_port: str = "/dev/ttyUSB0"
-    """The USB port used by the HeadBar Zaber motor controllers (devices). Note, this motor group also includes the 
-    running wheel x-axis motor."""
+    """The USB port used by the HeadBar Zaber motor controllers (devices)."""
     lickport_port: str = "/dev/ttyUSB1"
     """The USB port used by the LickPort Zaber motor controllers (devices)."""
+    wheel_port: str = "/dev/ttyUSB2"
+    """The USB port used by the (running) Wheel Zaber motor controllers (devices)."""
     unity_ip: str = "127.0.0.1"
     """The IP address of the MQTT broker used to communicate with the Unity game engine."""
     unity_port: int = 1883
@@ -422,7 +423,7 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
         message = (
             "Unable to resolve the path to the local system configuration file, as local machine does not have the "
             "Sun lab data directory. Generate the local configuration file and Sun lab data directory by calling the "
-            "'sl-config' CLI command and rerun the command that produced this error."
+            "'sl-create-system-config' CLI command and rerun the command that produced this error."
         )
         console.error(message=message, error=FileNotFoundError)
 
@@ -435,7 +436,7 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
         message = (
             "Unable to resolve the path to the local system configuration file, as the file pointed by the path stored "
             "in Sun lab data directory does not exist. Generate a new local configuration file by calling the "
-            "'sl-config' CLI command and rerun the command that produced this error."
+            "'sl-create-system-config' CLI command and rerun the command that produced this error."
         )
         console.error(message=message, error=FileNotFoundError)
 

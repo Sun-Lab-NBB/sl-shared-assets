@@ -288,6 +288,15 @@ def generate_experiment_configuration_file(project: str, experiment: str, state_
     acquisition_system = get_system_configuration_data()
     file_path = acquisition_system.paths.root_directory.joinpath(project, "configuration", f"{experiment}.yaml")
 
+    if not acquisition_system.paths.root_directory.joinpath(project).exists():
+        message = (
+            f"Unable to generate the experiment {experiment} configuration file for the project {project}. "
+            f"The target project does not exist on the local machine (PC). Use the "
+            f"'sl-create-project' CLI command to create the project before creating new experiment configuration(s). "
+        )
+        console.error(message=message, error=ValueError)
+        raise ValueError(message)  # Fall-back to appease mypy, should not be reachable
+
     # Loops over the number of requested states and, for each, generates a precursor experiment state field inside the
     # 'states' dictionary.
     states = {}
