@@ -438,6 +438,16 @@ class SessionData(YamlConfig):
         # Constructs the root session directory path
         session_path = acquisition_system.paths.root_directory.joinpath(project_name, animal_id, session_name)
 
+        # Prevents creating new sessions for non-existent projects.
+        if not acquisition_system.paths.root_directory.joinpath(project_name).exists():
+            message = (
+                f"Unable to create the session directory hierarchy for the session {session_name} of the animal "
+                f"'{animal_id}' and project '{project_name}'. The project does not exist on the local machine (PC). "
+                f"Use the 'sl-create-project' CLI command to create the project on the local machine before creating "
+                f"new sessions."
+            )
+            console.error(message=message, error=FileNotFoundError)
+
         # Handles potential session name conflicts
         counter = 0
         while session_path.exists():

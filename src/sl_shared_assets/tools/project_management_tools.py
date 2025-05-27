@@ -5,10 +5,10 @@ up a given project."""
 from pathlib import Path
 
 import polars as pl
+from ataraxis_base_utilities import console
 
 from ..data_classes import SessionData
 from .packaging_tools import calculate_directory_checksum
-from ataraxis_base_utilities import console
 
 
 def generate_project_manifest(
