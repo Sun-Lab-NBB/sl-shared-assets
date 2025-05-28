@@ -111,6 +111,9 @@ class MesoscopePaths:
     sharing protocol, such as SMB."""
     harvesters_cti_path: Path = Path("/opt/mvIMPACT_Acquire/lib/x86_64/mvGenTLProducer.cti")
     """The path to the GeniCam CTI file used to connect to Harvesters-managed cameras."""
+    server_processed_data_root: Path = Path("/workdir/sun_data")
+    """The absolute path to the BioHPC server directory used to store the processed data from all Sun lab projects. 
+    This path is relative to the server root and is only used when submitting remote jobs to the server."""
 
 
 @dataclass()
@@ -298,6 +301,7 @@ class MesoscopeSystemConfiguration(YamlConfig):
         self.paths.nas_directory = Path(self.paths.nas_directory)
         self.paths.mesoscope_directory = Path(self.paths.mesoscope_directory)
         self.paths.harvesters_cti_path = Path(self.paths.harvesters_cti_path)
+        self.paths.server_processed_data_root = Path(self.paths.server_processed_data_root)
 
         # Converts valve_calibration data from dictionary to a tuple of tuples format
         if not isinstance(self.microcontrollers.valve_calibration_data, tuple):
@@ -346,6 +350,7 @@ class MesoscopeSystemConfiguration(YamlConfig):
         original.paths.nas_directory = str(original.paths.nas_directory)  # type: ignore
         original.paths.mesoscope_directory = str(original.paths.mesoscope_directory)  # type: ignore
         original.paths.harvesters_cti_path = str(original.paths.harvesters_cti_path)  # type: ignore
+        original.paths.server_processed_data_root = str(original.paths.server_processed_data_root)  # type: ignore
 
         # Converts valve calibration data into dictionary format
         if isinstance(original.microcontrollers.valve_calibration_data, tuple):

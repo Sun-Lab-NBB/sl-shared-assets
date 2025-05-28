@@ -137,7 +137,9 @@ def generate_project_manifest(
     )
 
 
-def verify_session_checksum(session_path: Path) -> bool:
+def verify_session_checksum(
+    session_path: Path, create_processed_data_directory: bool = True, processed_data_root: None | Path = None
+) -> bool:
     """Verifies the integrity of the session's raw data by generating the checksum of the raw_data directory and
     comparing it against the checksum stored in the ax_checksum.txt file.
 
@@ -149,16 +151,27 @@ def verify_session_checksum(session_path: Path) -> bool:
         Removing the telomere.bin marker file from session's raw_data folder marks the session as incomplete, excluding
         it from all further automatic processing.
 
+        This function is also used to create the processed data hierarchy on the BioHPC server, when it is called as
+        part of the data preprocessing runtime performed by a data acquisition system.
+
     Args:
         session_path: The path to the session directory to be verified. Note, the input session directory must contain
             the 'raw_data' subdirectory.
+        create_processed_data_directory: Determines whether to create the processed data hierarchy during runtime.
+        processed_data_root: The root directory where to store the processed data hierarchy. This path has to point to
+            the root directory where to store the processed data from all projects, and it will be automatically
+            modified to include the project name, the animal name, and the session ID.
 
     Returns:
         True if the checksum matches, False otherwise.
     """
 
-    # Loads session data layout
-    session_data = SessionData.load(session_path=session_path)
+    # Loads session data layout. If configured to do so, also creates the processed data hierarchy
+    session_data = SessionData.load(
+        session_path=session_path,
+        processed_data_root=processed_data_root,
+        make_processed_data_directory=create_processed_data_directory,
+    )
 
     # Re-calculates the checksum for the raw_data directory
     calculated_checksum = calculate_directory_checksum(

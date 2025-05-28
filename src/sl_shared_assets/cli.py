@@ -25,7 +25,32 @@ from .data_classes import (
     required=True,
     help="The absolute path to the session whose raw data needs to be verified for potential corruption.",
 )
-def verify_session_integrity(session_path: str) -> None:
+@click.option(
+    "-c",
+    "--create_processed_directories",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help=(
+        "Determines whether to created the processed data hierarchy. This flag should be disabled for most runtimes. "
+        "Primarily, it is used by lab acquisition system code to generate processed data directories on the remote "
+        "compute servers as part of the data preprocessing pipeline."
+    ),
+)
+@click.option(
+    "-pdr",
+    "--processed_data_root",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=False,
+    help=(
+        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
+        "this command. This argument is used when calling the CLI on the BioHPC server, which uses different data "
+        "volumes for raw and processed data. Note, the input path must point to the root directory, as it will be "
+        "automatically modified to include the project name, the animal id, and the session ID. This argument is only "
+        "used if 'create_processed_directories' flag is True."
+    ),
+)
+def verify_session_integrity(session_path: str, create_processed_directories: bool, processed_data_root: Path) -> None:
     """Checks the integrity of the target session's raw data (contents of the raw_data directory).
 
     This command assumes that the data has been checksummed during acquisition and contains an ax_checksum.txt file
@@ -33,9 +58,14 @@ def verify_session_integrity(session_path: str) -> None:
     always verified the integrity of the 'raw_data' directory. It does not work with 'processed_data' or any other
     directories. If the session data was corrupted, the command removes the 'telomere.bin' file, marking the session as
     'incomplete' and automatically excluding it from all further automated processing runtimes.
+
+    The command is also used by Sun lab data acquisition systems to generate the processed data hierarchy for each
+    processed session. This use case is fully automated and should not be triggered manually by the user.
     """
     session = Path(session_path)
-    if verify_session_checksum(session):
+    if verify_session_checksum(
+        session, create_processed_data_directory=create_processed_directories, processed_data_root=processed_data_root
+    ):
         console.echo(message=f"Session {session.stem} raw data integrity: verified.", level=LogLevel.SUCCESS)
     else:
         console.echo(message=f"Session {session.stem} raw data integrity: compromised!", level=LogLevel.ERROR)

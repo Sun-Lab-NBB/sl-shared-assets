@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from .tools import (
     ascend_tyche_data as ascend_tyche_data,
     verify_session_checksum as verify_session_checksum,
@@ -13,7 +15,7 @@ from .data_classes import (
     set_system_configuration_file as set_system_configuration_file,
 )
 
-def verify_session_integrity(session_path: str) -> None:
+def verify_session_integrity(session_path: str, create_processed_directories: bool, processed_data_root: Path) -> None:
     """Checks the integrity of the target session's raw data (contents of the raw_data directory).
 
     This command assumes that the data has been checksummed during acquisition and contains an ax_checksum.txt file
@@ -21,6 +23,9 @@ def verify_session_integrity(session_path: str) -> None:
     always verified the integrity of the 'raw_data' directory. It does not work with 'processed_data' or any other
     directories. If the session data was corrupted, the command removes the 'telomere.bin' file, marking the session as
     'incomplete' and automatically excluding it from all further automated processing runtimes.
+
+    The command is also used by Sun lab data acquisition systems to generate the processed data hierarchy for each
+    processed session. This use case is fully automated and should not be triggered manually by the user.
     """
 
 def generate_project_manifest_file(
