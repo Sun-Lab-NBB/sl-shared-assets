@@ -114,6 +114,9 @@ class MesoscopePaths:
     server_processed_data_root: Path = Path("/workdir/sun_data")
     """The absolute path to the BioHPC server directory used to store the processed data from all Sun lab projects. 
     This path is relative to the server root and is only used when submitting remote jobs to the server."""
+    server_raw_data_root: Path = Path("/storage/sun_data")
+    """The absolute path to the BioHPC server directory used to store the raw data from all Sun lab projects. 
+    This path is relative to the server root and is only used when submitting remote jobs to the server."""
 
 
 @dataclass()
@@ -302,6 +305,7 @@ class MesoscopeSystemConfiguration(YamlConfig):
         self.paths.mesoscope_directory = Path(self.paths.mesoscope_directory)
         self.paths.harvesters_cti_path = Path(self.paths.harvesters_cti_path)
         self.paths.server_processed_data_root = Path(self.paths.server_processed_data_root)
+        self.paths.server_raw_data_root = Path(self.paths.server_raw_data_root)
 
         # Converts valve_calibration data from dictionary to a tuple of tuples format
         if not isinstance(self.microcontrollers.valve_calibration_data, tuple):
@@ -351,6 +355,7 @@ class MesoscopeSystemConfiguration(YamlConfig):
         original.paths.mesoscope_directory = str(original.paths.mesoscope_directory)  # type: ignore
         original.paths.harvesters_cti_path = str(original.paths.harvesters_cti_path)  # type: ignore
         original.paths.server_processed_data_root = str(original.paths.server_processed_data_root)  # type: ignore
+        original.paths.server_raw_data_root = str(original.paths.server_raw_data_root)  # type: ignore
 
         # Converts valve calibration data into dictionary format
         if isinstance(original.microcontrollers.valve_calibration_data, tuple):
