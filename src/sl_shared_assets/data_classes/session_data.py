@@ -569,6 +569,7 @@ class SessionData(YamlConfig):
 
         # RAW DATA
         new_root = local_root.joinpath(instance.project_name, instance.animal_id, instance.session_name, "raw_data")
+        instance.raw_data = RawData()  # Overrides the default YAML loader which sets it to None (null)
         instance.raw_data.resolve_paths(root_directory_path=new_root)
 
         # Unless a different root is provided for processed data, it uses the same root as raw_data.
@@ -576,6 +577,7 @@ class SessionData(YamlConfig):
             processed_data_root = new_root
 
         # Regenerates the processed_data path depending on the root resolution above
+        instance.processed_data = ProcessedData()  # Overrides the default YAML loader which sets it to None (null)
         instance.processed_data.resolve_paths(
             root_directory_path=processed_data_root.joinpath(
                 instance.project_name, instance.animal_id, instance.session_name, "processed_data"

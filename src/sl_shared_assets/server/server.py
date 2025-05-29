@@ -162,7 +162,7 @@ class Server:
         # If batch_job is not in the output received from SLURM in response to issuing the submission command, raises an
         # error.
         if "Submitted batch job" not in job_output:
-            message = f"Failed to submit the {job.job_name} job to the BioHPC cluster."
+            message = f"Failed to submit the '{job.job_name}' job to the BioHPC cluster."
             console.error(message, RuntimeError)
 
             # Fallback to appease mypy, should not be reachable
