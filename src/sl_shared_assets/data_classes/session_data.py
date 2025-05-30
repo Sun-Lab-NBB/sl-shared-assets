@@ -381,6 +381,14 @@ class SessionData(YamlConfig):
     """Stores the paths to all subfolders and files found under the /project/animal/session/processed_data directory of 
     any PC used to work with Sun lab data."""
 
+    def __post_init__(self) -> None:
+        """Ensures raw_data and processed_data are always instances of RawData and ProcessedData."""
+        if not isinstance(self.raw_data, RawData):
+            self._raw_data = RawData()
+
+        if not isinstance(self.processed_data, ProcessedData):
+            self._processed_data = ProcessedData()
+
     @classmethod
     def create(
         cls,
@@ -569,7 +577,6 @@ class SessionData(YamlConfig):
 
         # RAW DATA
         new_root = local_root.joinpath(instance.project_name, instance.animal_id, instance.session_name, "raw_data")
-        instance.raw_data = RawData()  # Overrides the default YAML loader which sets it to None (null)
         instance.raw_data.resolve_paths(root_directory_path=new_root)
 
         # Unless a different root is provided for processed data, it uses the same root as raw_data.
@@ -577,7 +584,6 @@ class SessionData(YamlConfig):
             processed_data_root = new_root
 
         # Regenerates the processed_data path depending on the root resolution above
-        instance.processed_data = ProcessedData()  # Overrides the default YAML loader which sets it to None (null)
         instance.processed_data.resolve_paths(
             root_directory_path=processed_data_root.joinpath(
                 instance.project_name, instance.animal_id, instance.session_name, "processed_data"
