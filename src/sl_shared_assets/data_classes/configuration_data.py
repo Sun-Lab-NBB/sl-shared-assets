@@ -207,7 +207,7 @@ class MesoscopeMicroControllers:
     PC, conserving communication bandwidth."""
     torque_averaging_pool_size: int = 10
     """The number of torque sensor readouts to average together to produce the final torque sensor readout value."""
-    wheel_encoder_ppr = 8192
+    wheel_encoder_ppr: int = 8192
     """The resolution of the managed quadrature encoder, in Pulses Per Revolution (PPR). This is the number of 
     quadrature pulses the encoder emits per full 360-degree rotation."""
     wheel_encoder_report_cw: bool = False
@@ -219,9 +219,9 @@ class MesoscopeMicroControllers:
     wheel_encoder_delta_threshold_pulse: int = 15
     """The minimum difference, in encoder pulse counts, between two encoder readouts for the change to be reported to 
     the PC. This is used to prevent reporting idle readouts and filter out sub-threshold noise."""
-    wheel_encoder_polling_delay_us = 500
+    wheel_encoder_polling_delay_us: int = 500
     """The delay, in microseconds, between any two successive encoder state readouts."""
-    cm_per_unity_unit = 10.0
+    cm_per_unity_unit: float = 10.0
     """The length of each Unity 'unit' in real-world centimeters recorded by the running wheel encoder."""
     screen_trigger_pulse_duration_ms: int = 500
     """The duration of the HIGH phase of the TTL pulse used to toggle the VR screens between ON and OFF states."""
