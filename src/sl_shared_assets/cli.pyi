@@ -7,6 +7,7 @@ from .tools import (
 )
 from .server import generate_server_credentials as generate_server_credentials
 from .data_classes import (
+    SessionData as SessionData,
     ExperimentState as ExperimentState,
     ProjectConfiguration as ProjectConfiguration,
     MesoscopeSystemConfiguration as MesoscopeSystemConfiguration,
@@ -22,7 +23,8 @@ def verify_session_integrity(session_path: str, create_processed_directories: bo
     that stores the data checksum generated before transferring the data to long-term storage destination. This function
     always verified the integrity of the 'raw_data' directory. It does not work with 'processed_data' or any other
     directories. If the session data was corrupted, the command removes the 'telomere.bin' file, marking the session as
-    'incomplete' and automatically excluding it from all further automated processing runtimes.
+    'incomplete' and automatically excluding it from all further automated processing runtimes. if the session data
+    is intact, generates a 'verified.bin' marker file inside the session's raw_data folder.
 
     The command is also used by Sun lab data acquisition systems to generate the processed data hierarchy for each
     processed session. This use case is fully automated and should not be triggered manually by the user.

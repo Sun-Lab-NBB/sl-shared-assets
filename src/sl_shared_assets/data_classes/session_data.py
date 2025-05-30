@@ -217,6 +217,11 @@ class RawData:
     the long-term storage destinations (NAS and Server) and the integrity of the moved data is verified on at least one 
     destination. During 'purge' sl-experiment runtimes, the library discovers and removes all session data marked with 
     'ubiquitin.bin' files from the machine that runs the code."""
+    verified_bin_path: Path = Path()
+    """Stores the path to the verified.bin file. This marker file is created (or removed) by the sl-shared-assets 
+    'verify-session' CLI command to indicate whether the session data inside the folder marked by the file has been 
+    verified for integrity. Primarily, this is used when the data is moved to the long-term storage destination (BioHPC
+    server) to ensure it is safe to remove any local copies of the data stored on the acquisition system machine(s)."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -248,6 +253,7 @@ class RawData:
         self.system_configuration_path = self.raw_data_path.joinpath("system_configuration.yaml")
         self.telomere_path = self.raw_data_path.joinpath("telomere.bin")
         self.ubiquitin_path = self.raw_data_path.joinpath("ubiquitin.bin")
+        self.verified_bin_path = self.raw_data_path.joinpath("verified.bin")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""

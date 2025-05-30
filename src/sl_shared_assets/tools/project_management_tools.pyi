@@ -29,13 +29,13 @@ def generate_project_manifest(
 
 def verify_session_checksum(
     session_path: Path, create_processed_data_directory: bool = True, processed_data_root: None | Path = None
-) -> bool:
+) -> None:
     """Verifies the integrity of the session's raw data by generating the checksum of the raw_data directory and
     comparing it against the checksum stored in the ax_checksum.txt file.
 
     Primarily, this function is used to verify data integrity after transferring it from a local PC to the remote
-    server for long-term storage. This function is designed to do nothing if the checksum matches and to remove the
-    'telomere.bin' marker file if it does not.
+    server for long-term storage. This function is designed to create the 'verified.bin' marker file if the checksum
+    matches and to remove the 'telomere.bin' and 'verified.bin' marker files if it does not.
 
     Notes:
         Removing the telomere.bin marker file from session's raw_data folder marks the session as incomplete, excluding
@@ -51,7 +51,4 @@ def verify_session_checksum(
         processed_data_root: The root directory where to store the processed data hierarchy. This path has to point to
             the root directory where to store the processed data from all projects, and it will be automatically
             modified to include the project name, the animal name, and the session ID.
-
-    Returns:
-        True if the checksum matches, False otherwise.
     """

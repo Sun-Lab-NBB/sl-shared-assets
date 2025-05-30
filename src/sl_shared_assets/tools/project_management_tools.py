@@ -61,6 +61,7 @@ def generate_project_manifest(
         "raw_data": [],  # Server-side raw_data folder path.
         "processed_data": [],  # Server-side processed_data folder path.
         "complete": [],  # Determines if the session data is complete. Incomplete sessions are excluded from processing.
+        "verified": [],  # Determines if the session data integrity has been verified upon transfer to storage machine.
         "single_day_suite2p": [],  # Determines whether the session has been processed with the single-day s2p pipeline.
         "multi_day_suite2p": [],  # Determines whether the session has been processed with the multi-day s2p pipeline.
         "behavior": [],  # Determines whether the session has been processed with the behavior extraction pipeline.
@@ -87,9 +88,13 @@ def generate_project_manifest(
         # If the session raw_data folder contains the telomere.bin file, marks the session as complete.
         manifest["complete"].append(session_data.raw_data.telomere_path.exists())
 
-        # If the session is incomplete, marks all processing steps as FALSE, as automatic processing is disabled for
-        # incomplete sessions.
-        if not manifest["complete"][-1]:
+        # If the session raw_data folder contains the verified.bin file, marks the session as verified.
+        manifest["verified"].append(session_data.raw_data.verified_bin_path.exists())
+
+        # If the session is incomplete or unverified, marks all processing steps as FALSE, as automatic processing is
+        # disabled for incomplete sessions. If the session unverified, the case is even more severe, as its data may be
+        # corrupted.
+        if not manifest["complete"][-1] or not not manifest["verified"][-1]:
             manifest["single_day_suite2p"].append(False)
             manifest["multi_day_suite2p"].append(False)
             manifest["behavior"].append(False)
@@ -120,6 +125,7 @@ def generate_project_manifest(
         "processed_data": pl.String,
         "type": pl.String,
         "complete": pl.Boolean,
+        "verified": pl.Boolean,
         "single_day_suite2p": pl.Boolean,
         "multi_day_suite2p": pl.Boolean,
         "behavior": pl.Boolean,
@@ -139,13 +145,13 @@ def generate_project_manifest(
 
 def verify_session_checksum(
     session_path: Path, create_processed_data_directory: bool = True, processed_data_root: None | Path = None
-) -> bool:
+) -> None:
     """Verifies the integrity of the session's raw data by generating the checksum of the raw_data directory and
     comparing it against the checksum stored in the ax_checksum.txt file.
 
     Primarily, this function is used to verify data integrity after transferring it from a local PC to the remote
-    server for long-term storage. This function is designed to do nothing if the checksum matches and to remove the
-    'telomere.bin' marker file if it does not.
+    server for long-term storage. This function is designed to create the 'verified.bin' marker file if the checksum
+    matches and to remove the 'telomere.bin' and 'verified.bin' marker files if it does not.
 
     Notes:
         Removing the telomere.bin marker file from session's raw_data folder marks the session as incomplete, excluding
@@ -161,9 +167,6 @@ def verify_session_checksum(
         processed_data_root: The root directory where to store the processed data hierarchy. This path has to point to
             the root directory where to store the processed data from all projects, and it will be automatically
             modified to include the project name, the animal name, and the session ID.
-
-    Returns:
-        True if the checksum matches, False otherwise.
     """
 
     # Loads session data layout. If configured to do so, also creates the processed data hierarchy
@@ -185,10 +188,13 @@ def verify_session_checksum(
     # If the two checksums do not match, this likely indicates data corruption.
     if stored_checksum != calculated_checksum:
         # If the telomere.bin file exists, removes this file. This automatically marks the session as incomplete for
-        # all other Sun lab runtimes. The presence of the telomere.bin file after integrity verification is used as a
-        # heuristic for determining whether the session has passed the verification process.
-        if session_data.raw_data.telomere_path.exists():
-            session_data.raw_data.telomere_path.unlink()
-        return False
+        # all other Sun lab runtimes.
+        session_data.raw_data.telomere_path.unlink(missing_ok=True)
 
-    return True
+        # Also unlinks the verified.bin marker if it exists. The presence or absence of the marker is used as the
+        # primary heuristic for determining if the session data passed verification.
+        session_data.raw_data.verified_bin_path.unlink(missing_ok=True)
+
+    # Otherwise, ensures that the session is marked with the verified.bin marker file.
+    else:
+        session_data.raw_data.verified_bin_path.touch(exist_ok=True)

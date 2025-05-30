@@ -8,6 +8,7 @@ from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from .tools import ascend_tyche_data, verify_session_checksum, generate_project_manifest
 from .server import generate_server_credentials
 from .data_classes import (
+    SessionData,
     ExperimentState,
     ProjectConfiguration,
     MesoscopeSystemConfiguration,
@@ -57,18 +58,25 @@ def verify_session_integrity(session_path: str, create_processed_directories: bo
     that stores the data checksum generated before transferring the data to long-term storage destination. This function
     always verified the integrity of the 'raw_data' directory. It does not work with 'processed_data' or any other
     directories. If the session data was corrupted, the command removes the 'telomere.bin' file, marking the session as
-    'incomplete' and automatically excluding it from all further automated processing runtimes.
+    'incomplete' and automatically excluding it from all further automated processing runtimes. if the session data
+    is intact, generates a 'verified.bin' marker file inside the session's raw_data folder.
 
     The command is also used by Sun lab data acquisition systems to generate the processed data hierarchy for each
     processed session. This use case is fully automated and should not be triggered manually by the user.
     """
     session = Path(session_path)
-    if verify_session_checksum(
+
+    # Runs the verification process
+    verify_session_checksum(
         session, create_processed_data_directory=create_processed_directories, processed_data_root=processed_data_root
-    ):
-        console.echo(message=f"Session {session.stem} raw data integrity: verified.", level=LogLevel.SUCCESS)
+    )
+
+    # Checks the outcome of the verification process
+    session_data = SessionData.load(session_path=session)
+    if session_data.raw_data.verified_bin_path.exists():
+        console.echo(message=f"Session {session.stem} raw data integrity: Verified.", level=LogLevel.SUCCESS)
     else:
-        console.echo(message=f"Session {session.stem} raw data integrity: compromised!", level=LogLevel.ERROR)
+        console.echo(message=f"Session {session.stem} raw data integrity: Compromised!", level=LogLevel.ERROR)
 
 
 @click.command()

@@ -131,7 +131,7 @@ class Server:
             job: The Job object that contains all job data.
 
         Returns:
-            The job object whose 'job_id' attribute had been modified with the job ID, if the job was successfully
+            The job object whose 'job_id' attribute had been modified with the job ID if the job was successfully
             submitted.
 
         Raises:
