@@ -21,6 +21,7 @@ _excluded_files = {
     "multi_day_suite2p.bin",
     "behavior.bin",
     "dlc.bin",
+    "verified.bin",
 }
 
 

@@ -75,7 +75,7 @@ class Server:
     """
 
     def __init__(self, credentials_path: Path) -> None:
-        # Tracker used to prevent __del__ from classing stop() for a partially initialized class.
+        # Tracker used to prevent __del__ from calling stop() for a partially initialized class.
         self._open: bool = False
 
         # Loads the credentials from the provided .yaml file
@@ -95,6 +95,7 @@ class Server:
                     self._credentials.host, username=self._credentials.username, password=self._credentials.password
                 )
                 console.echo(f"Connected to {self._credentials.host}", level=LogLevel.SUCCESS)
+                self._open = True
                 break
             except paramiko.AuthenticationException:
                 message = (

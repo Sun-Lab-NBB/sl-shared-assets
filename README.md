@@ -13,16 +13,16 @@ ___
 
 ## Detailed Description
 
-Primarily, this library is designed to make the two main Sun lab libraries used in data acquisition 
+Primarily, this library is designed to make the two main Sun lab libraries used for data acquisition 
 ([sl-experiment](https://github.com/Sun-Lab-NBB/sl-experiment)) and processing 
 ([sl-forgery](https://github.com/Sun-Lab-NBB/sl-forgery)) independent of each other. This is beneficial, as both 
-libraries feature an extensive and potentially incompatible set of runtime dependencies. Moreover, having a shared
+libraries feature an extensive and largely incompatible set of runtime dependencies. Moreover, having a shared
 repository of classes and tools reused across Sun lab pipelines streamlines the maintenance of these tools.
 
 The library broadly stores two types of assets. First, it stores various dataclasses used to save the data acquired 
-during experiments in the lab. Moreover, it also stores the dataclasses used to configure data acquisition and 
-processing runtimes. Secondly, it stores the tools used to safely move the data between the computers used in the data 
-acquisition and processing and provides the API for accessing the lab’s main computation server.
+during experiments in the lab and the dataclasses used to configure data acquisition and processing runtimes. Secondly, 
+it stores the tools used to safely move the data between the machines (computers) used in the data acquisition and 
+processing, and provides the API for running various data processing jobs on remote compute servers.
 
 ---
 
@@ -64,7 +64,10 @@ Use the following command to install the library using pip: ```pip install sl-sh
 ## Usage
 
 All library components are intended to be used via other Sun lab libraries. Developers should study the API and CLI 
-documentation below to learn how to use library components in other Sun lab libraries.
+documentation below to learn how to use library components in other Sun lab libraries. For notes on using shared 
+assets for data acquisition, see the [sl-experiment](https://github.com/Sun-Lab-NBB/sl-experiment) library ReadMe.
+For notes on using shared assets for data processing, see the [sl-forgery](https://github.com/Sun-Lab-NBB/sl-forgery) 
+library ReadMe.
 
 ---
 

@@ -176,6 +176,11 @@ def verify_session_checksum(
         make_processed_data_directory=create_processed_data_directory,
     )
 
+    # Unlinks the verified.bin marker if it exists. The presence or absence of the marker is used as the
+    # primary heuristic for determining if the session data passed verification. Unlinking it early helps in the case
+    # the verification procedure aborts unexpectedly for any reason.
+    session_data.raw_data.verified_bin_path.unlink(missing_ok=True)
+
     # Re-calculates the checksum for the raw_data directory
     calculated_checksum = calculate_directory_checksum(
         directory=session_data.raw_data.raw_data_path, batch=False, save_checksum=False
@@ -190,10 +195,6 @@ def verify_session_checksum(
         # If the telomere.bin file exists, removes this file. This automatically marks the session as incomplete for
         # all other Sun lab runtimes.
         session_data.raw_data.telomere_path.unlink(missing_ok=True)
-
-        # Also unlinks the verified.bin marker if it exists. The presence or absence of the marker is used as the
-        # primary heuristic for determining if the session data passed verification.
-        session_data.raw_data.verified_bin_path.unlink(missing_ok=True)
 
     # Otherwise, ensures that the session is marked with the verified.bin marker file.
     else:
