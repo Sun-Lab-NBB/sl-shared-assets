@@ -172,8 +172,6 @@ class SessionData(YamlConfig):
     experiment_name: str | None
     raw_data: RawData = field(default_factory=Incomplete)
     processed_data: ProcessedData = field(default_factory=Incomplete)
-    _raw_data = ...
-    _processed_data = ...
     def __post_init__(self) -> None:
         """Ensures raw_data and processed_data are always instances of RawData and ProcessedData."""
     @classmethod

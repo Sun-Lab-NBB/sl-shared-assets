@@ -384,10 +384,10 @@ class SessionData(YamlConfig):
     def __post_init__(self) -> None:
         """Ensures raw_data and processed_data are always instances of RawData and ProcessedData."""
         if not isinstance(self.raw_data, RawData):
-            self._raw_data = RawData()
+            self.raw_data = RawData()
 
         if not isinstance(self.processed_data, ProcessedData):
-            self._processed_data = ProcessedData()
+            self.processed_data = ProcessedData()
 
     @classmethod
     def create(
