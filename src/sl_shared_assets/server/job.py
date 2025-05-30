@@ -99,7 +99,7 @@ class Job:
         self._command.add_cmd("conda init bash")
 
         # Activates the target conda environment for the command.
-        self._command.add_cmd(f"conda activate {conda_environment}")
+        self._command.add_cmd(f"source activate {conda_environment}")  # Need to use old syntax for our server.
 
     def __repr__(self) -> str:
         """Returns the string representation of the Job instance."""
