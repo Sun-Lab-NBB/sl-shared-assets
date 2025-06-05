@@ -587,7 +587,7 @@ class SessionData(YamlConfig):
 
         # Unless a different root is provided for processed data, it uses the same root as raw_data.
         if processed_data_root is None:
-            processed_data_root = new_root
+            processed_data_root = local_root
 
         # Regenerates the processed_data path depending on the root resolution above
         instance.processed_data.resolve_paths(

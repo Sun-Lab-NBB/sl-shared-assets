@@ -5,7 +5,7 @@ import importlib_metadata
 project = 'sl-shared-assets'
 # noinspection PyShadowingBuiltins
 copyright = '2025, Sun (NeuroAI) lab'
-authors = ['Ivan Kondratyev (Inkaros)', 'Kushaan Gupta', 'Yuantao Deng', 'Natalie Yeung']
+authors = ['Ivan Kondratyev', 'Kushaan Gupta', 'Yuantao Deng', 'Natalie Yeung']
 # Extracts the project version from the .toml file.
 release = importlib_metadata.version("sl-shared-assets")
 

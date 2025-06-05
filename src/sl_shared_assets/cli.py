@@ -33,7 +33,7 @@ from .data_classes import (
     show_default=True,
     default=False,
     help=(
-        "Determines whether to created the processed data hierarchy. This flag should be disabled for most runtimes. "
+        "Determines whether to create the processed data hierarchy. This flag should be disabled for most runtimes. "
         "Primarily, it is used by lab acquisition system code to generate processed data directories on the remote "
         "compute servers as part of the data preprocessing pipeline."
     ),
