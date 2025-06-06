@@ -16,6 +16,7 @@ from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
 
 from .configuration_data import get_system_configuration_data
+from filelock import FileLock
 
 # Stores all supported input for SessionData class 'session_type' fields.
 _valid_session_types = {"lick training", "run training", "mesoscope experiment", "window checking"}
@@ -490,6 +491,7 @@ class SessionData(YamlConfig):
         processed_data.resolve_paths(root_directory_path=session_path.joinpath("processed_data"))
 
         # Packages the sections generated above into a SessionData instance
+        # noinspection PyArgumentList
         instance = SessionData(
             project_name=project_name,
             animal_id=animal_id,
@@ -623,3 +625,118 @@ class SessionData(YamlConfig):
 
         # Saves instance data as a .YAML file
         origin.to_yaml(file_path=self.raw_data.session_data_path)
+
+
+@dataclass()
+class ProcessingTracker(YamlConfig):
+    is_complete: bool = False
+    """Tracks whether the processing runtime managed by this tracker has been successfully carried out for the session 
+    that calls the tracker."""
+    encountered_error: bool = False
+    """Tracks whether the processing runtime managed by this tracker has encountered an error while running for the 
+    session that calls the tracker."""
+    is_running: bool = False
+    """Tracks whether the processing runtime managed by this tracker is currently running for the session that calls 
+    the tracker."""
+
+    def __post_init__(self):
+        """Initializes the file lock instance variable."""
+        self._lock: FileLock | None = None
+
+    def _get_lock(self, file_path: Path) -> FileLock:
+        """Gets or creates a FileLock instance for the .target .YAML file (file path).
+
+        Args:
+            file_path: The path to the target tracker .YAML file.
+        """
+        if self._lock is None:
+            lock_path = file_path.with_suffix(file_path.suffix + '.lock')
+            self._lock = FileLock(str(lock_path))
+        return self._lock
+
+    def load_state(self, file_path: Path, timeout: float = 10.0) -> None:
+        """Reads the current processing state from the specified .YAML file in a thread-safe manner and uses it to
+        update internal attributes.
+
+        This method updates the instance with the data stored inside the .YAML file while avoiding race conditions.
+
+        Args:
+            file_path: The path to the tracker .YAML file from which to load the state data.
+            timeout: The maximum time to wait for the .YAML file lock to be released if it is currently used by another
+                process.
+
+        Raises:
+            TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
+        """
+
+        # Resolves the path to the .lock file for the target tracker .yaml file.
+        lock = self._get_lock(file_path)
+
+        # Attempts to acquire the lock.
+        try:
+            with lock.acquire(timeout=timeout):
+                # If the lock is acquired and the target file exists, loads its data and uses it to update instance
+                # attributes.
+                if file_path.exists():
+                    instance: ProcessingTracker = self.from_yaml(file_path)  # type: ignore
+                    self.is_complete = instance.is_complete
+                    self.encountered_error = instance.encountered_error
+                    self.is_running = instance.is_running
+        # If lock acquisition or file reading fails for any reason, aborts with an error
+        except Exception as e:
+            message = (
+                f"Unable to load the ProcessingTracker data cached inside the target file {file_path.stem}. "
+                f"Encountered the following error: {e}."
+            )
+            console.error(message=message, error=type(e))
+            raise type(e)(message)  # Fallback to appease mypy, should not be reachable
+
+    def save_state(self, file_path: Path, timeout: float = 10.0) -> None:
+        """Saves the current processing state stored inside instance attributes to the specified .YAML file in a
+        thread-safe manner.
+
+        This method caches the tracked processing state into a .YAML file while avoiding race conditions.
+
+        Args:
+            file_path: The path to the .YAML file where to cache the tracked processing state.
+            timeout: The maximum time to wait for the .YAML file lock to be released if it is currently used by another
+                process.
+
+        Raises:
+            TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
+        """
+        # Resolves the path to the .lock file for the target tracker .yaml file.
+        lock = self._get_lock(file_path)
+
+        # Attempts to acquire the lock.
+        try:
+            with lock.acquire(timeout=timeout):
+                # Resets the _lock to None before dumping the data to .YAML to avoid issues with loading it back.
+                original = copy.deepcopy(self)
+                original._lock = None
+                original.to_yaml(file_path=file_path)
+        # If lock acquisition or file reading fails for any reason, aborts with an error
+        except Exception as e:
+            message = (
+                f"Unable to cache the ProcessingTracker instance data to the target file {file_path.stem}. "
+                f"Encountered the following error: {e}."
+            )
+            console.error(message=message, error=type(e))
+            raise type(e)(message)  # Fallback to appease mypy, should not be reachable
+
+    def start_processing(self, file_path: Path) -> None:
+        """Mark processing as started."""
+        # Resolves the path to the .lock file for the target tracker .yaml file.
+        lock = self._get_lock(file_path)
+
+        # Attempts to acquire the lock.
+        try:
+            with lock.acquire(timeout=timeout):
+        # If lock acquisition or file reading fails for any reason, aborts with an error
+        except Exception as e:
+            message = (
+                f"Unable to load the ProcessingTracker data cached inside the target file {file_path.stem}. "
+                f"Encountered the following error: {e}."
+            )
+            console.error(message=message, error=type(e))
+            raise type(e)(message)  # Fallback to appease mypy, should not be reachable
