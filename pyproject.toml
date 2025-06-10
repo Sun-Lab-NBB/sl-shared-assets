@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 # Project metdata section. Provides the genral ID information about the project.
 [project]
 name = "sl-shared-assets"
-version = "1.0.2"
+version = "1.1.0"
 description = "Stores assets shared between multiple Sun (NeuroAI) lab data pipelines."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -37,7 +37,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     # Supported OS systems
-    "Operating System :: POSIX :: Linux",
+    "Operating System :: OS Independent",
 ]
 
 # Runtime project dependencies. This overlaps with the 'condarun' optional list.
@@ -54,6 +54,7 @@ dependencies = [
     "natsort>=8,<9",
     "polars>=1,<2",
     "pyarrow>=20,<21",
+    "filelock>=3,<4",
 ]
 
 [project.urls]
@@ -75,6 +76,7 @@ condarun = [
     "natsort>=8,<9",
     "polars>=1,<2",
     "pyarrow>=20,<21",
+    "filelock>=3,<4",
 ]
 
 # Dependencies known to be installable with conda for all development platforms (OSX ARM64, WIN AMD64, LIN AMD64).
@@ -101,6 +103,7 @@ conda = [
     "types-appdirs>=1,<2",
     "types-tqdm>=4,<5",
     "types-paramiko>=3,<4",
+    "types-filelock>=3,<4"
 ]
 
 # Dependencies known to not be installable with conda for at least one supported development platform
@@ -118,7 +121,7 @@ noconda = [
     "build>=1,<2",
 
     # Automation
-    "ataraxis-automation>=4,<5",
+    "ataraxis-automation>=5,<6",
 ]
 
 # A shorthand specification that installs tox and all packages required for development tasks. This specification can

@@ -1,6 +1,9 @@
 from pathlib import Path
 
-from ..data_classes import SessionData as SessionData
+from ..data_classes import (
+    SessionData as SessionData,
+    ProcessingTracker as ProcessingTracker,
+)
 from .packaging_tools import calculate_directory_checksum as calculate_directory_checksum
 
 def generate_project_manifest(

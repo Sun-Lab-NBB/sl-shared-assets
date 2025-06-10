@@ -96,7 +96,7 @@ class RawData:
     checksum_path: Path = ...
     telomere_path: Path = ...
     ubiquitin_path: Path = ...
-    verified_bin_path: Path = ...
+    integrity_verification_tracker_path: Path = ...
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
 
@@ -125,10 +125,10 @@ class ProcessedData:
     mesoscope_data_path: Path = ...
     behavior_data_path: Path = ...
     job_logs_path: Path = ...
-    single_day_suite2p_bin_path: Path = ...
-    multi_day_suite2p_bin_path: Path = ...
-    behavior_bin_path: Path = ...
-    dlc_bin_path: Path = ...
+    suite2p_processing_tracker_path: Path = ...
+    dataset_formation_tracker_path: Path = ...
+    behavior_processing_tracker_path: Path = ...
+    video_processing_tracker_path: Path = ...
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
 
@@ -250,3 +250,62 @@ class SessionData(YamlConfig):
         data processing. The method is intended to only be used by the SessionData instance itself during its
         create() method runtime.
         """
+
+@dataclass()
+class ProcessingTracker(YamlConfig):
+    """Wraps the .yaml file that tracks the state of a data processing runtime and provides tools for communicating the
+    state between multiple processes in a thread-safe manner.
+
+    Primarily, this tracker class is used by all remote data processing pipelines in the lab to prevent race conditions
+    and make it impossible to run multiple processing runtimes at the same time.
+    """
+
+    file_path: Path
+    _is_complete: bool = ...
+    _encountered_error: bool = ...
+    _is_running: bool = ...
+    _lock_path: str = field(init=False)
+    def __post_init__(self) -> None: ...
+    def _load_state(self) -> None:
+        """Reads the current processing state from the wrapped .YAML file."""
+    def _save_state(self) -> None:
+        """Saves the current processing state stored inside instance attributes to the specified .YAML file."""
+    def start(self) -> None:
+        """Configures the tracker file to indicate that the tracked processing runtime is currently running.
+
+        All further attempts to start the same processing runtime for the same session's data will automatically abort
+        with an error.
+
+        Raises:
+            TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
+        """
+    def error(self) -> None:
+        """Configures the tracker file to indicate that the tracked processing runtime encountered an error and failed
+        to complete.
+
+        This method will only work for an active runtime. When called for an active runtime, it expects the runtime to
+        be aborted with an error after the method returns. It configures the target tracker to allow other processes
+        to restart the runtime at any point after this method returns, so it is UNSAFE to do any further processing
+        from the process that calls this method.
+
+        Raises:
+            TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
+        """
+    def stop(self) -> None:
+        """Mark processing as started.
+
+        Raises:
+            TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
+        """
+    @property
+    def is_complete(self) -> bool:
+        """Returns True if the tracker wrapped by the instance indicates that the processing runtime has been completed
+        successfully and False otherwise."""
+    @property
+    def encountered_error(self) -> bool:
+        """Returns True if the tracker wrapped by the instance indicates that the processing runtime aborted due to
+        encountering an error and False otherwise."""
+    @property
+    def is_running(self) -> bool:
+        """Returns True if the tracker wrapped by the instance indicates that the processing runtime is currently
+        running and False otherwise."""

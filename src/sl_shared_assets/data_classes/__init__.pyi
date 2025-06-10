@@ -10,6 +10,7 @@ from .session_data import (
     RawData as RawData,
     SessionData as SessionData,
     ProcessedData as ProcessedData,
+    ProcessingTracker as ProcessingTracker,
     ProjectConfiguration as ProjectConfiguration,
 )
 from .surgery_data import (
@@ -58,4 +59,5 @@ __all__ = [
     "MesoscopeCameras",
     "MesoscopeMicroControllers",
     "MesoscopeAdditionalFirmware",
+    "ProcessingTracker",
 ]

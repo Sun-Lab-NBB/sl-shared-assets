@@ -11,12 +11,12 @@ import shutil as sh
 from pathlib import Path
 from dataclasses import field, dataclass
 
+from filelock import Timeout, FileLock
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
 
 from .configuration_data import get_system_configuration_data
-from filelock import FileLock
 
 # Stores all supported input for SessionData class 'session_type' fields.
 _valid_session_types = {"lick training", "run training", "mesoscope experiment", "window checking"}
@@ -218,7 +218,7 @@ class RawData:
     the long-term storage destinations (NAS and Server) and the integrity of the moved data is verified on at least one 
     destination. During 'purge' sl-experiment runtimes, the library discovers and removes all session data marked with 
     'ubiquitin.bin' files from the machine that runs the code."""
-    verified_bin_path: Path = Path()
+    integrity_verification_tracker_path: Path = Path()
     """Stores the path to the verified.bin file. This marker file is created (or removed) by the sl-shared-assets 
     'verify-session' CLI command to indicate whether the session data inside the folder marked by the file has been 
     verified for integrity. Primarily, this is used when the data is moved to the long-term storage destination (BioHPC
@@ -254,7 +254,7 @@ class RawData:
         self.system_configuration_path = self.raw_data_path.joinpath("system_configuration.yaml")
         self.telomere_path = self.raw_data_path.joinpath("telomere.bin")
         self.ubiquitin_path = self.raw_data_path.joinpath("ubiquitin.bin")
-        self.verified_bin_path = self.raw_data_path.joinpath("verified.bin")
+        self.integrity_verification_tracker_path = self.raw_data_path.joinpath("integrity_verification_tracker.yaml")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
@@ -291,20 +291,20 @@ class ProcessedData:
     server-side data processing pipeline runtimes. This directory is primarily used when running data processing jobs 
     on the remote server. However, it is possible to configure local runtimes to also redirect log data to files 
     stored in this directory (by editing ataraxis-base-utilities 'console' variable)."""
-    single_day_suite2p_bin_path: Path = Path()
+    suite2p_processing_tracker_path: Path = Path()
     """Stores the path to the single_day_suite2p.bin file. This file is created by our single-day suite2p data 
     processing pipeline to mark sessions that have been successfully processed with the single-day sl-suite2p library 
     pipeline. Note, the file is removed at the beginning of the suite2p pipeline, so its presence always indicates 
     successful processing runtime completion."""
-    multi_day_suite2p_bin_path: Path = Path()
+    dataset_formation_tracker_path: Path = Path()
     """Same as single_day_suite2p_bin_path, but tracks whether the session has been successfully processed with the 
     multi-day suite2p pipeline."""
-    behavior_bin_path: Path = Path()
+    behavior_processing_tracker_path: Path = Path()
     """Stores the path to the behavior.bin file. This file is created by our behavior data extraction pipeline
     to mark sessions that have been successfully processed with the sl-behavior library pipeline. Note, the 
     file is removed at the beginning of the behavior data extraction pipeline, so its presence always indicates 
     successful processing runtime completion."""
-    dlc_bin_path: Path = Path()
+    video_processing_tracker_path: Path = Path()
     """Stores the path to the dlc.bin file. This file is created by our DeepLabCut-based pose tracking pipeline
     to mark sessions that have been successfully processed with the sl-dlc library pipeline. Note, the 
     file is removed at the beginning of the DeepLabCut pipeline, so its presence always indicates successful processing 
@@ -327,10 +327,10 @@ class ProcessedData:
         self.mesoscope_data_path = self.processed_data_path.joinpath("mesoscope_data")
         self.behavior_data_path = self.processed_data_path.joinpath("behavior_data")
         self.job_logs_path = self.processed_data_path.joinpath("job_logs")
-        self.single_day_suite2p_bin_path = self.processed_data_path.joinpath("single_day_suite2p.bin")
-        self.multi_day_suite2p_bin_path = self.processed_data_path.joinpath("multi_day_suite2p.bin")
-        self.behavior_bin_path = self.processed_data_path.joinpath("behavior.bin")
-        self.dlc_bin_path = self.processed_data_path.joinpath("dlc.bin")
+        self.suite2p_processing_tracker_path = self.processed_data_path.joinpath("suite2p_processing_tracker.yaml")
+        self.dataset_formation_tracker_path = self.processed_data_path.joinpath("dataset_formation_tracker.yaml")
+        self.behavior_processing_tracker_path = self.processed_data_path.joinpath("behavior_processing_tracker.yaml")
+        self.video_processing_tracker_path = self.processed_data_path.joinpath("video_processing_tracker.yaml")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
@@ -478,6 +478,7 @@ class SessionData(YamlConfig):
                 f"already exists. The newly created session directory uses a '_{counter}' postfix to distinguish "
                 f"itself from the already existing session directory."
             )
+            # noinspection PyTypeChecker
             console.echo(message=message, level=LogLevel.ERROR)
 
         # Generates subclasses stored inside the main class instance based on the data resolved above.
@@ -629,114 +630,248 @@ class SessionData(YamlConfig):
 
 @dataclass()
 class ProcessingTracker(YamlConfig):
-    is_complete: bool = False
+    """Wraps the .yaml file that tracks the state of a data processing runtime and provides tools for communicating the
+    state between multiple processes in a thread-safe manner.
+
+    Primarily, this tracker class is used by all remote data processing pipelines in the lab to prevent race conditions
+    and make it impossible to run multiple processing runtimes at the same time.
+    """
+
+    file_path: Path
+    """Stores the path to the .yaml file used to save the tracker data between runtimes. The class instance functions as
+    a wrapper around the data stored inside the specified .yaml file."""
+    _is_complete: bool = False
     """Tracks whether the processing runtime managed by this tracker has been successfully carried out for the session 
     that calls the tracker."""
-    encountered_error: bool = False
+    _encountered_error: bool = False
     """Tracks whether the processing runtime managed by this tracker has encountered an error while running for the 
     session that calls the tracker."""
-    is_running: bool = False
+    _is_running: bool = False
     """Tracks whether the processing runtime managed by this tracker is currently running for the session that calls 
     the tracker."""
+    _lock_path: str = field(init=False)
+    """Stores the path to the .lock file for the target tracker .yaml file. This file is used to ensure that only one 
+    process can simultaneously read from or write to the wrapped .yaml file."""
 
-    def __post_init__(self):
-        """Initializes the file lock instance variable."""
-        self._lock: FileLock | None = None
+    def __post_init__(self) -> None:
+        # Generates the lock file for the target .yaml file path.
+        if self.file_path is not None:
+            self._lock_path = str(self.file_path.with_suffix(self.file_path.suffix + ".lock"))
+        else:
+            self._lock_path = ""
 
-    def _get_lock(self, file_path: Path) -> FileLock:
-        """Gets or creates a FileLock instance for the .target .YAML file (file path).
+    def _load_state(self) -> None:
+        """Reads the current processing state from the wrapped .YAML file."""
+        if self.file_path.exists():
+            # Loads the data for the state values, but does not replace the file path or lock attributes.
+            instance: ProcessingTracker = self.from_yaml(self.file_path)  # type: ignore
+            self._is_complete = instance._is_complete
+            self._encountered_error = instance._encountered_error
+            self._is_running = instance._is_running
+        else:
+            # Otherwise, if the tracker file does not exist, generates a new .yaml file using default instance values.
+            self._save_state()
 
-        Args:
-            file_path: The path to the target tracker .YAML file.
+    def _save_state(self) -> None:
+        """Saves the current processing state stored inside instance attributes to the specified .YAML file."""
+        # Resets the _lock and file_path to None before dumping the data to .YAML to avoid issues with loading it
+        # back.
+        console.echo(message=f"{self.file_path}")
+        original = copy.deepcopy(self)
+        original.file_path = None  # type: ignore
+        original._lock_path = None  # type: ignore
+        original.to_yaml(file_path=self.file_path)
+
+    def start(self) -> None:
+        """Configures the tracker file to indicate that the tracked processing runtime is currently running.
+
+        All further attempts to start the same processing runtime for the same session's data will automatically abort
+        with an error.
+
+        Raises:
+            TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
         """
-        if self._lock is None:
-            lock_path = file_path.with_suffix(file_path.suffix + '.lock')
-            self._lock = FileLock(str(lock_path))
-        return self._lock
+        try:
+            # Acquires the lock
+            lock = FileLock(self._lock_path)
+            with lock.acquire(timeout=10.0):
+                # Loads tracker state from .yaml file
+                self._load_state()
 
-    def load_state(self, file_path: Path, timeout: float = 10.0) -> None:
-        """Reads the current processing state from the specified .YAML file in a thread-safe manner and uses it to
-        update internal attributes.
+                # If the runtime is already running, aborts with an error
+                if self._is_running:
+                    message = (
+                        f"Unable to start the processing runtime. The {self.file_path.name} tracker file indicates "
+                        f"that the runtime is currently running from a different process. Only a single runtime "
+                        f"instance is allowed to run at the same time."
+                    )
+                    console.error(message=message, error=RuntimeError)
+                    raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
 
-        This method updates the instance with the data stored inside the .YAML file while avoiding race conditions.
+                # Otherwise, marks the runtime as running and saves the state back to the .yaml file.
+                self._is_running = True
+                self._is_complete = False
+                self._encountered_error = False
+                self._save_state()
 
-        Args:
-            file_path: The path to the tracker .YAML file from which to load the state data.
-            timeout: The maximum time to wait for the .YAML file lock to be released if it is currently used by another
-                process.
+        # If lock acquisition fails for any reason, aborts with an error
+        except Timeout:
+            message = (
+                f"Unable to interface with the ProcessingTracker instance data cached inside the target .yaml file "
+                f"{self.file_path.stem}. Specifically, unable to acquire the file lock before the timeout duration of "
+                f"10 minutes has passed."
+            )
+            console.error(message=message, error=Timeout)
+            raise Timeout(message)  # Fallback to appease mypy, should not be reachable
+
+    def error(self) -> None:
+        """Configures the tracker file to indicate that the tracked processing runtime encountered an error and failed
+        to complete.
+
+        This method will only work for an active runtime. When called for an active runtime, it expects the runtime to
+        be aborted with an error after the method returns. It configures the target tracker to allow other processes
+        to restart the runtime at any point after this method returns, so it is UNSAFE to do any further processing
+        from the process that calls this method.
 
         Raises:
             TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
         """
 
-        # Resolves the path to the .lock file for the target tracker .yaml file.
-        lock = self._get_lock(file_path)
-
-        # Attempts to acquire the lock.
         try:
-            with lock.acquire(timeout=timeout):
-                # If the lock is acquired and the target file exists, loads its data and uses it to update instance
-                # attributes.
-                if file_path.exists():
-                    instance: ProcessingTracker = self.from_yaml(file_path)  # type: ignore
-                    self.is_complete = instance.is_complete
-                    self.encountered_error = instance.encountered_error
-                    self.is_running = instance.is_running
-        # If lock acquisition or file reading fails for any reason, aborts with an error
-        except Exception as e:
+            # Acquires the lock
+            lock = FileLock(self._lock_path)
+            with lock.acquire(timeout=10.0):
+                # Loads tracker state from .yaml file
+                self._load_state()
+
+                # If the runtime is not running, aborts with an error
+                if not self._is_running:
+                    message = (
+                        f"Unable to report that the processing runtime encountered an error. The {self.file_path.name} "
+                        f"tracker file indicates that the runtime is currently NOT running. A runtime has to be "
+                        f"actively running to set the tracker to an error state."
+                    )
+                    console.error(message=message, error=RuntimeError)
+                    raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
+
+                # Otherwise, indicates that the runtime aborted with an error
+                self._is_running = False
+                self._is_complete = False
+                self._encountered_error = True
+                self._save_state()
+
+        # If lock acquisition fails for any reason, aborts with an error
+        except Timeout:
             message = (
-                f"Unable to load the ProcessingTracker data cached inside the target file {file_path.stem}. "
-                f"Encountered the following error: {e}."
+                f"Unable to interface with the ProcessingTracker instance data cached inside the target .yaml file "
+                f"{self.file_path.stem}. Specifically, unable to acquire the file lock before the timeout duration of "
+                f"10 minutes has passed."
             )
-            console.error(message=message, error=type(e))
-            raise type(e)(message)  # Fallback to appease mypy, should not be reachable
+            console.error(message=message, error=Timeout)
+            raise Timeout(message)  # Fallback to appease mypy, should not be reachable
 
-    def save_state(self, file_path: Path, timeout: float = 10.0) -> None:
-        """Saves the current processing state stored inside instance attributes to the specified .YAML file in a
-        thread-safe manner.
-
-        This method caches the tracked processing state into a .YAML file while avoiding race conditions.
-
-        Args:
-            file_path: The path to the .YAML file where to cache the tracked processing state.
-            timeout: The maximum time to wait for the .YAML file lock to be released if it is currently used by another
-                process.
+    def stop(self) -> None:
+        """Mark processing as started.
 
         Raises:
             TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
         """
-        # Resolves the path to the .lock file for the target tracker .yaml file.
-        lock = self._get_lock(file_path)
 
-        # Attempts to acquire the lock.
         try:
-            with lock.acquire(timeout=timeout):
-                # Resets the _lock to None before dumping the data to .YAML to avoid issues with loading it back.
-                original = copy.deepcopy(self)
-                original._lock = None
-                original.to_yaml(file_path=file_path)
-        # If lock acquisition or file reading fails for any reason, aborts with an error
-        except Exception as e:
+            # Acquires the lock
+            lock = FileLock(self._lock_path)
+            with lock.acquire(timeout=10.0):
+                # Loads tracker state from .yaml file
+                self._load_state()
+
+                # If the runtime is not running, aborts with an error
+                if not self._is_running:
+                    message = (
+                        f"Unable to stop (complete) the processing runtime. The {self.file_path.name} tracker file "
+                        f"indicates that the runtime is currently NOT running. A runtime has to be actively running to "
+                        f"mark it as complete and stop the runtime."
+                    )
+                    console.error(message=message, error=RuntimeError)
+                    raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
+
+                # Otherwise, marks the runtime as complete (stopped)
+                self._is_running = False
+                self._is_complete = True
+                self._encountered_error = False
+                self._save_state()
+
+        # If lock acquisition fails for any reason, aborts with an error
+        except Timeout:
             message = (
-                f"Unable to cache the ProcessingTracker instance data to the target file {file_path.stem}. "
-                f"Encountered the following error: {e}."
+                f"Unable to interface with the ProcessingTracker instance data cached inside the target .yaml file "
+                f"{self.file_path.stem}. Specifically, unable to acquire the file lock before the timeout duration of "
+                f"10 minutes has passed."
             )
-            console.error(message=message, error=type(e))
-            raise type(e)(message)  # Fallback to appease mypy, should not be reachable
+            console.error(message=message, error=Timeout)
+            raise Timeout(message)  # Fallback to appease mypy, should not be reachable
 
-    def start_processing(self, file_path: Path) -> None:
-        """Mark processing as started."""
-        # Resolves the path to the .lock file for the target tracker .yaml file.
-        lock = self._get_lock(file_path)
-
-        # Attempts to acquire the lock.
+    @property
+    def is_complete(self) -> bool:
+        """Returns True if the tracker wrapped by the instance indicates that the processing runtime has been completed
+        successfully and False otherwise."""
         try:
-            with lock.acquire(timeout=timeout):
-        # If lock acquisition or file reading fails for any reason, aborts with an error
-        except Exception as e:
+            # Acquires the lock
+            lock = FileLock(self._lock_path)
+            with lock.acquire(timeout=10.0):
+                # Loads tracker state from .yaml file
+                self._load_state()
+                return self._is_complete
+
+            # If lock acquisition fails for any reason, aborts with an error
+        except Timeout:
             message = (
-                f"Unable to load the ProcessingTracker data cached inside the target file {file_path.stem}. "
-                f"Encountered the following error: {e}."
+                f"Unable to interface with the ProcessingTracker instance data cached inside the target .yaml file "
+                f"{self.file_path.stem}. Specifically, unable to acquire the file lock before the timeout duration of "
+                f"10 minutes has passed."
             )
-            console.error(message=message, error=type(e))
-            raise type(e)(message)  # Fallback to appease mypy, should not be reachable
+            console.error(message=message, error=Timeout)
+            raise Timeout(message)  # Fallback to appease mypy, should not be reachable
+
+    @property
+    def encountered_error(self) -> bool:
+        """Returns True if the tracker wrapped by the instance indicates that the processing runtime aborted due to
+        encountering an error and False otherwise."""
+        try:
+            # Acquires the lock
+            lock = FileLock(self._lock_path)
+            with lock.acquire(timeout=10.0):
+                # Loads tracker state from .yaml file
+                self._load_state()
+                return self._encountered_error
+
+            # If lock acquisition fails for any reason, aborts with an error
+        except Timeout:
+            message = (
+                f"Unable to interface with the ProcessingTracker instance data cached inside the target .yaml file "
+                f"{self.file_path.stem}. Specifically, unable to acquire the file lock before the timeout duration of "
+                f"10 minutes has passed."
+            )
+            console.error(message=message, error=Timeout)
+            raise Timeout(message)  # Fallback to appease mypy, should not be reachable
+
+    @property
+    def is_running(self) -> bool:
+        """Returns True if the tracker wrapped by the instance indicates that the processing runtime is currently
+        running and False otherwise."""
+        try:
+            # Acquires the lock
+            lock = FileLock(self._lock_path)
+            with lock.acquire(timeout=10.0):
+                # Loads tracker state from .yaml file
+                self._load_state()
+                return self._is_running
+
+            # If lock acquisition fails for any reason, aborts with an error
+        except Timeout:
+            message = (
+                f"Unable to interface with the ProcessingTracker instance data cached inside the target .yaml file "
+                f"{self.file_path.stem}. Specifically, unable to acquire the file lock before the timeout duration of "
+                f"10 minutes has passed."
+            )
+            console.error(message=message, error=Timeout)
+            raise Timeout(message)  # Fallback to appease mypy, should not be reachable
