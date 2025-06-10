@@ -88,6 +88,20 @@ class Server:
             ValueError: If the input Job object does not contain a valid job_id, suggesting that it has not been
                 submitted to the server.
         """
+    def pull_file(self, local_file_path: Path, remote_file_path: Path) -> None:
+        """Moves the specified file from the remote server to the local machine.
+
+        Args:
+            local_file_path: The path to the local instance of the file (where to copy the file).
+            remote_file_path: The path to the target file on the remote server (the file to be copied).
+        """
+    def push_file(self, local_file_path: Path, remote_file_path: Path) -> None:
+        """Moves the specified file from the remote server to the local machine.
+
+        Args:
+            local_file_path: The path to the file that needs to be copied to the remote server.
+            remote_file_path: The path to the file on the remote server (where to copy the file).
+        """
     def close(self) -> None:
         """Closes the SSH connection to the server.
 
