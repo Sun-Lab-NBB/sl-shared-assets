@@ -226,6 +226,20 @@ class Server:
         sftp.put(localpath=local_file_path, remotepath=str(remote_file_path))
         sftp.close()
 
+    def remove(self, remote_path: Path, is_dir: bool) -> None:
+        """Removes the specified file or directory from the remote server.
+
+        Args:
+            remote_path: The path to the file or directory on the remote server to be removed.
+            is_dir: Determines whether the input path represents a directory or a file.
+        """
+        sftp = self._client.open_sftp()
+        if is_dir:
+            sftp.rmdir(path=str(remote_path))
+        else:
+            sftp.unlink(path=str(remote_path))
+        sftp.close()
+
     def close(self) -> None:
         """Closes the SSH connection to the server.
 
