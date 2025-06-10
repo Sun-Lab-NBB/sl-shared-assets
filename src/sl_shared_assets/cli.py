@@ -10,6 +10,7 @@ from .server import generate_server_credentials
 from .data_classes import (
     SessionData,
     ExperimentState,
+    ProcessingTracker,
     ProjectConfiguration,
     MesoscopeSystemConfiguration,
     MesoscopeExperimentConfiguration,
@@ -65,6 +66,7 @@ def verify_session_integrity(session_path: str, create_processed_directories: bo
     processed session. This use case is fully automated and should not be triggered manually by the user.
     """
     session = Path(session_path)
+    session_data = SessionData.load(session_path=session)
 
     # Runs the verification process
     verify_session_checksum(
@@ -72,10 +74,12 @@ def verify_session_integrity(session_path: str, create_processed_directories: bo
     )
 
     # Checks the outcome of the verification process
-    session_data = SessionData.load(session_path=session)
-    if session_data.raw_data.verified_bin_path.exists():
+    tracker = ProcessingTracker(file_path=session_data.raw_data.integrity_verification_tracker_path)
+    if tracker.is_complete:
+        # noinspection PyTypeChecker
         console.echo(message=f"Session {session.stem} raw data integrity: Verified.", level=LogLevel.SUCCESS)
     else:
+        # noinspection PyTypeChecker
         console.echo(message=f"Session {session.stem} raw data integrity: Compromised!", level=LogLevel.ERROR)
 
 
@@ -120,6 +124,7 @@ def generate_project_manifest_file(
         output_directory=Path(output_directory),
         processed_project_directory=Path(project_processed_path) if project_processed_path else None,
     )
+    # noinspection PyTypeChecker
     console.echo(message=f"Project {Path(project_path).stem} data manifest file: generated.", level=LogLevel.SUCCESS)
 
 
@@ -177,6 +182,7 @@ def generate_system_configuration_file(output_directory: str, acquisition_system
             f"Mesoscope-VR system configuration file: generated. Edit the configuration parameters stored inside the "
             f"{file_name} file to match the state of the acquisition system and use context."
         )
+        # noinspection PyTypeChecker
         console.echo(message=message, level=LogLevel.SUCCESS)
 
     # For unsupported system types, raises an error message
@@ -234,6 +240,7 @@ def generate_server_credentials_file(output_directory: str, host: str, username:
         f"Server access credentials file: generated. If necessary, remember to edit the data acquisition system "
         f"configuration file to include the path to the credentials file generated via this CLI."
     )
+    # noinspection PyTypeChecker
     console.echo(message=message, level=LogLevel.SUCCESS)
 
 
@@ -284,6 +291,7 @@ def generate_project_configuration_file(project: str, surgery_log_id: str, water
         project_name=project, surgery_sheet_id=surgery_log_id, water_log_sheet_id=water_restriction_log_id
     )
     configuration.save(path=file_path.joinpath())
+    # noinspection PyTypeChecker
     console.echo(message=f"Project {project} data structure and configuration file: generated.", level=LogLevel.SUCCESS)
 
 
@@ -360,6 +368,7 @@ def generate_experiment_configuration_file(project: str, experiment: str, state_
         raise ValueError(message)  # Fall-back to appease mypy, should not be reachable
 
     experiment_configuration.to_yaml(file_path=file_path)
+    # noinspection PyTypeChecker
     console.echo(message=f"Experiment {experiment} configuration file: generated.", level=LogLevel.SUCCESS)
 
 

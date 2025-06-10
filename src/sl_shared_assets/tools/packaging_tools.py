@@ -17,11 +17,16 @@ _excluded_files = {
     "ax_checksum.txt",
     "ubiquitin.bin",
     "telomere.bin",
-    "single_day_suite2p.bin",
-    "multi_day_suite2p.bin",
-    "behavior.bin",
-    "dlc.bin",
-    "verified.bin",
+    "suite2p_processing_tracker.yaml",
+    "dataset_formation_tracker.yaml",
+    "behavior_processing_tracker.yaml",
+    "video_processing_tracker.yaml",
+    "integrity_verification_tracker.yaml",
+    "suite2p_processing_tracker.yaml.lock",
+    "dataset_formation_tracker.yaml.lock",
+    "behavior_processing_tracker.yaml.lock",
+    "video_processing_tracker.yaml.lock",
+    "integrity_verification_tracker.yaml.lock",
 }
 
 

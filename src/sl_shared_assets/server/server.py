@@ -204,6 +204,28 @@ class Server:
         else:
             return False
 
+    def pull_file(self, local_file_path: Path, remote_file_path: Path) -> None:
+        """Moves the specified file from the remote server to the local machine.
+
+        Args:
+            local_file_path: The path to the local instance of the file (where to copy the file).
+            remote_file_path: The path to the target file on the remote server (the file to be copied).
+        """
+        sftp = self._client.open_sftp()
+        sftp.get(localpath=local_file_path, remotepath=str(remote_file_path))
+        sftp.close()
+
+    def push_file(self, local_file_path: Path, remote_file_path: Path) -> None:
+        """Moves the specified file from the remote server to the local machine.
+
+        Args:
+            local_file_path: The path to the file that needs to be copied to the remote server.
+            remote_file_path: The path to the file on the remote server (where to copy the file).
+        """
+        sftp = self._client.open_sftp()
+        sftp.put(localpath=local_file_path, remotepath=str(remote_file_path))
+        sftp.close()
+
     def close(self) -> None:
         """Closes the SSH connection to the server.
 

@@ -7,7 +7,7 @@ from pathlib import Path
 import polars as pl
 from ataraxis_base_utilities import console
 
-from ..data_classes import SessionData
+from ..data_classes import SessionData, ProcessingTracker
 from .packaging_tools import calculate_directory_checksum
 
 
@@ -60,12 +60,15 @@ def generate_project_manifest(
         "type": [],  # Type of the session (e.g., Experiment, Training, etc.).
         "raw_data": [],  # Server-side raw_data folder path.
         "processed_data": [],  # Server-side processed_data folder path.
-        "complete": [],  # Determines if the session data is complete. Incomplete sessions are excluded from processing.
-        "verified": [],  # Determines if the session data integrity has been verified upon transfer to storage machine.
-        "single_day_suite2p": [],  # Determines whether the session has been processed with the single-day s2p pipeline.
-        "multi_day_suite2p": [],  # Determines whether the session has been processed with the multi-day s2p pipeline.
-        "behavior": [],  # Determines whether the session has been processed with the behavior extraction pipeline.
-        "dlc": [],  # Determines whether the session has been processed with the DeepLabCut pipeline.
+        # Determines whether the session data is complete. Incomplete sessions are excluded from processing.
+        "complete": [],
+        # Determines whether the session data integrity has been verified upon transfer to storage machine.
+        "integrity_verification": [],
+        "suite2p_processing": [],  # Determines whether the session has been processed with the single-day s2p pipeline.
+        "dataset_formation": [],  # Determines whether the session's data has been integrated into a dataset.
+        # Determines whether the session has been processed with the behavior extraction pipeline.
+        "behavior_processing": [],
+        "video_processing": [],  # Determines whether the session has been processed with the DeepLabCut pipeline.
     }
 
     # Loops over each session of every animal in the project and extracts session ID information and information
@@ -88,34 +91,35 @@ def generate_project_manifest(
         # If the session raw_data folder contains the telomere.bin file, marks the session as complete.
         manifest["complete"].append(session_data.raw_data.telomere_path.exists())
 
-        # If the session raw_data folder contains the verified.bin file, marks the session as verified.
-        manifest["verified"].append(session_data.raw_data.verified_bin_path.exists())
+        # Data verification status
+        tracker = ProcessingTracker(file_path=session_data.raw_data.integrity_verification_tracker_path)
+        manifest["integrity_verification"].append(tracker.is_complete)
 
         # If the session is incomplete or unverified, marks all processing steps as FALSE, as automatic processing is
         # disabled for incomplete sessions. If the session unverified, the case is even more severe, as its data may be
         # corrupted.
         if not manifest["complete"][-1] or not not manifest["verified"][-1]:
-            manifest["single_day_suite2p"].append(False)
-            manifest["multi_day_suite2p"].append(False)
-            manifest["behavior"].append(False)
-            manifest["dlc"].append(False)
+            manifest["suite2p_processing"].append(False)
+            manifest["dataset_formation"].append(False)
+            manifest["behavior_processing"].append(False)
+            manifest["video_processing"].append(False)
             continue  # Cycles to the next session
 
-        # If the session processed_data folder contains the single-day suite2p.bin file, marks the single-day suite2p
-        # processing step as complete.
-        manifest["single_day_suite2p"].append(session_data.processed_data.single_day_suite2p_bin_path.exists())
+        # Suite2p (single-day) status
+        tracker = ProcessingTracker(file_path=session_data.processed_data.suite2p_processing_tracker_path)
+        manifest["suite2p_processing"].append(tracker.is_complete)
 
-        # If the session processed_data folder contains the multi-day suite2p.bin file, marks the multi-day suite2p
-        # processing step as complete.
-        manifest["multi_day_suite2p"].append(session_data.processed_data.multi_day_suite2p_bin_path.exists())
+        # Dataset formation (integration) status. Tracks whether the session has been added to any dataset(s).
+        tracker = ProcessingTracker(file_path=session_data.processed_data.dataset_formation_tracker_path)
+        manifest["dataset_formation"].append(tracker.is_complete)
 
-        # If the session processed_data folder contains the behavior.bin file, marks the behavior processing step as
-        # complete.
-        manifest["behavior"].append(session_data.processed_data.behavior_data_path.exists())
+        # Dataset formation (integration) status. Tracks whether the session has been added to any dataset(s).
+        tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
+        manifest["behavior_processing"].append(tracker.is_complete)
 
-        # If the session processed_data folder contains the dlc.bin file, marks the dlc processing step as
-        # complete.
-        manifest["dlc"].append(session_data.processed_data.dlc_bin_path.exists())
+        # DeepLabCut (video) processing status.
+        tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
+        manifest["video_processing"].append(tracker.is_complete)
 
     # Converts the manifest dictionary to a Polars Dataframe
     schema = {
@@ -125,11 +129,11 @@ def generate_project_manifest(
         "processed_data": pl.String,
         "type": pl.String,
         "complete": pl.Boolean,
-        "verified": pl.Boolean,
-        "single_day_suite2p": pl.Boolean,
-        "multi_day_suite2p": pl.Boolean,
-        "behavior": pl.Boolean,
-        "dlc": pl.Boolean,
+        "integrity_verification": pl.Boolean,
+        "suite2p_processing": pl.Boolean,
+        "dataset_formation": pl.Boolean,
+        "behavior_processing": pl.Boolean,
+        "video_processing": pl.Boolean,
     }
     df = pl.DataFrame(manifest, schema=schema)
 
@@ -176,26 +180,38 @@ def verify_session_checksum(
         make_processed_data_directory=create_processed_data_directory,
     )
 
-    # Unlinks the verified.bin marker if it exists. The presence or absence of the marker is used as the
-    # primary heuristic for determining if the session data passed verification. Unlinking it early helps in the case
-    # the verification procedure aborts unexpectedly for any reason.
-    session_data.raw_data.verified_bin_path.unlink(missing_ok=True)
+    # Initializes the ProcessingTracker instance for the verification tracker file
+    tracker = ProcessingTracker(file_path=session_data.raw_data.integrity_verification_tracker_path)
 
-    # Re-calculates the checksum for the raw_data directory
-    calculated_checksum = calculate_directory_checksum(
-        directory=session_data.raw_data.raw_data_path, batch=False, save_checksum=False
-    )
+    # Updates the tracker data to communicate that the verification process has started. This automatically clears
+    # the previous 'completed' status.
+    tracker.start()
 
-    # Loads the checksum stored inside the ax_checksum.txt file
-    with open(session_data.raw_data.checksum_path, "r") as f:
-        stored_checksum = f.read().strip()
+    # Try starts here to allow for proper error-driven 'start' terminations of the tracker cannot acquire the lock for
+    # a long time, or if another runtime is already underway.
+    try:
+        # Re-calculates the checksum for the raw_data directory
+        calculated_checksum = calculate_directory_checksum(
+            directory=session_data.raw_data.raw_data_path, batch=False, save_checksum=False
+        )
 
-    # If the two checksums do not match, this likely indicates data corruption.
-    if stored_checksum != calculated_checksum:
-        # If the telomere.bin file exists, removes this file. This automatically marks the session as incomplete for
-        # all other Sun lab runtimes.
-        session_data.raw_data.telomere_path.unlink(missing_ok=True)
+        # Loads the checksum stored inside the ax_checksum.txt file
+        with open(session_data.raw_data.checksum_path, "r") as f:
+            stored_checksum = f.read().strip()
 
-    # Otherwise, ensures that the session is marked with the verified.bin marker file.
-    else:
-        session_data.raw_data.verified_bin_path.touch(exist_ok=True)
+        # If the two checksums do not match, this likely indicates data corruption.
+        if stored_checksum != calculated_checksum:
+            # If the telomere.bin file exists, removes this file. This automatically marks the session as incomplete for
+            # all other Sun lab runtimes.
+            session_data.raw_data.telomere_path.unlink(missing_ok=True)
+
+        else:
+            # Sets the tracker to indicate that the verification runtime completed successfully.
+            tracker.stop()
+
+    finally:
+        # If the code reaches this section while the tracker indicates that the processing is still running,
+        # this means that the verification runtime encountered an error. Configures the tracker to indicate that this
+        # runtime finished with an error to prevent deadlocking the runtime.
+        if tracker.is_running:
+            tracker.error()

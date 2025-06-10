@@ -9,6 +9,7 @@ from .server import generate_server_credentials as generate_server_credentials
 from .data_classes import (
     SessionData as SessionData,
     ExperimentState as ExperimentState,
+    ProcessingTracker as ProcessingTracker,
     ProjectConfiguration as ProjectConfiguration,
     MesoscopeSystemConfiguration as MesoscopeSystemConfiguration,
     MesoscopeExperimentConfiguration as MesoscopeExperimentConfiguration,
