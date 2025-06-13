@@ -9,6 +9,13 @@ from .configuration_data import get_system_configuration_data as get_system_conf
 _valid_session_types: Incomplete
 
 @dataclass()
+class VersionData(YamlConfig):
+    """Stores information about the versions of important Sun lab libraries used to acquire the session's data."""
+
+    python_version: str = ...
+    sl_experiment_version: str = ...
+
+@dataclass()
 class ProjectConfiguration(YamlConfig):
     """Stores the project-specific configuration parameters that do not change between different animals and runtime
     sessions.
@@ -97,6 +104,7 @@ class RawData:
     telomere_path: Path = ...
     ubiquitin_path: Path = ...
     integrity_verification_tracker_path: Path = ...
+    version_data_path: Path = ...
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
 

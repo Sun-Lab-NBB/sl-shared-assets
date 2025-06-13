@@ -23,6 +23,16 @@ _valid_session_types = {"lick training", "run training", "mesoscope experiment",
 
 
 @dataclass()
+class VersionData(YamlConfig):
+    """Stores information about the versions of important Sun lab libraries used to acquire the session's data."""
+
+    python_version: str = ""
+    """Stores the Python version used by the environment that acquired the data."""
+    sl_experiment_version: str = ""
+    """Stores the version of the sl-experiment library that was used to acquire the data."""
+
+
+@dataclass()
 class ProjectConfiguration(YamlConfig):
     """Stores the project-specific configuration parameters that do not change between different animals and runtime
     sessions.
@@ -223,6 +233,9 @@ class RawData:
     'verify-session' CLI command to indicate whether the session data inside the folder marked by the file has been 
     verified for integrity. Primarily, this is used when the data is moved to the long-term storage destination (BioHPC
     server) to ensure it is safe to remove any local copies of the data stored on the acquisition system machine(s)."""
+    version_data_path: Path = Path()
+    """Stores the path to the version_data.yaml file. This file contains the snapshot of Python and sl-experiment 
+    library versions that were used when the data was acquired."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -255,6 +268,7 @@ class RawData:
         self.telomere_path = self.raw_data_path.joinpath("telomere.bin")
         self.ubiquitin_path = self.raw_data_path.joinpath("ubiquitin.bin")
         self.integrity_verification_tracker_path = self.raw_data_path.joinpath("integrity_verification_tracker.yaml")
+        self.version_data_path = self.raw_data_path.joinpath("version_data.yaml")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
