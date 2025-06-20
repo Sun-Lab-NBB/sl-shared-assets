@@ -171,6 +171,9 @@ class MesoscopeExperimentDescriptor(YamlConfig):
     """The weight of the animal, in grams, at the beginning of the session."""
     dispensed_water_volume_ml: float
     """Stores the total water volume, in milliliters, dispensed during runtime."""
+    is_guided: bool = False
+    """Determines whether the animal has to lick in the reward zone to receive water rewards. If this is set to False, 
+    the system automatically dispenses water when the animal enters the reward zone."""
     experimenter_notes: str = "Replace this with your notes."
     """This field is not set during runtime. It is expected that each experimenter will replace this field with their 
     notes made during runtime."""

@@ -690,7 +690,6 @@ class ProcessingTracker(YamlConfig):
         """Saves the current processing state stored inside instance attributes to the specified .YAML file."""
         # Resets the _lock and file_path to None before dumping the data to .YAML to avoid issues with loading it
         # back.
-        console.echo(message=f"{self.file_path}")
         original = copy.deepcopy(self)
         original.file_path = None  # type: ignore
         original._lock_path = None  # type: ignore
