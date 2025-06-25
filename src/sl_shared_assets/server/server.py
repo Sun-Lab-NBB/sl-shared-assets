@@ -21,16 +21,35 @@ from .job import Job
 
 
 def generate_server_credentials(
-    output_directory: Path, username: str, password: str, host: str = "cbsuwsun.biohpc.cornell.edu"
+    output_directory: Path,
+    username: str,
+    password: str,
+    host: str = "cbsuwsun.biohpc.cornell.edu",
+    raw_data_root: str = "/workdir/sun_data",
+    processed_data_root: str = "/storage/sun_data",
 ) -> None:
     """Generates a new server_credentials.yaml file under the specified directory, using input information.
 
     This function provides a convenience interface for generating new BioHPC server credential files. Generally, this is
     only used when setting up new host-computers in the lab.
+
+    Args:
+        output_directory: The directory where to save the generated server_credentials.yaml file.
+        username: The username to use for server authentication.
+        password: The password to use for server authentication.
+        host: The hostname or IP address of the server to connect to.
+        raw_data_root: The path to the root directory used to store the raw data from all Sun lab projects on the
+            server.
+        processed_data_root: The path to the root directory used to store the processed data from all Sun lab projects
+            on the server.
     """
-    ServerCredentials(username=username, password=password, host=host).to_yaml(
-        file_path=output_directory.joinpath("server_credentials.yaml")
-    )
+    ServerCredentials(
+        username=username,
+        password=password,
+        host=host,
+        raw_data_root=raw_data_root,
+        processed_data_root=processed_data_root,
+    ).to_yaml(file_path=output_directory.joinpath("server_credentials.yaml"))
 
 
 @dataclass()
@@ -49,6 +68,11 @@ class ServerCredentials(YamlConfig):
     """The password to use for server authentication."""
     host: str = "cbsuwsun.biohpc.cornell.edu"
     """The hostname or IP address of the server to connect to."""
+    raw_data_root: str = "/workdir/sun_data"
+    """The path to the root directory used to store the raw data from all Sun lab projects on the target server."""
+    processed_data_root: str = "/storage/sun_data"
+    """The path to the root directory used to store the processed data from all Sun lab projects on the target 
+    server."""
 
 
 class Server:
@@ -248,3 +272,17 @@ class Server:
         # Prevents closing already closed connections
         if self._open:
             self._client.close()
+
+    @property
+    def raw_data_root(self) -> str:
+        """Returns the absolute path to the directory used to store the raw data for all Sun lab projects on the server
+        accessible through this class.
+        """
+        return self._credentials.raw_data_root
+
+    @property
+    def processed_data_root(self) -> str:
+        """Returns the absolute path to the directory used to store the processed data for all Sun lab projects on the
+        server accessible through this class.
+        """
+        return self._credentials.processed_data_root

@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 # Project metdata section. Provides the genral ID information about the project.
 [project]
 name = "sl-shared-assets"
-version = "1.2.0rc2"
+version = "1.2.0rc3"
 description = "Stores assets shared between multiple Sun (NeuroAI) lab data pipelines."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -16,7 +16,6 @@ requires-python = ">=3.11"
 authors = [
     {name = "Ivan Kondratyev"},
     {name = "Kushaan Gupta"},
-    {name = "Yuantao Deng"},
     {name = "Natalie Yeung"}
 ]
 maintainers = [
@@ -42,19 +41,19 @@ classifiers = [
 
 # Runtime project dependencies. This overlaps with the 'condarun' optional list.
 dependencies = [
-    "ataraxis-time>=3,<4",
-    "ataraxis-base-utilities>=3,<4",
-    "ataraxis-data-structures>=3.1.1,<4",
-    "appdirs>=1,<2",
-    "tqdm>=4,<5",
-    "xxhash>=3,<4",
-    "paramiko>=3.5.1, <4",
-    "simple-slurm>=0,<1",
-    "click>=8,<9",
-    "natsort>=8,<9",
-    "polars>=1,<2",
-    "pyarrow>=20,<21",
-    "filelock>=3,<4",
+    "ataraxis-time==3.0.0",
+    "ataraxis-base-utilities==3.0.1",
+    "ataraxis-data-structures==3.1.1",
+    "appdirs==1.4.4",
+    "tqdm==4.67.1",
+    "xxhash==3.5.0",
+    "paramiko==3.5.1",
+    "simple-slurm==0.3.6",
+    "click==8.2.1",
+    "natsort==8.4.0",
+    "polars==1.31.0",
+    "pyarrow==20.0.0",
+    "filelock==3.18.0",
 ]
 
 [project.urls]
@@ -69,14 +68,14 @@ Documentation = "https://sl-shared-assets-api-docs.netlify.app/"
 # (OSX ARM64, WIN AMD64, LIN AMD64). This specification is used by ataraxis-automation to resolve as many
 # project dependencies with conda over pip as possible.
 condarun = [
-    "appdirs>=1,<2",
-    "tqdm>=4,<5",
-    "paramiko>=3.5.1,<4",
-    "click>=8,<9",
-    "natsort>=8,<9",
-    "polars>=1,<2",
-    "pyarrow>=20,<21",
-    "filelock>=3,<4",
+    "appdirs==1.4.4",
+    "tqdm==4.67.1",
+    "paramiko==3.5.1",
+    "click==8.2.1",
+    "natsort==8.4.0",
+    "polars==1.31.0",
+    "pyarrow==20.0.0",
+    "filelock==3.18.0",
 ]
 
 # Dependencies known to be installable with conda for all development platforms (OSX ARM64, WIN AMD64, LIN AMD64).
