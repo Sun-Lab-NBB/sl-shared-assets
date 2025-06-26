@@ -6,7 +6,6 @@ from pathlib import Path
 
 import polars as pl
 from ataraxis_base_utilities import console
-
 from ..data_classes import (
     SessionData,
     ProcessingTracker,
@@ -63,7 +62,7 @@ class ProjectManifest:
         This data view is optimized for tracking which processing steps have been applied to each session inside the
         project.
         """
-        summary_cols = ["animal", "session", "type", "complete", "integrity_verification",
+        summary_cols = ["animal", "date", "session", "type", "complete", "integrity_verification",
                         "suite2p_processing", "behavior_processing", "video_processing", "dataset_formation"]
 
         # Ensures the data displays properly
@@ -86,7 +85,7 @@ class ProjectManifest:
         """
 
         # Pre-selects the columns to display
-        df = self._data.select(["animal", "session", "type", "notes"])
+        df = self._data.select(["animal", "date", "session", "type", "notes"])
 
         # Optionally filters the data for the target animal
         if animal is not None:
@@ -156,7 +155,7 @@ class ProjectManifest:
         if exclude_incomplete:
             data = data.filter(pl.col("complete") is True)
 
-        # Formats and returns session IDs to caller
+        # Formats and returns session IDs to the caller
         sessions = (
             data.select("session").sort("session").to_series().to_list()
         )
@@ -223,9 +222,10 @@ def generate_project_manifest(
         console.error(message=message, error=FileNotFoundError)
 
     # Precreates the 'manifest' dictionary structure
-    manifest: dict[str, list[str | bool]] = {
+    manifest: dict[str, list[str | bool | pl.Expr]] = {
         "animal": [],  # Animal IDs.
         "session": [],  # Session names.
+        "date": [],  # Session names stored as timezone-aware date-time objects in EST.
         "type": [],  # Type of the session (e.g., Experiment, Training, etc.).
         "notes": [],  # The experimenter notes about the session.
         # Determines whether the session data is complete (ran for the intended duration and has all expected data).
@@ -260,6 +260,24 @@ def generate_project_manifest(
         manifest["animal"].append(session_data.animal_id)
         manifest["session"].append(session_data.session_name)
         manifest["type"].append(session_data.session_type)
+
+        # Parses session name into the Polars date-time object to simplify working with date-time data in the future
+        date_time_components = session_data.session_name.split("-")
+        date_time = pl.datetime(  # type: ignore
+            year=int(date_time_components[0]),
+            month=int(date_time_components[1]),
+            day=int(date_time_components[2]),
+            hour=int(date_time_components[3]),
+            minute=int(date_time_components[4]),
+            second=int(date_time_components[5]),
+            microsecond=int(date_time_components[6]),
+            time_unit="us",
+            time_zone="UTC"
+        )
+
+        # Converts from UTC to EST / EDT for user convenience
+        date_time.dt.convert_time_zone(time_zone="America/New_York")
+        manifest["date"].append(date_time)  # Appends to storage
 
         # Depending on the session type, instantiates the appropriate descriptor instance and uses it to read the
         # experimenter notes
@@ -324,6 +342,7 @@ def generate_project_manifest(
     # Converts the manifest dictionary to a Polars Dataframe.
     schema = {
         "animal": animal_type,
+        "date": pl.Datetime,
         "session": pl.String,
         "type": pl.String,
         "notes": pl.String,
