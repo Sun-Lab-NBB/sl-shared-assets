@@ -3,9 +3,12 @@ functionality of SessionData class via a convenient API that allows working with
 up a given project."""
 
 from pathlib import Path
+from datetime import datetime
 
+import pytz
 import polars as pl
 from ataraxis_base_utilities import console
+
 from ..data_classes import (
     SessionData,
     ProcessingTracker,
@@ -19,59 +22,88 @@ _valid_session_types = {"lick training", "run training", "mesoscope experiment",
 
 
 class ProjectManifest:
+    """Wraps the contents of a Sun lab project manifest .feather file and exposes methods for visualizing and
+    working with the data stored inside the file.
+
+    This class functions as a high-level API for working with Sun lab projects. It is used both to visualize the
+    current state of various projects and during automated data processing to determine which processing steps to
+    apply to different sessions.
+
+    Args:
+        manifest_file: The path to the .feather manifest file that stores the target project's state data.
+
+    Attributes:
+        _data: Stores the manifest data as a Polars DataFrame.
+        _animal_string: Determines whether animal IDs are stored as strings or unsigned integers.
+    """
+
     def __init__(self, manifest_file: Path):
-        """Wraps the contents of a Sun lab project manifest .feather file and exposes methods for visualizing and
-        working with the data stored inside the file.
-
-        This class functions as a high-level API for working with Sun lab projects. It is used both to visualize the
-        current state of various projects and during automated data processing to determine which processing steps to
-        apply to different sessions.
-
-        Args:
-            manifest_file: The path to the .feather manifest file that stores the target project's state data.
-
-        Attributes:
-            _data: Stores the manifest data as a Polars DataFrame.
-            _animal_string: Determines whether animal IDs are stored as strings or unsigned integers.
-        """
-
         # Reads the data from the target manifest file into the class attribute
         self._data: pl.DataFrame = pl.read_ipc(source=manifest_file, use_pyarrow=True)
 
         # Determines whether animal IDs are stored as strings or as numbers
         self._animal_string = False
         schema = self._data.collect_schema()
-        if isinstance(schema['animal'], pl.String):
+        if isinstance(schema["animal"], pl.String):
             self._animal_string = True
 
     def print_data(self) -> None:
         """Prints the entire contents of the manifest file to the terminal."""
         with pl.Config(
-                set_tbl_rows=-1,  # Displays all rows (-1 means unlimited)
-                set_tbl_cols=-1,  # Displays all columns (-1 means unlimited)
-                set_tbl_width_chars=200,  # Sets table width to 200 characters
-                set_tbl_cell_alignment="LEFT",  # Left-aligns content
-                set_fmt_str_lengths=300,  # Allows longer strings to display properly (default is 32)
+            set_tbl_rows=-1,  # Displays all rows (-1 means unlimited)
+            set_tbl_cols=-1,  # Displays all columns (-1 means unlimited)
+            set_tbl_hide_column_data_types=True,
+            set_tbl_cell_alignment="LEFT",
+            set_tbl_width_chars=250,  # Sets table width to 200 characters
+            set_fmt_str_lengths=600,  # Allows longer strings to display properly (default is 32)
         ):
             print(self._data)
 
-    def print_summary(self) -> None:
+    def print_summary(self, animal: str | int | None = None) -> None:
         """Prints a summary view of the manifest file to the terminal, excluding the 'experimenter notes' data for
         each session.
 
         This data view is optimized for tracking which processing steps have been applied to each session inside the
         project.
+
+        Args:
+            animal: The ID of the animal for which to display the data. If an ID is provided, this method will only
+                display the data for that animal. Otherwise, it will display the data for all animals.
         """
-        summary_cols = ["animal", "date", "session", "type", "complete", "integrity_verification",
-                        "suite2p_processing", "behavior_processing", "video_processing", "dataset_formation"]
+        summary_cols = [
+            "animal",
+            "date",
+            "session",
+            "type",
+            "complete",
+            "integrity_verification",
+            "suite2p_processing",
+            "behavior_processing",
+            "video_processing",
+            "dataset_formation",
+        ]
+
+        # Retrieves the data
+        df = self._data.select(summary_cols)
+
+        # Optionally filters the data for the target animal
+        if animal is not None:
+            # Ensures that the 'animal' argument has the same type as the data inside the DataFrame.
+            if self._animal_string:
+                animal = str(animal)
+            else:
+                animal = int(animal)
+        df = df.filter(pl.col("animal") == animal)
 
         # Ensures the data displays properly
         with pl.Config(
-                set_tbl_rows=-1,
-                set_tbl_cols=-1,
-                set_tbl_width_chars=150,
+            set_tbl_rows=-1,
+            set_tbl_cols=-1,
+            set_tbl_width_chars=250,
+            set_tbl_hide_column_data_types=True,
+            set_tbl_cell_alignment="CENTER",
         ):
-            print(self._data.select(summary_cols))
+            print(df)
 
     def print_notes(self, animal: str | int | None = None) -> None:
         """Prints only animal, session, and notes data from the manifest file.
@@ -89,7 +121,6 @@ class ProjectManifest:
 
         # Optionally filters the data for the target animal
         if animal is not None:
-
             # Ensures that the 'animal' argument has the same type as the data inside the DataFrame.
             if self._animal_string:
                 animal = str(animal)
@@ -100,10 +131,12 @@ class ProjectManifest:
 
         #  Prints the extracted data
         with pl.Config(
-                set_tbl_rows=-1,
-                set_tbl_cols=-1,
-                set_tbl_width_chars=300,  # Wider columns for notes
-                set_fmt_str_lengths=300,  # Allows very long strings for notes
+            set_tbl_rows=-1,
+            set_tbl_cols=-1,
+            set_tbl_hide_column_data_types=True,
+            set_tbl_cell_alignment="LEFT",
+            set_tbl_width_chars=250,  # Wider columns for notes
+            set_fmt_str_lengths=600,  # Allows very long strings for notes
         ):
             print(df)
 
@@ -153,12 +186,10 @@ class ProjectManifest:
 
         # Optionally filters out incomplete sessions
         if exclude_incomplete:
-            data = data.filter(pl.col("complete") is True)
+            data = data.filter(pl.col("complete") == 1)
 
         # Formats and returns session IDs to the caller
-        sessions = (
-            data.select("session").sort("session").to_series().to_list()
-        )
+        sessions = data.select("session").sort("session").to_series().to_list()
         return tuple(sessions)
 
     def get_session_info(self, animal: str | int, session: str) -> pl.DataFrame:
@@ -175,7 +206,7 @@ class ProjectManifest:
             animal = int(animal)
 
         df = self._data
-        df = df.filter(pl.col("animal") == animal and pl.col("session") == session)
+        df = df.filter(pl.col("animal").eq(animal) & pl.col("session").eq(session))
         return df
 
 
@@ -222,7 +253,7 @@ def generate_project_manifest(
         console.error(message=message, error=FileNotFoundError)
 
     # Precreates the 'manifest' dictionary structure
-    manifest: dict[str, list[str | bool | pl.Expr]] = {
+    manifest: dict[str, list[str | bool | datetime | int]] = {
         "animal": [],  # Animal IDs.
         "session": [],  # Session names.
         "date": [],  # Session names stored as timezone-aware date-time objects in EST.
@@ -242,7 +273,6 @@ def generate_project_manifest(
     # Loops over each session of every animal in the project and extracts session ID information and information
     # about which processing steps have been successfully applied to the session.
     for directory in session_directories:
-
         # Skips processing directories without files (sessions with empty raw-data directories)
         if len([file for file in directory.joinpath("raw_data").glob("*")]) == 0:
             continue
@@ -261,9 +291,9 @@ def generate_project_manifest(
         manifest["session"].append(session_data.session_name)
         manifest["type"].append(session_data.session_type)
 
-        # Parses session name into the Polars date-time object to simplify working with date-time data in the future
+        # Parses session name into the date-time object to simplify working with date-time data in the future
         date_time_components = session_data.session_name.split("-")
-        date_time = pl.datetime(  # type: ignore
+        date_time = datetime(
             year=int(date_time_components[0]),
             month=int(date_time_components[1]),
             day=int(date_time_components[2]),
@@ -271,13 +301,13 @@ def generate_project_manifest(
             minute=int(date_time_components[4]),
             second=int(date_time_components[5]),
             microsecond=int(date_time_components[6]),
-            time_unit="us",
-            time_zone="UTC"
+            tzinfo=pytz.UTC,
         )
 
         # Converts from UTC to EST / EDT for user convenience
-        date_time.dt.convert_time_zone(time_zone="America/New_York")
-        manifest["date"].append(date_time)  # Appends to storage
+        eastern = pytz.timezone("America/New_York")
+        date_time = date_time.astimezone(eastern)
+        manifest["date"].append(date_time)
 
         # Depending on the session type, instantiates the appropriate descriptor instance and uses it to read the
         # experimenter notes
@@ -309,7 +339,7 @@ def generate_project_manifest(
         # If the session is incomplete or unverified, marks all processing steps as FALSE, as automatic processing is
         # disabled for incomplete sessions. If the session is unverified, the case is even more severe, as its data may
         # be corrupted.
-        if not manifest["complete"][-1] or not not manifest["integrity_verification"][-1]:
+        if not manifest["complete"][-1] or not manifest["integrity_verification"][-1]:
             manifest["suite2p_processing"].append(False)
             manifest["dataset_formation"].append(False)
             manifest["behavior_processing"].append(False)
@@ -329,12 +359,15 @@ def generate_project_manifest(
         manifest["behavior_processing"].append(tracker.is_complete)
 
         # DeepLabCut (video) processing status.
-        tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
+        tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
         manifest["video_processing"].append(tracker.is_complete)
 
     # If all animal IDs are integer-convertible, stores them as numbers to promote proper sorting. Otherwise, stores
     # them as strings. The latter options are primarily kept for compatibility with Tyche data
-    if all([str(animal).isdigit() for animal in manifest['animal']]):
+    animal_type: type[pl.UInt64] | type[pl.String]
+    if all([str(animal).isdigit() for animal in manifest["animal"]]):
+        # Converts all strings to integers
+        manifest["animal"] = [int(animal) for animal in manifest["animal"]]  # type: ignore
         animal_type = pl.UInt64  # Uint64 for future proofing
     else:
         animal_type = pl.String
@@ -353,7 +386,7 @@ def generate_project_manifest(
         "behavior_processing": pl.UInt8,
         "video_processing": pl.UInt8,
     }
-    df = pl.DataFrame(manifest, schema=schema)
+    df = pl.DataFrame(manifest, schema=schema, strict=False)
 
     # Sorts the DataFrame by animal and then session. Since we assign animal IDs sequentially and 'name' sessions based
     # on acquisition timestamps, the sort order is chronological.

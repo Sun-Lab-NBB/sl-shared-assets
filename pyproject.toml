@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 # Project metdata section. Provides the genral ID information about the project.
 [project]
 name = "sl-shared-assets"
-version = "1.2.0rc3"
+version = "1.2.0rc4"
 description = "Stores assets shared between multiple Sun (NeuroAI) lab data pipelines."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -44,6 +44,7 @@ dependencies = [
     "ataraxis-time==3.0.0",
     "ataraxis-base-utilities==3.0.1",
     "ataraxis-data-structures==3.1.1",
+    "numpy==2.2.6",
     "appdirs==1.4.4",
     "tqdm==4.67.1",
     "xxhash==3.5.0",
@@ -54,6 +55,7 @@ dependencies = [
     "polars==1.31.0",
     "pyarrow==20.0.0",
     "filelock==3.18.0",
+    "pytz==2025.2",
 ]
 
 [project.urls]
@@ -68,6 +70,7 @@ Documentation = "https://sl-shared-assets-api-docs.netlify.app/"
 # (OSX ARM64, WIN AMD64, LIN AMD64). This specification is used by ataraxis-automation to resolve as many
 # project dependencies with conda over pip as possible.
 condarun = [
+    "numpy==2.2.6",
     "appdirs==1.4.4",
     "tqdm==4.67.1",
     "paramiko==3.5.1",
@@ -76,6 +79,7 @@ condarun = [
     "polars==1.31.0",
     "pyarrow==20.0.0",
     "filelock==3.18.0",
+    "pytz==2025.2",
 ]
 
 # Dependencies known to be installable with conda for all development platforms (OSX ARM64, WIN AMD64, LIN AMD64).
@@ -112,6 +116,9 @@ noconda = [
     "tox>=4,<5",
     "tox-uv>=1,<2",
     "uv>=0,<1",
+
+    # Types
+    "types-pytz>=2025,<2026",
 
     # Documentation
     "sphinx-rtd-dark-mode>=1,<2",
