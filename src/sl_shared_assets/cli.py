@@ -226,6 +226,26 @@ def generate_system_configuration_file(output_directory: str, acquisition_system
     required=True,
     help="The password to use for server authentication.",
 )
+@click.option(
+    "-rdp",
+    "--raw_data_path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=True,
+    help=(
+        "The absolute path to the directory used to store raw data from all Sun lab projects, relative to the server "
+        "root."
+    ),
+)
+@click.option(
+    "-pdp",
+    "--processed_data_path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=True,
+    help=(
+        "The absolute path to the directory used to store processed data from all Sun lab projects, relative to the "
+        "server root."
+    ),
+)
 def generate_server_credentials_file(output_directory: str, host: str, username: str, password: str) -> None:
     """Generates a new server_credentials.yaml file under the specified directory, using input information.
 
