@@ -21,34 +21,52 @@ _valid_session_types = {"lick training", "run training", "mesoscope experiment",
 
 class ProjectManifest:
     def __init__(self, manifest_file: Path):
-        """Loads the data from a Sun lab project manifest.feather file and exposes methods for working with the data.
+        """Wraps the contents of a Sun lab project manifest .feather file and exposes methods for visualizing and
+        working with the data stored inside the file.
 
-        The manifest file contains the snapshot of the entire managed project, specifying the available animals and
-        sessions, as well as their current processing status.
+        This class functions as a high-level API for working with Sun lab projects. It is used both to visualize the
+        current state of various projects and during automated data processing to determine which processing steps to
+        apply to different sessions.
 
         Args:
-            manifest_file: The path to the .feather manifest file from which to load the data.
+            manifest_file: The path to the .feather manifest file that stores the target project's state data.
+
+        Attributes:
+            _data: Stores the manifest data as a Polars DataFrame.
+            _animal_string: Determines whether animal IDs are stored as strings or unsigned integers.
         """
 
         # Reads the data from the target manifest file into the class attribute
         self._data: pl.DataFrame = pl.read_ipc(source=manifest_file, use_pyarrow=True)
 
+        # Determines whether animal IDs are stored as strings or as numbers
+        self._animal_string = False
+        schema = self._data.collect_schema()
+        if isinstance(schema['animal'], pl.String):
+            self._animal_string = True
+
     def print_data(self) -> None:
-        """Print the entire manifest DataFrame with full display options."""
+        """Prints the entire contents of the manifest file to the terminal."""
         with pl.Config(
-                set_tbl_rows=-1,  # Display all rows (-1 means unlimited)
-                set_tbl_cols=-1,  # Display all columns (-1 means unlimited)
-                set_tbl_width_chars=200,  # Set table width to 200 characters
-                set_tbl_cell_alignment="LEFT",  # Left-align content
-                set_fmt_str_lengths=100,  # Allow longer strings to display (default is 32)
+                set_tbl_rows=-1,  # Displays all rows (-1 means unlimited)
+                set_tbl_cols=-1,  # Displays all columns (-1 means unlimited)
+                set_tbl_width_chars=200,  # Sets table width to 200 characters
+                set_tbl_cell_alignment="LEFT",  # Left-aligns content
+                set_fmt_str_lengths=300,  # Allows longer strings to display properly (default is 32)
         ):
             print(self._data)
 
     def print_summary(self) -> None:
-        """Print a summary view without the notes column for better readability."""
+        """Prints a summary view of the manifest file to the terminal, excluding the 'experimenter notes' data for
+        each session.
+
+        This data view is optimized for tracking which processing steps have been applied to each session inside the
+        project.
+        """
         summary_cols = ["animal", "session", "type", "complete", "integrity_verification",
                         "suite2p_processing", "behavior_processing", "video_processing", "dataset_formation"]
 
+        # Ensures the data displays properly
         with pl.Config(
                 set_tbl_rows=-1,
                 set_tbl_cols=-1,
@@ -56,166 +74,110 @@ class ProjectManifest:
         ):
             print(self._data.select(summary_cols))
 
-    def print_notes(self, animal_id: str = None) -> None:
-        """Print only animal, session, and notes columns for easier reading of experiment notes.
+    def print_notes(self, animal: str | int | None = None) -> None:
+        """Prints only animal, session, and notes data from the manifest file.
+
+        This data view is optimized for experimenters to check what sessions have been recorded for each animal in the
+        project and refresh their memory on the outcomes of each session using experimenter notes.
 
         Args:
-            animal_id: Optional animal ID to filter by
+            animal: The ID of the animal for which to display the data. If an ID is provided, this method will only
+                display the data for that animal. Otherwise, it will display the data for all animals.
         """
+
+        # Pre-selects the columns to display
         df = self._data.select(["animal", "session", "type", "notes"])
 
-        if animal_id is not None:
-            df = df.filter(pl.col("animal") == animal_id)
+        # Optionally filters the data for the target animal
+        if animal is not None:
 
+            # Ensures that the 'animal' argument has the same type as the data inside the DataFrame.
+            if self._animal_string:
+                animal = str(animal)
+            else:
+                animal = int(animal)
+
+            df = df.filter(pl.col("animal") == animal)
+
+        #  Prints the extracted data
         with pl.Config(
                 set_tbl_rows=-1,
                 set_tbl_cols=-1,
-                set_tbl_width_chars=300,  # Wider for notes
-                set_fmt_str_lengths=200,  # Allow very long strings for notes
+                set_tbl_width_chars=300,  # Wider columns for notes
+                set_fmt_str_lengths=300,  # Allows very long strings for notes
         ):
             print(df)
 
     @property
     def animals(self) -> tuple[str, ...]:
-        """Get all unique animal IDs in the manifest.
+        """Returns all unique animal IDs stored inside the manifest file.
 
-        Returns:
-            Tuple of unique animal ID strings, sorted
+        This provides a tuple of all animal IDs participating in the target project.
         """
         return tuple(self._data.select("animal").unique().sort("animal").to_series().to_list())
 
     @property
     def sessions(self) -> tuple[str, ...]:
-        """Get all session names in the manifest.
+        """Returns all session IDs stored inside the manifest file.
 
-        Returns:
-            Tuple of all session name strings, sorted
+        This provides a tuple of all sessions, independent of the participating animal, that were recorded as part
+        of the target project.
         """
         return tuple(self._data.select("session").sort("session").to_series().to_list())
 
-    def get_sessions_for_animal(self, animal_id: str) -> tuple[str, ...]:
-        """Get all sessions for a specific animal.
+    def get_sessions_for_animal(self, animal: str | int, exclude_incomplete: bool = True) -> tuple[str, ...]:
+        """Returns all session IDs for the target animal.
+
+        This provides a tuple of all sessions performed by the target animal as part of the target project.
 
         Args:
-            animal_id: The animal ID to filter by
-
-        Returns:
-            Tuple of session names for the specified animal, sorted
+            animal: The ID of the animal for which to get the session data.
+            exclude_incomplete: Determines whether to exclude sessions not marked as 'complete' from the output
+                list.
 
         Raises:
-            ValueError: If animal_id is not found in the manifest
+            ValueError: If the specified animal is not found in the manifest file.
         """
-        if animal_id not in self.animals:
-            raise ValueError(f"Animal ID '{animal_id}' not found in manifest. Available animals: {self.animals}")
 
+        # Ensures that the 'animal' argument has the same type as the data inside the DataFrame.
+        if self._animal_string:
+            animal = str(animal)
+        else:
+            animal = int(animal)
+
+        if animal not in self.animals:
+            message = f"Animal ID '{animal}' not found in manifest. Available animals: {self.animals}"
+            console.error(message=message, error=ValueError)
+
+        # Filters by animal ID
+        data = self._data.filter(pl.col("animal") == animal)
+
+        # Optionally filters out incomplete sessions
+        if exclude_incomplete:
+            data = data.filter(pl.col("complete") is True)
+
+        # Formats and returns session IDs to caller
         sessions = (
-            self._data.filter(pl.col("animal") == animal_id).select("session").sort("session").to_series().to_list()
+            data.select("session").sort("session").to_series().to_list()
         )
-
         return tuple(sessions)
 
-    def get_session_info(self, animal_id: str = None, session_name: str = None) -> pl.DataFrame:
-        """Get detailed information for sessions based on filters.
+    def get_session_info(self, animal: str | int, session: str) -> pl.DataFrame:
+        """Returns a Polars DataFrame that stores detailed information for the specified session and animal combination.
 
         Args:
-            animal_id: Optional animal ID to filter by
-            session_name: Optional session name to filter by
-
-        Returns:
-            Filtered DataFrame with session information
+            animal: The ID of the animal for which to retrieve the data.
+            session: The ID of the session for which to retrieve the data.
         """
+        # Ensures that the 'animal' argument has the same type as the data inside the DataFrame.
+        if self._animal_string:
+            animal = str(animal)
+        else:
+            animal = int(animal)
+
         df = self._data
-
-        if animal_id is not None:
-            df = df.filter(pl.col("animal") == animal_id)
-
-        if session_name is not None:
-            df = df.filter(pl.col("session") == session_name)
-
+        df = df.filter(pl.col("animal") == animal and pl.col("session") == session)
         return df
-
-    def get_complete_sessions(self, animal_id: str = None) -> pl.DataFrame:
-        """Get all complete sessions, optionally filtered by animal.
-
-        Args:
-            animal_id: Optional animal ID to filter by
-
-        Returns:
-            DataFrame containing only complete sessions
-        """
-        df = self._data.filter(pl.col("complete") == True)
-
-        if animal_id is not None:
-            df = df.filter(pl.col("animal") == animal_id)
-
-        return df
-
-    def get_processed_sessions(self, processing_type: str, animal_id: str = None) -> pl.DataFrame:
-        """Get sessions that have completed a specific processing pipeline.
-
-        Args:
-            processing_type: Type of processing to filter by
-                           ('suite2p_processing', 'behavior_processing',
-                            'video_processing', 'dataset_formation')
-            animal_id: Optional animal ID to filter by
-
-        Returns:
-            DataFrame containing sessions with completed processing
-
-        Raises:
-            ValueError: If processing_type is not valid
-        """
-        valid_types = ["suite2p_processing", "behavior_processing", "video_processing", "dataset_formation"]
-
-        if processing_type not in valid_types:
-            raise ValueError(f"Invalid processing_type '{processing_type}'. Must be one of: {valid_types}")
-
-        df = self._data.filter(pl.col(processing_type) == True)
-
-        if animal_id is not None:
-            df = df.filter(pl.col("animal") == animal_id)
-
-        return df
-
-    def get_session_count_by_animal(self) -> pl.DataFrame:
-        """Get count of sessions per animal.
-
-        Returns:
-            DataFrame with animal IDs and their session counts
-        """
-        return self._data.group_by("animal").agg(pl.len().alias("session_count")).sort("animal")
-
-    def get_processing_summary(self) -> pl.DataFrame:
-        """Get summary of processing status across all sessions.
-
-        Returns:
-            DataFrame with counts and percentages for each processing type
-        """
-        total_sessions = self._data.height
-
-        summary = []
-        processing_columns = [
-            "complete",
-            "integrity_verification",
-            "suite2p_processing",
-            "behavior_processing",
-            "video_processing",
-            "dataset_formation",
-        ]
-
-        for col in processing_columns:
-            completed = self._data.filter(pl.col(col) is True).height
-            percentage = (completed / total_sessions) * 100 if total_sessions > 0 else 0
-            summary.append(
-                {
-                    "processing_type": col,
-                    "completed_sessions": completed,
-                    "total_sessions": total_sessions,
-                    "completion_percentage": round(percentage, 2),
-                }
-            )
-
-        return pl.DataFrame(summary)
 
 
 def generate_project_manifest(
@@ -225,8 +187,8 @@ def generate_project_manifest(
 
     This function evaluates the input project directory and builds the 'manifest' file for the project. The file
     includes the descriptive information about every session stored inside the input project folder and the state of
-    session's data processing (which processing pipelines have been applied to each session). The file will be created
-    under the 'output_path' directory and use the following name pattern: {ProjectName}}_manifest.feather.
+    the session's data processing (which processing pipelines have been applied to each session). The file will be
+    created under the 'output_path' directory and use the following name pattern: {ProjectName}}_manifest.feather.
 
     Notes:
         The manifest file is primarily used to capture and move project state information between machines, typically
@@ -268,7 +230,7 @@ def generate_project_manifest(
         "notes": [],  # The experimenter notes about the session.
         # Determines whether the session data is complete (ran for the intended duration and has all expected data).
         "complete": [],
-        # Determines whether the session data integrity has been verified upon transfer to storage machine.
+        # Determines whether the session data integrity has been verified upon transfer to a storage machine.
         "integrity_verification": [],
         "suite2p_processing": [],  # Determines whether the session has been processed with the single-day s2p pipeline.
         # Determines whether the session has been processed with the behavior extraction pipeline.
@@ -327,8 +289,8 @@ def generate_project_manifest(
         manifest["integrity_verification"].append(tracker.is_complete)
 
         # If the session is incomplete or unverified, marks all processing steps as FALSE, as automatic processing is
-        # disabled for incomplete sessions. If the session unverified, the case is even more severe, as its data may be
-        # corrupted.
+        # disabled for incomplete sessions. If the session is unverified, the case is even more severe, as its data may
+        # be corrupted.
         if not manifest["complete"][-1] or not not manifest["integrity_verification"][-1]:
             manifest["suite2p_processing"].append(False)
             manifest["dataset_formation"].append(False)
@@ -352,18 +314,25 @@ def generate_project_manifest(
         tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
         manifest["video_processing"].append(tracker.is_complete)
 
-    # Converts the manifest dictionary to a Polars Dataframe
+    # If all animal IDs are integer-convertible, stores them as numbers to promote proper sorting. Otherwise, stores
+    # them as strings. The latter options are primarily kept for compatibility with Tyche data
+    if all([str(animal).isdigit() for animal in manifest['animal']]):
+        animal_type = pl.UInt64  # Uint64 for future proofing
+    else:
+        animal_type = pl.String
+
+    # Converts the manifest dictionary to a Polars Dataframe.
     schema = {
-        "animal": pl.String,
+        "animal": animal_type,
         "session": pl.String,
         "type": pl.String,
         "notes": pl.String,
-        "complete": pl.Boolean,
-        "integrity_verification": pl.Boolean,
-        "suite2p_processing": pl.Boolean,
-        "dataset_formation": pl.Boolean,
-        "behavior_processing": pl.Boolean,
-        "video_processing": pl.Boolean,
+        "complete": pl.UInt8,
+        "integrity_verification": pl.UInt8,
+        "suite2p_processing": pl.UInt8,
+        "dataset_formation": pl.UInt8,
+        "behavior_processing": pl.UInt8,
+        "video_processing": pl.UInt8,
     }
     df = pl.DataFrame(manifest, schema=schema)
 
@@ -388,8 +357,8 @@ def verify_session_checksum(
     matches and to remove the 'telomere.bin' and 'verified.bin' marker files if it does not.
 
     Notes:
-        Removing the telomere.bin marker file from session's raw_data folder marks the session as incomplete, excluding
-        it from all further automatic processing.
+        Removing the telomere.bin marker file from the session's raw_data folder marks the session as incomplete,
+        excluding it from all further automatic processing.
 
         This function is also used to create the processed data hierarchy on the BioHPC server, when it is called as
         part of the data preprocessing runtime performed by a data acquisition system.
@@ -445,4 +414,3 @@ def verify_session_checksum(
         # runtime finished with an error to prevent deadlocking the runtime.
         if tracker.is_running:
             tracker.error()
-

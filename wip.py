@@ -3,4 +3,4 @@ from pathlib import Path
 
 manifest = ProjectManifest(manifest_file=Path("/home/cyberaxolotl/Data/TestMice_manifest.feather"))
 
-manifest.print_notes(animal_id="6")
+manifest.print_notes(animal="6")
