@@ -192,21 +192,23 @@ class ProjectManifest:
         sessions = data.select("session").sort("session").to_series().to_list()
         return tuple(sessions)
 
-    def get_session_info(self, animal: str | int, session: str) -> pl.DataFrame:
-        """Returns a Polars DataFrame that stores detailed information for the specified session and animal combination.
+    def get_session_info(self, session: str) -> pl.DataFrame:
+        """Returns a Polars DataFrame that stores detailed information for the specified session.
+
+        Since session IDs are unique, it is expected that filtering by session ID is enough to get the requested
+        information.
 
         Args:
-            animal: The ID of the animal for which to retrieve the data.
             session: The ID of the session for which to retrieve the data.
+
+        Returns:
+            A Polars DataFrame with the following columns: 'animal', 'date', 'notes', 'session', 'type', 'complete',
+            'intensity_verification', 'suite2p_processing', 'behavior_processing', 'video_processing',
+            'dataset_formation'.
         """
-        # Ensures that the 'animal' argument has the same type as the data inside the DataFrame.
-        if self._animal_string:
-            animal = str(animal)
-        else:
-            animal = int(animal)
 
         df = self._data
-        df = df.filter(pl.col("animal").eq(animal) & pl.col("session").eq(session))
+        df = df.filter(pl.col("session").eq(session))
         return df
 
 
