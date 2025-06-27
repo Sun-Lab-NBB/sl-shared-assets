@@ -229,10 +229,9 @@ class RawData:
     destination. During 'purge' sl-experiment runtimes, the library discovers and removes all session data marked with 
     'ubiquitin.bin' files from the machine that runs the code."""
     integrity_verification_tracker_path: Path = Path()
-    """Stores the path to the verified.bin file. This marker file is created (or removed) by the sl-shared-assets 
-    'verify-session' CLI command to indicate whether the session data inside the folder marked by the file has been 
-    verified for integrity. Primarily, this is used when the data is moved to the long-term storage destination (BioHPC
-    server) to ensure it is safe to remove any local copies of the data stored on the acquisition system machine(s)."""
+    """Stores the path to the integrity_verification.yaml tracker file. This file stores the current state of the data 
+    integrity verification pipeline. It prevents more than one instance of the pipeline from working with the data 
+    at a given time and communicates the outcome (success or failure) of the most recent pipeline runtime."""
     version_data_path: Path = Path()
     """Stores the path to the version_data.yaml file. This file contains the snapshot of Python and sl-experiment 
     library versions that were used when the data was acquired."""
@@ -306,23 +305,17 @@ class ProcessedData:
     on the remote server. However, it is possible to configure local runtimes to also redirect log data to files 
     stored in this directory (by editing ataraxis-base-utilities 'console' variable)."""
     suite2p_processing_tracker_path: Path = Path()
-    """Stores the path to the single_day_suite2p.bin file. This file is created by our single-day suite2p data 
-    processing pipeline to mark sessions that have been successfully processed with the single-day sl-suite2p library 
-    pipeline. Note, the file is removed at the beginning of the suite2p pipeline, so its presence always indicates 
-    successful processing runtime completion."""
+    """Stores the path to the suite2p_processing_tracker.yaml tracker file. This file stores the current state of the 
+    sl-suite2p single-day data processing pipeline."""
     dataset_formation_tracker_path: Path = Path()
-    """Same as single_day_suite2p_bin_path, but tracks whether the session has been successfully processed with the 
-    multi-day suite2p pipeline."""
+    """Same as suite2p_processing_tracker_path, but stores the current state of the dataset formation process that 
+    includes this session (communicates whether the session has been successfully added to any dataset(s))."""
     behavior_processing_tracker_path: Path = Path()
-    """Stores the path to the behavior.bin file. This file is created by our behavior data extraction pipeline
-    to mark sessions that have been successfully processed with the sl-behavior library pipeline. Note, the 
-    file is removed at the beginning of the behavior data extraction pipeline, so its presence always indicates 
-    successful processing runtime completion."""
+    """Stores the path to the behavior_processing_tracker.yaml file. This file stores the current state of the 
+    behavior (log) data processing pipeline."""
     video_processing_tracker_path: Path = Path()
-    """Stores the path to the dlc.bin file. This file is created by our DeepLabCut-based pose tracking pipeline
-    to mark sessions that have been successfully processed with the sl-dlc library pipeline. Note, the 
-    file is removed at the beginning of the DeepLabCut pipeline, so its presence always indicates successful processing 
-    runtime completion."""
+    """Stores the path to the video_processing_tracker.yaml file. This file stores the current state of the video 
+    tracking (DeepLabCut) processing pipeline."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.

@@ -171,6 +171,10 @@ class MesoscopeExperimentDescriptor(YamlConfig):
     """The weight of the animal, in grams, at the beginning of the session."""
     dispensed_water_volume_ml: float
     """Stores the total water volume, in milliliters, dispensed during runtime."""
+    maximum_unconsumed_rewards: int = 1
+    """Stores the maximum number of consecutive rewards that can be delivered without the animal consuming them. If 
+    the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal 
+    consumes the rewards."""
     experimenter_notes: str = "Replace this with your notes."
     """This field is not set during runtime. It is expected that each experimenter will replace this field with their 
     notes made during runtime."""

@@ -17,20 +17,8 @@ Command Line Interfaces
    :prog: sl-project-manifest
    :nested: full
 
-.. click:: sl_shared_assets.cli:generate_system_configuration_file
-   :prog: sl-create-system-config
-   :nested: full
-
 .. click:: sl_shared_assets.cli:generate_server_credentials_file
    :prog: sl-create-server-credentials
-   :nested: full
-
-.. click:: sl_shared_assets.cli:generate_project_configuration_file
-   :prog: sl-create-project
-   :nested: full
-
-.. click:: sl_shared_assets.cli:generate_experiment_configuration_file
-   :prog: sl-create-experiment
    :nested: full
 
 .. click:: sl_shared_assets.cli:ascend_tyche_directory
