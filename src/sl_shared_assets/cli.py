@@ -153,8 +153,9 @@ def generate_project_manifest_file(
 @click.option(
     "-rdp",
     "--raw_data_path",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    type=str,
     required=True,
+    default="/storage/sun_data",
     help=(
         "The absolute path to the directory used to store raw data from all Sun lab projects, relative to the server "
         "root."
@@ -163,14 +164,17 @@ def generate_project_manifest_file(
 @click.option(
     "-pdp",
     "--processed_data_path",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    type=str,
     required=True,
+    default="/workdir/sun_data",
     help=(
         "The absolute path to the directory used to store processed data from all Sun lab projects, relative to the "
         "server root."
     ),
 )
-def generate_server_credentials_file(output_directory: str, host: str, username: str, password: str) -> None:
+def generate_server_credentials_file(
+    output_directory: str, host: str, username: str, password: str, raw_data_path: str, processed_data_path: str
+) -> None:
     """Generates a new server_credentials.yaml file under the specified directory, using input information.
 
     This command is used to set up access to compute servers and clusters on new machines (PCs). The data stored inside
@@ -178,7 +182,12 @@ def generate_server_credentials_file(output_directory: str, host: str, username:
     lab data processing libraries.
     """
     generate_server_credentials(
-        output_directory=Path(output_directory), username=username, password=password, host=host
+        output_directory=Path(output_directory),
+        username=username,
+        password=password,
+        host=host,
+        raw_data_root=raw_data_path,
+        processed_data_root=processed_data_path,
     )
     message = (
         f"Server access credentials file: generated. If necessary, remember to edit the data acquisition system "

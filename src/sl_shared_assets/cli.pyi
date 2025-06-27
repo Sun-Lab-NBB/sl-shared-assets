@@ -36,7 +36,9 @@ def generate_project_manifest_file(
     between machines (as it is cached in a file).
     """
 
-def generate_server_credentials_file(output_directory: str, host: str, username: str, password: str) -> None:
+def generate_server_credentials_file(
+    output_directory: str, host: str, username: str, password: str, raw_data_path: str, processed_data_path: str
+) -> None:
     """Generates a new server_credentials.yaml file under the specified directory, using input information.
 
     This command is used to set up access to compute servers and clusters on new machines (PCs). The data stored inside
