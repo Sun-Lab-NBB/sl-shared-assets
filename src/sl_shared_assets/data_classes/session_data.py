@@ -307,15 +307,17 @@ class ProcessedData:
     suite2p_processing_tracker_path: Path = Path()
     """Stores the path to the suite2p_processing_tracker.yaml tracker file. This file stores the current state of the 
     sl-suite2p single-day data processing pipeline."""
-    dataset_formation_tracker_path: Path = Path()
-    """Same as suite2p_processing_tracker_path, but stores the current state of the dataset formation process that 
-    includes this session (communicates whether the session has been successfully added to any dataset(s))."""
     behavior_processing_tracker_path: Path = Path()
     """Stores the path to the behavior_processing_tracker.yaml file. This file stores the current state of the 
     behavior (log) data processing pipeline."""
     video_processing_tracker_path: Path = Path()
     """Stores the path to the video_processing_tracker.yaml file. This file stores the current state of the video 
     tracking (DeepLabCut) processing pipeline."""
+    neurotrophin_path: Path = Path()
+    """Stores the path to the neurotrophin.bin file. This file serves as a static marker of whether the marked session 
+    has been sufficiently processed to be integrated into a dataset. The presence of this file guarantees that the 
+    marked session is safe to be included into analysis datasets, while the absence of this file indicates that the 
+    session has not yet been fully processed."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -335,9 +337,9 @@ class ProcessedData:
         self.behavior_data_path = self.processed_data_path.joinpath("behavior_data")
         self.job_logs_path = self.processed_data_path.joinpath("job_logs")
         self.suite2p_processing_tracker_path = self.processed_data_path.joinpath("suite2p_processing_tracker.yaml")
-        self.dataset_formation_tracker_path = self.processed_data_path.joinpath("dataset_formation_tracker.yaml")
         self.behavior_processing_tracker_path = self.processed_data_path.joinpath("behavior_processing_tracker.yaml")
         self.video_processing_tracker_path = self.processed_data_path.joinpath("video_processing_tracker.yaml")
+        self.neurotrophin_path = self.processed_data_path.joinpath("neurotrophin.bin")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""

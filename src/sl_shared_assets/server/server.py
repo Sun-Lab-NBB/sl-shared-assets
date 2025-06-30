@@ -7,7 +7,7 @@ resources.
 import time
 from pathlib import Path
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import paramiko
 
@@ -25,13 +25,13 @@ def generate_server_credentials(
     username: str,
     password: str,
     host: str = "cbsuwsun.biohpc.cornell.edu",
-    raw_data_root: str = "/workdir/sun_data",
-    processed_data_root: str = "/storage/sun_data",
+    raw_data_root: str = "/local/workdir/sun_data",
+    processed_data_root: str = "/local/storage/sun_data",
 ) -> None:
     """Generates a new server_credentials.yaml file under the specified directory, using input information.
 
     This function provides a convenience interface for generating new BioHPC server credential files. Generally, this is
-    only used when setting up new host-computers in the lab.
+    only used when setting up new host-computers or users in the lab.
 
     Args:
         output_directory: The directory where to save the generated server_credentials.yaml file.
@@ -43,6 +43,7 @@ def generate_server_credentials(
         processed_data_root: The path to the root directory used to store the processed data from all Sun lab projects
             on the server.
     """
+    # noinspection PyArgumentList
     ServerCredentials(
         username=username,
         password=password,
@@ -68,11 +69,21 @@ class ServerCredentials(YamlConfig):
     """The password to use for server authentication."""
     host: str = "cbsuwsun.biohpc.cornell.edu"
     """The hostname or IP address of the server to connect to."""
-    raw_data_root: str = "/workdir/sun_data"
+    raw_data_root: str = "/local/workdir/sun_data"
     """The path to the root directory used to store the raw data from all Sun lab projects on the target server."""
-    processed_data_root: str = "/storage/sun_data"
+    processed_data_root: str = "/local/storage/sun_data"
     """The path to the root directory used to store the processed data from all Sun lab projects on the target 
     server."""
+    user_data_root: str = field(init=False, default_factory=lambda: "local/storage/YourNetID")
+    """The path to the root directory of the user on the target server. Unlike raw and processed data roots, which are 
+    shared between all Sun lab users, each user_data directory is unique for every server user."""
+    user_working_root: str = field(init=False, default_factory=lambda: "local/workdir/YourNetID")
+    """The path to the root user working directory on the target server. This directory is unique for every user."""
+
+    def __post_init__(self):
+        """Statically resolves the paths to user-specific data and working directories on class initialization."""
+        self.user_data_root = f"local/storage/{self.username}"
+        self.user_working_root = f"local/workdir/{self.username}"
 
 
 class Server:
@@ -274,15 +285,37 @@ class Server:
             self._client.close()
 
     @property
-    def raw_data_root(self) -> str:
+    def raw_data_root(self) -> Path:
         """Returns the absolute path to the directory used to store the raw data for all Sun lab projects on the server
         accessible through this class.
         """
-        return self._credentials.raw_data_root
+        return Path(self._credentials.raw_data_root)
 
     @property
-    def processed_data_root(self) -> str:
+    def processed_data_root(self) -> Path:
         """Returns the absolute path to the directory used to store the processed data for all Sun lab projects on the
         server accessible through this class.
         """
-        return self._credentials.processed_data_root
+        return Path(self._credentials.processed_data_root)
+
+    @property
+    def user_data_root(self) -> Path:
+        """Returns the absolute path to the directory used to store user-specific data on the server accessible through
+        this class."""
+        return Path(self._credentials.user_data_root)
+
+    @property
+    def user_working_root(self) -> Path:
+        """Returns the absolute path to the user-specific working (fast) directory on the server accessible through
+        this class."""
+        return Path(self._credentials.user_working_root)
+
+    @property
+    def host(self) -> str:
+        """Returns the hostname or IP address of the server accessible through this class."""
+        return self._credentials.host
+
+    @property
+    def user(self) -> str:
+        """Returns the username used to authenticate with the server."""
+        return self._credentials.username

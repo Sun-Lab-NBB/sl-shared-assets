@@ -76,11 +76,11 @@ class ProjectManifest:
             "session",
             "type",
             "complete",
-            "integrity_verification",
-            "suite2p_processing",
-            "behavior_processing",
-            "video_processing",
-            "dataset_formation",
+            "integrity",
+            "suite2p",
+            "behavior",
+            "video",
+            "dataset",
         ]
 
         # Retrieves the data
@@ -93,7 +93,7 @@ class ProjectManifest:
                 animal = str(animal)
             else:
                 animal = int(animal)
-        df = df.filter(pl.col("animal") == animal)
+            df = df.filter(pl.col("animal") == animal)
 
         # Ensures the data displays properly
         with pl.Config(
@@ -203,8 +203,8 @@ class ProjectManifest:
 
         Returns:
             A Polars DataFrame with the following columns: 'animal', 'date', 'notes', 'session', 'type', 'complete',
-            'intensity_verification', 'suite2p_processing', 'behavior_processing', 'video_processing',
-            'dataset_formation'.
+            'intensity_verification', 'suite2p', 'behavior', 'video',
+            'dataset'.
         """
 
         df = self._data
@@ -264,12 +264,12 @@ def generate_project_manifest(
         # Determines whether the session data is complete (ran for the intended duration and has all expected data).
         "complete": [],
         # Determines whether the session data integrity has been verified upon transfer to a storage machine.
-        "integrity_verification": [],
-        "suite2p_processing": [],  # Determines whether the session has been processed with the single-day s2p pipeline.
+        "integrity": [],
+        "suite2p": [],  # Determines whether the session has been processed with the single-day s2p pipeline.
         # Determines whether the session has been processed with the behavior extraction pipeline.
-        "behavior_processing": [],
-        "video_processing": [],  # Determines whether the session has been processed with the DeepLabCut pipeline.
-        "dataset_formation": [],  # Determines whether the session's data has been integrated into a dataset.
+        "behavior": [],
+        "video": [],  # Determines whether the session has been processed with the DeepLabCut pipeline.
+        "dataset": [],  # Determines whether the session's data is ready to be integrated into a dataset.
     }
 
     # Loops over each session of every animal in the project and extracts session ID information and information
@@ -336,33 +336,34 @@ def generate_project_manifest(
 
         # Data verification status
         tracker = ProcessingTracker(file_path=session_data.raw_data.integrity_verification_tracker_path)
-        manifest["integrity_verification"].append(tracker.is_complete)
+        manifest["integrity"].append(tracker.is_complete)
 
         # If the session is incomplete or unverified, marks all processing steps as FALSE, as automatic processing is
         # disabled for incomplete sessions. If the session is unverified, the case is even more severe, as its data may
         # be corrupted.
-        if not manifest["complete"][-1] or not manifest["integrity_verification"][-1]:
-            manifest["suite2p_processing"].append(False)
-            manifest["dataset_formation"].append(False)
-            manifest["behavior_processing"].append(False)
-            manifest["video_processing"].append(False)
+        if not manifest["complete"][-1] or not manifest["integrity"][-1]:
+            manifest["suite2p"].append(False)
+            manifest["dataset"].append(False)
+            manifest["behavior"].append(False)
+            manifest["video"].append(False)
             continue  # Cycles to the next session
 
-        # Suite2p (single-day) status
+        # Suite2p (single-day) processing status.
         tracker = ProcessingTracker(file_path=session_data.processed_data.suite2p_processing_tracker_path)
-        manifest["suite2p_processing"].append(tracker.is_complete)
+        manifest["suite2p"].append(tracker.is_complete)
 
-        # Dataset formation (integration) status. Tracks whether the session has been added to any dataset(s).
-        tracker = ProcessingTracker(file_path=session_data.processed_data.dataset_formation_tracker_path)
-        manifest["dataset_formation"].append(tracker.is_complete)
-
-        # Dataset formation (integration) status. Tracks whether the session has been added to any dataset(s).
+        # Behavior data processing status.
         tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
-        manifest["behavior_processing"].append(tracker.is_complete)
+        manifest["behavior"].append(tracker.is_complete)
 
         # DeepLabCut (video) processing status.
         tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
-        manifest["video_processing"].append(tracker.is_complete)
+        manifest["video"].append(tracker.is_complete)
+
+        # Tracks whether the session's data is ready for dataset integration. To be considered ready, the data must be
+        # successfully processed with all relevant pipelines. Any session currently being processed with any processing
+        # pipeline is considered NOT ready.
+        manifest["dataset"].append(session_data.processed_data.neurotrophin_path.exists())
 
     # If all animal IDs are integer-convertible, stores them as numbers to promote proper sorting. Otherwise, stores
     # them as strings. The latter options are primarily kept for compatibility with Tyche data
@@ -382,11 +383,11 @@ def generate_project_manifest(
         "type": pl.String,
         "notes": pl.String,
         "complete": pl.UInt8,
-        "integrity_verification": pl.UInt8,
-        "suite2p_processing": pl.UInt8,
-        "dataset_formation": pl.UInt8,
-        "behavior_processing": pl.UInt8,
-        "video_processing": pl.UInt8,
+        "integrity": pl.UInt8,
+        "suite2p": pl.UInt8,
+        "dataset": pl.UInt8,
+        "behavior": pl.UInt8,
+        "video": pl.UInt8,
     }
     df = pl.DataFrame(manifest, schema=schema, strict=False)
 

@@ -8,18 +8,18 @@ build-backend = "hatchling.build"
 # Project metdata section. Provides the genral ID information about the project.
 [project]
 name = "sl-shared-assets"
-version = "2.0.1"
-description = "Stores assets shared between multiple Sun (NeuroAI) lab data pipelines."
+version = "3.0.0rc1"
+description = "Provides data acquisition and processing assets shared between Sun (NeuroAI) lab libraries."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
 authors = [
-    {name = "Ivan Kondratyev"},
-    {name = "Kushaan Gupta"},
-    {name = "Natalie Yeung"}
+    { name = "Ivan Kondratyev" },
+    { name = "Kushaan Gupta" },
+    { name = "Natalie Yeung" }
 ]
 maintainers = [
-    {name = "Ivan Kondratyev", email = "ik278@cornell.edu"},
+    { name = "Ivan Kondratyev", email = "ik278@cornell.edu" },
 ]
 
 keywords = ["sunlab", "data", "assets", "acquisition", "processing"]
@@ -44,7 +44,7 @@ dependencies = [
     "ataraxis-time==3.0.0",
     "ataraxis-base-utilities==3.0.1",
     "ataraxis-data-structures==3.1.1",
-    "numpy>=2.0.2,<2.3.0",
+    "numpy==2.2.6",
     "appdirs==1.4.4",
     "tqdm==4.67.1",
     "xxhash==3.5.0",

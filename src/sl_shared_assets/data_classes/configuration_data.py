@@ -41,6 +41,20 @@ class ExperimentState:
     """The time, in seconds, to maintain the current combination of the experiment and system states."""
 
 
+@dataclass()
+class TrialCueSequence:
+    """Encapsulates information about the Virtual Reality (VR) wall cue sequence experienced by the animal as part of
+    the given trial.
+
+    All Virtual Reality environments can be broadly conceptualized as repeating motifs (sequences) of wall cues. Since
+    some experimental tasks can use multiple cue sequences as part of the same experiment session, multiple instances of
+    this class can be used to specify supported trial structures. The information stored in this class instance is used
+    during behavior data parsing to assign trial information to data collected from various sources.
+    """
+    cue_sequence: tuple[int, ...]
+    """Specifies the sequence of wall cues experienced by the animal while running this trial."""
+
+
 # noinspection PyArgumentList
 @dataclass()
 class MesoscopeExperimentConfiguration(YamlConfig):
@@ -74,6 +88,13 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     )
     """A dictionary that uses human-readable state-names as keys and ExperimentState instances as values. Each 
     ExperimentState instance represents a phase of the experiment."""
+    trial_structures: dict[str, TrialCueSequence] = field(
+        default_factory=lambda: {
+            "circular_4cue": TrialCueSequence(cue_sequence=(0, 1, 0, 2, 0, 3, 0, 4))
+        }
+    )
+    """A dictionary that maps human-readable trial structure names as keys and TrialCueSequence instances as values. 
+    Each TrialCueSequence instance represents a specific VR wall cue sequence used by a given trial structure."""
 
 
 @dataclass()
