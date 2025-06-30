@@ -82,8 +82,10 @@ class ServerCredentials(YamlConfig):
 
     def __post_init__(self):
         """Statically resolves the paths to user-specific data and working directories on class initialization."""
-        self.user_data_root = f"local/storage/{self.username}"
-        self.user_working_root = f"local/workdir/{self.username}"
+
+        # User directories exist at the same level as the 'shared' root project directories, but user user-ids as names.
+        self.user_data_root = str(Path(self.raw_data_root).parent.joinpath(f"{self.username}"))
+        self.user_working_root = str(Path(self.processed_data_root).parent.joinpath(f"{self.username}"))
 
 
 class Server:
