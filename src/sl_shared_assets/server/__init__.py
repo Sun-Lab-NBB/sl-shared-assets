@@ -2,7 +2,7 @@
 and other compute servers. This package is also used across all Sun lab members private code to interface with the
 shared server."""
 
-from .job import Job
-from .server import Server, ServerCredentials, generate_server_credentials
+from .job import Job, JupyterJob
+from .server import Server, ServerCredentials, launch_jupyter_server, generate_server_credentials
 
-__all__ = ["Server", "ServerCredentials", "generate_server_credentials", "Job"]
+__all__ = ["Server", "ServerCredentials", "generate_server_credentials", "Job", "JupyterJob", launch_jupyter_server]

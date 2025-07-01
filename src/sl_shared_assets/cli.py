@@ -151,29 +151,50 @@ def generate_project_manifest_file(
     help="The password to use for server authentication.",
 )
 @click.option(
-    "-rdp",
-    "--raw_data_path",
+    "-sr",
+    "--storage_root",
     type=str,
     required=True,
-    default="/storage/sun_data",
+    show_default=True,
+    default="/storage",
     help=(
-        "The absolute path to the directory used to store raw data from all Sun lab projects, relative to the server "
-        "root."
+        "The absolute path to to the root storage (slow) server directory. Typically, this is the path to the "
+        "top-level (root) directory of the HDD RAID volume."
     ),
 )
 @click.option(
-    "-pdp",
-    "--processed_data_path",
+    "-wr",
+    "--working_root",
     type=str,
     required=True,
-    default="/workdir/sun_data",
+    show_default=True,
+    default="/workdir",
     help=(
-        "The absolute path to the directory used to store processed data from all Sun lab projects, relative to the "
-        "server root."
+        "The absolute path to the root working (fast) server directory. Typically, this is the path to the top-level "
+        "(root) directory of the NVME RAID volume. If the server uses the same volume for both storage and working "
+        "directories, enter the same path under both 'storage_root' and 'working_root'."
+    ),
+)
+@click.option(
+    "-sdn",
+    "--shared_directory_name",
+    type=str,
+    required=True,
+    show_default=True,
+    default="sun_data",
+    help=(
+        "The name of the shared directory used to store all Sun lab project data on the storage and working server "
+        "volumes."
     ),
 )
 def generate_server_credentials_file(
-    output_directory: str, host: str, username: str, password: str, raw_data_path: str, processed_data_path: str
+    output_directory: str,
+    host: str,
+    username: str,
+    password: str,
+    storage_root: str,
+    working_root: str,
+    shared_directory_name: str,
 ) -> None:
     """Generates a new server_credentials.yaml file under the specified directory, using input information.
 
@@ -186,8 +207,9 @@ def generate_server_credentials_file(
         username=username,
         password=password,
         host=host,
-        raw_data_root=raw_data_path,
-        processed_data_root=processed_data_path,
+        storage_root=storage_root,
+        working_root=working_root,
+        shared_directory_name=shared_directory_name,
     )
     message = (
         f"Server access credentials file: generated. If necessary, remember to edit the data acquisition system "
