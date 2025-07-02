@@ -363,7 +363,7 @@ def generate_project_manifest(
         # Tracks whether the session's data is ready for dataset integration. To be considered ready, the data must be
         # successfully processed with all relevant pipelines. Any session currently being processed with any processing
         # pipeline is considered NOT ready.
-        manifest["dataset"].append(session_data.processed_data.neurotrophin_path.exists())
+        manifest["dataset"].append(session_data.processed_data.p53_path.exists())
 
     # If all animal IDs are integer-convertible, stores them as numbers to promote proper sorting. Otherwise, stores
     # them as strings. The latter options are primarily kept for compatibility with Tyche data
@@ -469,3 +469,93 @@ def verify_session_checksum(
         # runtime finished with an error to prevent deadlocking the runtime.
         if tracker.is_running:
             tracker.error()
+
+
+def resolve_p53_marker(
+    session_path: Path,
+    create_processed_data_directory: bool = True,
+    processed_data_root: None | Path = None,
+    remove: bool = False,
+) -> None:
+    """Depending on configuration, either creates or removes the p53.bin marker file for the target session.
+
+    The marker file statically determines whether the session can be targeted by data processing or dataset formation
+    pipelines.
+
+    Notes:
+        Since dataset integration relies on data processing outputs, it is essential to prevent unintended
+        collisions resulting from processing altering the data while it is integrated into a dataset. The p53.bin
+        marker solves this issue by ensuring that only one type of runtimes is allowed to work with the session.
+
+        For the p53.bin marker to be created, the session must currently not undergo any processing and must be
+        successfully processed with the minimal set of pipelines for its session type. Removing the p53.bin marker does
+        not have any additional requirements, but is designed to only be performed manually, relying on the user to
+        determine whether it is safe to remove the marker.
+
+    Args:
+        session_path: The path to the session directory for which the p53.bin marker needs to be resolved. Note, the
+            input session directory must contain the 'raw_data' subdirectory.
+        create_processed_data_directory: Determines whether to create the processed data hierarchy during runtime.
+        processed_data_root: The root directory where to store the processed data hierarchy. This path has to point to
+            the root directory where to store the processed data from all projects, and it will be automatically
+            modified to include the project name, the animal name, and the session ID.
+        remove: Determines whether this function is called to create or remove the p53.bin marker.
+    """
+
+    # Loads session data layout. If configured to do so, also creates the processed data hierarchy
+    session_data = SessionData.load(
+        session_path=session_path,
+        processed_data_root=processed_data_root,
+        make_processed_data_directory=create_processed_data_directory,
+    )
+
+    # If the p53.bin marker exists and the runtime is configured to remove it, removes the marker file. If the runtime
+    # is configured to create the marker, aborts the runtime (as the marker exists)
+    if session_data.processed_data.p53_path.exists():
+        if remove:
+            session_data.processed_data.p53_path.unlink()
+        return
+
+    # The rest of the runtime deals with determining whether it is safe to create the marker file.
+    # Queries the type of the processed session
+    session_type = session_data.session_type
+
+    # If the session type is not supported, aborts with an error
+    if session_type not in _valid_session_types:
+        message = (
+            f"Unable to determine the mandatory processing pipelines for session {session_data.session_name} of animal "
+            f"{session_data.animal_id} and project {session_data.processed_data}. The type of the session "
+            f"{session_type} is not one of the supported session types: {', '.join(_valid_session_types)}."
+        )
+        console.error(message=message, error=ValueError)
+
+    # Window checking sessions are not designed to be integrated into datasets, so they cannot be marked with p53.bin
+    # file. Similarly, any incomplete session is automatically excluded from dataset formation.
+    if session_type == "window checking" or not session_data.raw_data.telomere_path.exists():
+        return
+
+    # Training sessions collect similar data and share processing pipeline requirements
+    if session_type in {"lick training", "run training"}:
+        # If the session has not been successfully processed with the behavior processing pipeline, aborts without
+        # creating the marker file. Also ensures that video tracking pipeline is not actively running, although it is
+        # not required
+        behavior_tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
+        video_tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
+        if not behavior_tracker.is_complete or video_tracker.is_running:
+            return
+
+    # Mesoscope experiment sessions require additional processing with suite2p
+    if session_type == "mesoscope experiment":
+        behavior_tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
+        suite2p_tracker = ProcessingTracker(file_path=session_data.processed_data.suite2p_processing_tracker_path)
+        video_tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
+
+        # Similar to above, if the session is not processed with the behavior pipeline or the suite2p pipeline, aborts
+        # without creating the marker file. Video tracker is not required for p53 marker creation, but the video
+        # tracking pipeline must not be actively running.
+        if not behavior_tracker.is_complete or not suite2p_tracker.is_complete or video_tracker.is_running:
+            return
+
+    # If the runtime reached this point, the session is eligible for dataset integration. Creates the p53.bin marker
+    # file, preventing the session from being processed again as long as the marker exists.
+    session_data.processed_data.p53_path.touch()

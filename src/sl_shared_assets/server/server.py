@@ -561,6 +561,21 @@ class Server:
         finally:
             sftp.close()
 
+    def exists(self, remote_path: Path) -> bool:
+        """Returns True if the target file or directory exists on the remote server."""
+
+        sftp = self._client.open_sftp()
+        try:
+            # Checks if the target file or directory exists by trying to stat it
+            sftp.stat(str(remote_path))
+
+            # If the request does not err, returns True (file or directory exists)
+            return True
+
+        # If the directory or file does not exist, returns False
+        except FileNotFoundError:
+            return False
+
     def close(self) -> None:
         """Closes the SSH connection to the server.
 
