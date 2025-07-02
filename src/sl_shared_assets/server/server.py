@@ -4,6 +4,7 @@ the running job status. All lab processing and analysis pipelines use this inter
 resources.
 """
 
+from random import randint
 from pathlib import Path
 import tempfile
 from dataclasses import field, dataclass
@@ -75,25 +76,25 @@ class ServerCredentials(YamlConfig):
     """The password to use for server authentication."""
     host: str = "cbsuwsun.biohpc.cornell.edu"
     """The hostname or IP address of the server to connect to."""
-    storage_root: str = "/storage"
+    storage_root: str = "/local/storage"
     """The path to the root storage (slow) server directory. Typically, this is the path to the top-level (root) 
     directory of the HDD RAID volume."""
-    working_root: str = "/workdir"
+    working_root: str = "/local/workdir"
     """The path to the root working (fast) server directory. Typically, this is the path to the top-level (root) 
     directory of the NVME RAID volume. If the server uses the same volume for both storage and working directories, 
     enter the same path under both 'storage_root' and 'working_root'."""
     shared_directory_name: str = "sun_data"
     """Stores the name of the shared directory used to store all Sun lab project data on the storage and working 
     server volumes."""
-    raw_data_root: str = field(init=False, default_factory=lambda: "/storage/sun_data")
+    raw_data_root: str = field(init=False, default_factory=lambda: "/local/storage/sun_data")
     """The path to the root directory used to store the raw data from all Sun lab projects on the target server."""
-    processed_data_root: str = field(init=False, default_factory=lambda: "/workdir/sun_data")
+    processed_data_root: str = field(init=False, default_factory=lambda: "/local/workdir/sun_data")
     """The path to the root directory used to store the processed data from all Sun lab projects on the target 
     server."""
-    user_data_root: str = field(init=False, default_factory=lambda: "storage/YourNetID")
+    user_data_root: str = field(init=False, default_factory=lambda: "/local/storage/YourNetID")
     """The path to the root directory of the user on the target server. Unlike raw and processed data roots, which are 
     shared between all Sun lab users, each user_data directory is unique for every server user."""
-    user_working_root: str = field(init=False, default_factory=lambda: "workdir/YourNetID")
+    user_working_root: str = field(init=False, default_factory=lambda: "/local/workdir/YourNetID")
     """The path to the root user working directory on the target server. This directory is unique for every user."""
 
     def __post_init__(self) -> None:
@@ -237,7 +238,7 @@ class Server:
         cpus_to_use: int = 2,
         ram_gb: int = 32,
         time_limit: int = 240,
-        port: int = 9999,
+        port: int = 0,
         jupyter_args: str = "",
     ) -> JupyterJob:
         """Launches a Jupyter notebook server on the target remote Sun lab server.
@@ -253,8 +254,9 @@ class Server:
             conda_environment: The name of the conda environment to activate on the server before running the job logic.
                 The environment should contain the necessary Python packages and CLIs to support running the job's
                 logic. For Jupyter jobs, this necessarily includes the Jupyter notebook and jupyterlab packages.
-            port: The connection port number for Jupyter server. Do not change the default value unless you know what
-                you are doing, as the server has most common communication ports closed for security reasons.
+            port: The connection port number for Jupyter server. If set to 0 (default), a random port number between
+                8888 and 9999 will be assigned to this connection to reduce the possibility of colliding with other
+                user sessions.
             notebook_directory: The directory to use as Jupyter's root. During runtime, Jupyter will only have GUI
                 access to items stored in or under this directory. For most runtimes, this should be set to the user's
                 root data or working directory.
@@ -280,6 +282,10 @@ class Server:
         timestamp = get_timestamp()
         working_directory = Path(self.user_working_root.joinpath("job_logs", f"{job_name}_{timestamp}"))
         self.create_directory(remote_path=working_directory, parents=True)
+
+        # If necessary, generates and sets port to a random value between 8888 and 9999.
+        if port == 0:
+            port = randint(8888, 9999)
 
         job = JupyterJob(
             job_name=job_name,
@@ -353,6 +359,7 @@ class Server:
         job_id = job_output.split()[-1]
         job.job_id = job_id
 
+        # Special processing for Jupyter jobs
         if isinstance(job, JupyterJob):
             # Transfers host and user information to the JupyterJob object
             job.host = self.host
@@ -378,8 +385,8 @@ class Server:
                     # Also removes the remote copy once the runtime is over
                     self.remove(remote_path=job.connection_info_file, is_dir=False)
 
-                    # Returns the updated job object to caller
-                    return job
+                    # Breaks the waiting loop
+                    break
 
                 except Exception:
                     # The file doesn't exist yet or job initialization failed
@@ -391,21 +398,22 @@ class Server:
                         console.error(message, RuntimeError)
 
                 timer.delay_noblock(delay=5, allow_sleep=True)  # Waits for 5 seconds before checking again
+            else:
+                # Only raises timeout error if the while loop is not broken in 120 seconds
+                message = (
+                    f"Remote jupyter server job {job.job_name} with id {job.job_id} did not start within 120 seconds "
+                    f"from being submitted. Since all jupyter jobs are intended to be interactive and the server is "
+                    f"busy running other jobs, this job is cancelled. Try again when the server is less busy."
+                )
+                console.error(message, TimeoutError)
+                raise TimeoutError(message)  # Fallback to appease mypy
 
-            message = (
-                f"Remote jupyter server job {job.job_name} with id {job.job_id} did not start within 120 seconds from "
-                f"being submitted. Since all jupyter jobs are intended to be interactive and the server is busy "
-                f"running other jobs, this job is cancelled. Try again when the server is less busy."
-            )
-            console.error(message, TimeoutError)
-            raise TimeoutError(message)  # Fallback to appease mypy
+        console.echo(message=f"{job.job_name} job: Submitted to {self.host}.", level=LogLevel.SUCCESS)
 
-        # If the Job instance is not a JupyterJob, returns the updated job object
-        else:
-            # Returns the updated job object
-            return job
+        # Returns the updated job object
+        return job
 
-    def job_complete(self, job: Job) -> bool:
+    def job_complete(self, job: Job | JupyterJob) -> bool:
         """Returns True if the job managed by the input Job instance has been completed or terminated its runtime due
         to an error.
 
@@ -434,7 +442,7 @@ class Server:
         else:
             return False
 
-    def abort_job(self, job: Job) -> None:
+    def abort_job(self, job: Job | JupyterJob) -> None:
         """Aborts the target job if it is currently running on the server.
 
         Use this method to immediately abort running or queued jobs, without waiting for the timeout guard. If the job
@@ -445,8 +453,12 @@ class Server:
             job: The Job object that needs to be aborted.
         """
 
-        # Sends the 'scancel' command to the server targeting the specific Job via ID.
-        self._client.exec_command(f"scancel {job.job_id}")
+        # Sends the 'scancel' command to the server targeting the specific Job via ID, unless the job is already
+        # complete
+        if not self.job_complete(job):
+            self._client.exec_command(f"scancel {job.job_id}")
+
+        console.echo(message=f"{job.job_name} job: Aborted.", level=LogLevel.SUCCESS)
 
     def pull_file(self, local_file_path: Path, remote_file_path: Path) -> None:
         """Moves the specified file from the remote server to the local machine.

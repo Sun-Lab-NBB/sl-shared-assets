@@ -272,11 +272,11 @@ class JupyterJob(Job):
     def _build_jupyter_command(self, jupyter_args: str) -> None:
         """Builds the command to launch Jupyter notebook server on the remote Sun lab server."""
 
-        # Command to get the hostname of the compute node.
+        # Gets the hostname of the compute node and caches it in the connection data file. Also caches the port name.
         self.add_command('echo "COMPUTE_NODE: $(hostname)" > {}'.format(self.connection_info_file))
         self.add_command('echo "PORT: {}" >> {}'.format(self.port, self.connection_info_file))
 
-        # Command to generate a random token for security.
+        # Generates a random access token for security and caches it in the connection data file.
         self.add_command("TOKEN=$(openssl rand -hex 24)")
         self.add_command('echo "TOKEN: $TOKEN" >> {}'.format(self.connection_info_file))
 

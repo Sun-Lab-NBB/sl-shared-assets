@@ -144,6 +144,7 @@ sl-verify-session = "sl_shared_assets.cli:verify_session_integrity"
 sl-project-manifest = "sl_shared_assets.cli:generate_project_manifest_file"
 sl-create-server-credentials = "sl_shared_assets.cli:generate_server_credentials_file"
 sl-ascend-tyche = "sl_shared_assets.cli:ascend_tyche_directory"
+sl-start-jupyter = "sl_shared_assets.cli:start_jupyter_server"
 
 # Specifies files that should not be included in the source-code distribution but are also not part of gitignore.
 [tool.hatch.build.targets.sdist]
