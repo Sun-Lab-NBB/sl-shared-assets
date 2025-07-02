@@ -3,6 +3,6 @@ and other compute servers. This package is also used across all Sun lab members 
 shared server."""
 
 from .job import Job, JupyterJob
-from .server import Server, ServerCredentials, launch_jupyter_server, generate_server_credentials
+from .server import Server, ServerCredentials, generate_server_credentials
 
-__all__ = ["Server", "ServerCredentials", "generate_server_credentials", "Job", "JupyterJob", launch_jupyter_server]
+__all__ = ["Server", "ServerCredentials", "generate_server_credentials", "Job", "JupyterJob"]

@@ -8,7 +8,7 @@ Authors: Ivan Kondratyev (Inkaros), Kushaan Gupta, Yuantao Deng, Natalie Yeung
 from ataraxis_base_utilities import console
 
 from .tools import transfer_directory, verify_session_checksum, generate_project_manifest, calculate_directory_checksum
-from .server import Job, Server, JupyterJob, ServerCredentials, launch_jupyter_server
+from .server import Job, Server, JupyterJob, ServerCredentials
 from .data_classes import (
     RawData,
     DrugData,
@@ -49,7 +49,6 @@ __all__ = [
     "ServerCredentials",
     "Job",
     "JupyterJob",
-    "launch_jupyter_server",
     # Data classes package
     "DrugData",
     "ImplantData",

@@ -16,6 +16,7 @@ from ataraxis_time import PrecisionTimer
 from paramiko.client import SSHClient
 from ataraxis_base_utilities import LogLevel, console
 from ataraxis_data_structures import YamlConfig
+from ataraxis_time.time_helpers import get_timestamp
 
 from .job import Job, JupyterJob
 
@@ -180,6 +181,124 @@ class Server:
         """If the instance is connected to the server, terminates the connection before the instance is destroyed."""
         self.close()
 
+    def create_job(
+        self,
+        job_name: str,
+        conda_environment: str,
+        cpus_to_use: int = 10,
+        ram_gb: int = 10,
+        time_limit: int = 60,
+    ) -> Job:
+        """Creates and returns a new Job instance.
+
+        Use this method to generate Job objects for all headless jobs that need to be run on the remote server. The
+        generated Job is a precursor that requires further configuration by the user before it can be submitted to the
+        server for execution.
+
+        Args:
+            job_name: The descriptive name of the SLURM job to be created. Primarily, this name is used in terminal
+                printouts to identify the job to human operators.
+            conda_environment: The name of the conda environment to activate on the server before running the job logic.
+                The environment should contain the necessary Python packages and CLIs to support running the job's
+                logic.
+            cpus_to_use: The number of CPUs to use for the job.
+            ram_gb: The amount of RAM to allocate for the job, in Gigabytes.
+            time_limit: The maximum time limit for the job, in minutes. If the job is still running at the end of this
+                time period, it will be forcibly terminated. It is highly advised to always set adequate maximum runtime
+                limits to prevent jobs from hogging the server in case of runtime or algorithm errors.
+
+        Returns:
+            The initialized Job instance pre-filled with SLURM configuration data and conda activation commands. Modify
+            the returned instance with any additional commands as necessary for the job to fulfill its intended
+            purpose. Note, the Job requires submission via submit_job() to be executed by the server.
+        """
+        # Statically configures the working directory to be stored under:
+        # user working root / job_logs / job_name_timestamp
+        timestamp = get_timestamp()
+        working_directory = Path(self.user_working_root.joinpath("job_logs", f"{job_name}_{timestamp}"))
+        self.create_directory(remote_path=working_directory, parents=True)
+
+        return Job(
+            job_name=job_name,
+            output_log=working_directory.joinpath("stdout.txt"),
+            error_log=working_directory.joinpath("stderr.txt"),
+            working_directory=working_directory,
+            conda_environment=conda_environment,
+            cpus_to_use=cpus_to_use,
+            ram_gb=ram_gb,
+            time_limit=time_limit,
+        )
+
+    def launch_jupyter_server(
+        self,
+        job_name: str,
+        conda_environment: str,
+        notebook_directory: Path,
+        cpus_to_use: int = 2,
+        ram_gb: int = 32,
+        time_limit: int = 240,
+        port: int = 9999,
+        jupyter_args: str = "",
+    ) -> JupyterJob:
+        """Launches a Jupyter notebook server on the target remote Sun lab server.
+
+        Use this method to run interactive Jupyter sessions on the remote server under SLURM control. Unlike the
+        create_job(), this method automatically submits the job for execution as part of its runtime. Therefore, the
+        returned JupyterJob instance should only be used to query information about how to connect to the remote
+        Jupyter server.
+
+        Args:
+            job_name: The descriptive name of the Jupyter SLURM job to be created. Primarily, this name is used in
+                terminal printouts to identify the job to human operators.
+            conda_environment: The name of the conda environment to activate on the server before running the job logic.
+                The environment should contain the necessary Python packages and CLIs to support running the job's
+                logic. For Jupyter jobs, this necessarily includes the Jupyter notebook and jupyterlab packages.
+            port: The connection port number for Jupyter server. Do not change the default value unless you know what
+                you are doing, as the server has most common communication ports closed for security reasons.
+            notebook_directory: The directory to use as Jupyter's root. During runtime, Jupyter will only have GUI
+                access to items stored in or under this directory. For most runtimes, this should be set to the user's
+                root data or working directory.
+            cpus_to_use: The number of CPUs to allocate to the Jupyter server. Keep this value as small as possible to
+                avoid interfering with headless data processing jobs.
+            ram_gb: The amount of RAM, in GB, to allocate to the Jupyter server. Keep this value as small as possible to
+                avoid interfering with headless data processing jobs.
+            time_limit: The maximum Jupyter server uptime, in minutes. Set this to the expected duration of your jupyter
+                session.
+            jupyter_args: Stores additional arguments to pass to jupyter notebook initialization command.
+
+        Returns:
+            The initialized JupyterJob instance that stores information on how to connect to the created Jupyter server.
+            Do NOT re-submit the job to the server, as this is done as part of this method's runtime.
+
+        Raises:
+            TimeoutError: If the target Jupyter server doesn't start within 120 minutes from this method being called.
+            RuntimeError: If job submission fails for any reason.
+        """
+
+        # Statically configures the working directory to be stored under:
+        # user working root / job_logs / job_name_timestamp
+        timestamp = get_timestamp()
+        working_directory = Path(self.user_working_root.joinpath("job_logs", f"{job_name}_{timestamp}"))
+        self.create_directory(remote_path=working_directory, parents=True)
+
+        job = JupyterJob(
+            job_name=job_name,
+            output_log=working_directory.joinpath("stdout.txt"),
+            error_log=working_directory.joinpath("stderr.txt"),
+            working_directory=working_directory,
+            conda_environment=conda_environment,
+            notebook_directory=notebook_directory,
+            port=port,
+            cpus_to_use=cpus_to_use,
+            ram_gb=ram_gb,
+            time_limit=time_limit,
+            jupyter_args=jupyter_args,
+        )
+
+        # Submits the job to the server and, if submission is successful, returns the JupyterJob object extended to
+        # include connection data received from the server.
+        return self.submit_job(job)  # type: ignore[return-value]
+
     def submit_job(self, job: Job | JupyterJob) -> Job | JupyterJob:
         """Submits the input job to the managed BioHPC server via SLURM job manager.
 
@@ -197,6 +316,7 @@ class Server:
         Raises:
             RuntimeError: If job submission to the server fails.
         """
+        console.echo(message=f"Submitting '{job.job_name}' job to the remote server {self.host}...")
 
         # Generates a temporary shell script on the local machine. Uses tempfile to automatically remove the
         # local script as soon as it is uploaded to the server.
@@ -234,6 +354,10 @@ class Server:
         job.job_id = job_id
 
         if isinstance(job, JupyterJob):
+            # Transfers host and user information to the JupyterJob object
+            job.host = self.host
+            job.user = self.user
+
             # Initializes a timer class to optionally delay loop cycling below
             timer = PrecisionTimer("s")
 
@@ -252,6 +376,10 @@ class Server:
                     local_info_file.unlink(missing_ok=True)
 
                     # Also removes the remote copy once the runtime is over
+                    self.remove(remote_path=job.connection_info_file, is_dir=False)
+
+                    # Returns the updated job object to caller
+                    return job
 
                 except Exception:
                     # The file doesn't exist yet or job initialization failed
@@ -262,7 +390,7 @@ class Server:
                         )
                         console.error(message, RuntimeError)
 
-                timer.delay_noblock(delay=3, allow_sleep=True)  # Waits for 2 seconds before checking again
+                timer.delay_noblock(delay=5, allow_sleep=True)  # Waits for 5 seconds before checking again
 
             message = (
                 f"Remote jupyter server job {job.job_name} with id {job.job_id} did not start within 120 seconds from "
@@ -272,8 +400,10 @@ class Server:
             console.error(message, TimeoutError)
             raise TimeoutError(message)  # Fallback to appease mypy
 
-        # Returns the updated job object
-        return job
+        # If the Job instance is not a JupyterJob, returns the updated job object
+        else:
+            # Returns the updated job object
+            return job
 
     def job_complete(self, job: Job) -> bool:
         """Returns True if the job managed by the input Job instance has been completed or terminated its runtime due
@@ -463,63 +593,3 @@ class Server:
     def user(self) -> str:
         """Returns the username used to authenticate with the server."""
         return self._credentials.username
-
-
-def launch_jupyter_server(
-    server: Server,
-    job_name: str,
-    conda_environment: str | None = None,
-    port: int | None = None,
-    notebook_dir: Path | None = None,
-    working_directory: Path | None = None,
-    cpus_to_use: int = 4,
-    ram_gb: int = 16,
-    time_limit: int = 480,
-    jupyter_args: str = "",
-) -> JupyterJob:
-    """Launches a Jupyter notebook server on the target remote Sun lab server.
-
-    Args:
-        server: The Server instance to use for the job submission.
-        job_name: The name to use for the Jupyter server job.
-        conda_environment: The name of the job conda environment. If this is not provided, uses the default conda
-            environment provided at JupyterServerManager initialization.
-        port: The port number to use for the server. If not provided, a random port number between 8888 and 9999
-            is used.
-        notebook_dir: The path to the root server directory Jupyter should use during runtime.
-        working_directory: The path to the server directory where to keep temporary job files.
-        cpus_to_use: The number of CPUs to allocate for the server.
-        ram_gb: The amount of RAM, in GB, to allocate to the server.
-        time_limit: The maximum server uptime, in minutes.
-        jupyter_args: Additional Jupyter server initialization arguments.
-
-    Returns:
-        Initialized JupyterConnectionInfo instance that stores connection details.
-
-    Raises:
-        TimeoutError: If the target Jupyter server doesn't start within max_wait_time.
-        RuntimeError: If job submission fails for any reason.
-    """
-
-    # Creates remote directories for job logs
-    log_dir = working_directory.joinpath("jupyter_logs")
-    server.create_directory(remote_path=log_dir, parents=True)
-
-    # Create the Jupyter server job
-    jupyter_job = JupyterJob(
-        job_name=job_name,
-        output_log=log_dir.joinpath(f"{job_name}_output.log"),
-        error_log=log_dir.joinpath(f"{job_name}_error.log"),
-        working_directory=working_directory,
-        conda_environment=conda_environment,
-        port=port,
-        notebook_directory=notebook_dir,
-        cpus_to_use=cpus_to_use,
-        ram_gb=ram_gb,
-        time_limit=time_limit,
-        jupyter_args=jupyter_args,
-    )
-
-    # Submits the job to SLURM and, if the job submission is successful, returns the job object that contains
-    # additional data added by the server class during job submission.
-    return server.submit_job(jupyter_job)  # type ignore

@@ -13,8 +13,9 @@ from pathlib import Path
 import datetime
 from dataclasses import dataclass
 
+# noinspection PyProtectedMember
 from simple_slurm import Slurm  # type: ignore
-from ataraxis_base_utilities import console
+from ataraxis_base_utilities import LogLevel, console
 
 
 @dataclass
@@ -281,13 +282,15 @@ class JupyterJob(Job):
 
         # Builds Jupyter startup command.
         jupyter_cmd = [
-            "jupyter notebook",
+            "jupyter lab",
             "--no-browser",
             f"--port={self.port}",
             "--ip=0.0.0.0",  # Listen on all interfaces
-            "--NotebookApp.allow_origin='*'",  # Allows connections from the SSH tunnel
-            "--NotebookApp.allow_remote_access=True",  # Enables remote access
-            f"--notebook-dir={self.notebook_dir}",  # Limits job's access to the specified root directory
+            "--ServerApp.allow_origin='*'",  # Allow connections from SSH tunnel
+            "--ServerApp.allow_remote_access=True",  # Enable remote access
+            "--ServerApp.disable_check_xsrf=True",  # Helps with proxy connections
+            f"--ServerApp.root_dir={self.notebook_dir}",  # Root directory (not notebook-dir)
+            "--IdentityProvider.token=$TOKEN",  # Token authentication
         ]
 
         # Adds any additional arguments.
@@ -296,7 +299,7 @@ class JupyterJob(Job):
 
         # Adds resolved jupyter command to the list of job commands.
         jupyter_cmd_str = " ".join(jupyter_cmd)
-        self.add_command(f"{jupyter_cmd_str} --NotebookApp.token=$TOKEN")
+        self.add_command(jupyter_cmd_str)
 
     def parse_connection_info(self, info_file: Path) -> None:
         """Parses the connection information file created by the Jupyter job on the server.
@@ -323,31 +326,43 @@ class JupyterJob(Job):
 
         # Stores extracted data inside connection_info attribute as a JupyterConnectionInfo instance.
         self.connection_info = JupyterConnectionInfo(
-            compute_node=compute_node_match.group(1).strip(),
-            port=int(port_match.group(1)),
-            token=token_match.group(1).strip(),
+            compute_node=compute_node_match.group(1).strip(),  # type: ignore
+            port=int(port_match.group(1)),  # type: ignore
+            token=token_match.group(1).strip(),  # type: ignore
         )
 
-    @property
-    def ssh_tunnel_data(self) -> tuple[str, str] | None:
-        """Returns the command to set up the SSH tunnel to the server and the link to the localhost server view.
+    def print_connection_info(self) -> None:
+        """Constructs and displays the command to set up the SSH tunnel to the server and the link to the localhost
+        server view in the terminal.
 
-        The command should be used via a separate terminal or subprocess call to establish the secure SSH tunnel to the
-        Jupyter server. Once the SSH tunnel is established, the returned localhost url can be used to view the server
-        from the local machine.
-
-        Returns:
-            The tuple of two strings. The first string is the SSH tunnel command and the second string is the localhost
-            url.
+        The SSH command should be used via a separate terminal or subprocess call to establish the secure SSH tunnel to
+        the Jupyter server. Once the SSH tunnel is established, the printed localhost url can be used to view the
+        server from the local machine.
         """
 
+        # If connection information is not available, there is nothing to print
         if self.connection_info is None:
-            return None
+            console.echo(
+                message=(
+                    f"No connection information is available for the job {self.job_name}, which indicates that the job "
+                    f"has not been submitted to the server. Submit the job for execution to the remote Sun lab server "
+                    f"to generate the connection information"
+                ),
+                level=LogLevel.WARNING,
+            )
+            return  # No connection information available, so does not proceed with printing.
 
+        # Prints generic connection details to terminal
+        console.echo(f"Jupyter is running on: {self.connection_info.compute_node}")
+        console.echo(f"Port: {self.connection_info.port}")
+        console.echo(f"Token: {self.connection_info.token}")
+
+        # Constructs and displays the SSH tunnel command and the localhost url for connecting to the server
         tunnel_cmd = (
             f"ssh -N -L {self.connection_info.port}:{self.connection_info.compute_node}:{self.connection_info.port} "
             f"{self.user}@{self.host}"
         )
-        local_url = f"http://localhost:{self.connection_info.port}/?token={self.connection_info.token}"
-
-        return tunnel_cmd, local_url
+        localhost_url = f"http://localhost:{self.connection_info.port}/?token={self.connection_info.token}"
+        print(f"\nTo access locally, run this in a terminal:")
+        print(tunnel_cmd)
+        print(f"\nThen open: {localhost_url}")
