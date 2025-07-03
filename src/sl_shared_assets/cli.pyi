@@ -88,7 +88,7 @@ def start_jupyter_server(
 def resolve_dataset_marker(
     session_path: Path, create_processed_directories: bool, project_processed_path: Path | None, remove: bool
 ) -> None:
-    """Depending on configuration, either creates or remove the p53.bin marker from the target session.
+    """Depending on configuration, either creates or removes the p53.bin marker from the target session.
 
     The p53.bin marker determines whether the session is ready for dataset integration. When the marker exists,
     processing pipelines are not allowed to work with the session data, ensuring that all processed data remains
