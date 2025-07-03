@@ -157,7 +157,13 @@ class ProjectManifest:
         """
         return tuple(self._data.select("session").sort("session").to_series().to_list())
 
-    def get_sessions_for_animal(self, animal: str | int, exclude_incomplete: bool = True) -> tuple[str, ...]:
+    def get_sessions_for_animal(
+        self,
+        animal: str | int,
+        exclude_incomplete: bool = True,
+        dataset_ready_only: bool = False,
+        not_dataset_ready_only: bool = False,
+    ) -> tuple[str, ...]:
         """Returns all session IDs for the target animal.
 
         This provides a tuple of all sessions performed by the target animal as part of the target project.
@@ -166,6 +172,11 @@ class ProjectManifest:
             animal: The ID of the animal for which to get the session data.
             exclude_incomplete: Determines whether to exclude sessions not marked as 'complete' from the output
                 list.
+            dataset_ready_only: Determines whether to exclude sessions not marked as 'dataset' integration ready from
+                the output list. Enabling this option only shows sessions that can be integrated into a dataset.
+            not_dataset_ready_only: The opposite of 'dataset_ready_only'. Determines whether to exclude sessions marked
+                as 'dataset' integration ready from the output list. Note, when both this and 'dataset_ready_only' are
+                enabled, the 'dataset_ready_only' option takes precedence.
 
         Raises:
             ValueError: If the specified animal is not found in the manifest file.
@@ -187,6 +198,12 @@ class ProjectManifest:
         # Optionally filters out incomplete sessions
         if exclude_incomplete:
             data = data.filter(pl.col("complete") == 1)
+
+        # Optionally filters sessions based on their readiness for dataset integration.
+        if dataset_ready_only:  # Dataset-ready option always takes precedence
+            data = data.filter(pl.col("dataset") == 1)
+        elif not_dataset_ready_only:
+            data = data.filter(pl.col("dataset") == 0)
 
         # Formats and returns session IDs to the caller
         sessions = data.select("session").sort("session").to_series().to_list()
@@ -483,14 +500,15 @@ def resolve_p53_marker(
     pipelines.
 
     Notes:
-        Since dataset integration relies on data processing outputs, it is essential to prevent unintended
-        collisions resulting from processing altering the data while it is integrated into a dataset. The p53.bin
-        marker solves this issue by ensuring that only one type of runtimes is allowed to work with the session.
+        Since dataset integration relies on data processing outputs, it is essential to prevent processing pipelines
+        from altering the data while it is integrated into a dataset. The p53.bin marker solves this issue by ensuring
+        that only one type of runtimes (processing or dataset integration) is allowed to work with the session.
 
         For the p53.bin marker to be created, the session must currently not undergo any processing and must be
         successfully processed with the minimal set of pipelines for its session type. Removing the p53.bin marker does
-        not have any additional requirements, but is designed to only be performed manually, relying on the user to
-        determine whether it is safe to remove the marker.
+        not have any dependencies and will be executed even if the session is currently undergoing dataset integration.
+        Due to this limitation, it is only possible to call this function with the 'remove' flag manually (via the
+        dedicated CLI).
 
     Args:
         session_path: The path to the session directory for which the p53.bin marker needs to be resolved. Note, the
@@ -510,11 +528,17 @@ def resolve_p53_marker(
     )
 
     # If the p53.bin marker exists and the runtime is configured to remove it, removes the marker file. If the runtime
-    # is configured to create the marker, aborts the runtime (as the marker exists)
+    # is configured to create the marker, aborts the runtime (as the marker already exists).
     if session_data.processed_data.p53_path.exists():
         if remove:
             session_data.processed_data.p53_path.unlink()
-        return
+            return  # Ends remove runtime
+
+        return  # Ends create runtime
+
+    # If the marker does not exist and the function is called in 'remove' mode, aborts the runtime
+    elif remove:
+        return  # Ends remove runtime
 
     # The rest of the runtime deals with determining whether it is safe to create the marker file.
     # Queries the type of the processed session
@@ -535,13 +559,14 @@ def resolve_p53_marker(
         return
 
     # Training sessions collect similar data and share processing pipeline requirements
-    if session_type in {"lick training", "run training"}:
+    if session_type == "lick training" or session_type == "run training":
         # If the session has not been successfully processed with the behavior processing pipeline, aborts without
-        # creating the marker file. Also ensures that video tracking pipeline is not actively running, although it is
-        # not required
+        # creating the marker file. Also ensures that the video tracking pipeline is not actively running, although it
+        # is not required
         behavior_tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
         video_tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
         if not behavior_tracker.is_complete or video_tracker.is_running:
+            # Note, training runtimes do not require suite2p processing.
             return
 
     # Mesoscope experiment sessions require additional processing with suite2p

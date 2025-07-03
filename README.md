@@ -93,7 +93,6 @@ We use [semantic versioning](https://semver.org/) for this project. For the vers
 
 - Ivan Kondratyev ([Inkaros](https://github.com/Inkaros))
 - Kushaan Gupta ([kushaangupta](https://github.com/kushaangupta))
-- Yuantao Deng ([YuantaoDeng](https://github.com/YuantaoDeng))
 - Natalie Yeung
 
 ___

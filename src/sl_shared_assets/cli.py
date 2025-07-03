@@ -5,7 +5,7 @@ from pathlib import Path
 import click
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 
-from .tools import ascend_tyche_data, verify_session_checksum, generate_project_manifest
+from .tools import ascend_tyche_data, resolve_p53_marker, verify_session_checksum, generate_project_manifest
 from .server import Server, JupyterJob, generate_server_credentials
 from .data_classes import SessionData, ProcessingTracker
 
@@ -16,7 +16,7 @@ from .data_classes import SessionData, ProcessingTracker
     "--session_path",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    help="The absolute path to the session whose raw data needs to be verified for potential corruption.",
+    help="The absolute path to the session directory whose raw data needs to be verified for potential corruption.",
 )
 @click.option(
     "-c",
@@ -43,7 +43,9 @@ from .data_classes import SessionData, ProcessingTracker
         "used if 'create_processed_directories' flag is True."
     ),
 )
-def verify_session_integrity(session_path: str, create_processed_directories: bool, processed_data_root: Path) -> None:
+def verify_session_integrity(
+    session_path: Path, create_processed_directories: bool, processed_data_root: Path | None
+) -> None:
     """Checks the integrity of the target session's raw data (contents of the raw_data directory).
 
     This command assumes that the data has been checksummed during acquisition and contains an ax_checksum.txt file
@@ -101,7 +103,7 @@ def verify_session_integrity(session_path: str, create_processed_directories: bo
     ),
 )
 def generate_project_manifest_file(
-    project_path: str, output_directory: str, project_processed_path: str | None
+    project_path: Path, output_directory: Path, project_processed_path: Path | None
 ) -> None:
     """Generates the manifest .feather file that provides information about the data-processing state of all available
     project sessions.
@@ -279,8 +281,8 @@ def ascend_tyche_directory(input_directory: Path) -> None:
     help=(
         "The name of the conda environment to use for running the Jupyter server. At a minimum, the target environment "
         "must contain the 'jupyterlab' and the 'notebook' Python packages. Note, the user whose credentials are used "
-        "to connect to the server must have a configured conda / mamba shell and the target environment for the job to "
-        "run as expected."
+        "to connect to the server must have a configured conda / mamba shell that exposes the target environment for "
+        "the job to run as expected."
     ),
 )
 @click.option(
@@ -303,7 +305,7 @@ def ascend_tyche_directory(input_directory: Path) -> None:
     default=2,
     help=(
         "The number of CPU cores to allocate to the Jupyter server. Note, during the interactive Jupyter runtime, it "
-        "will be impossible to use more than this number of CPU cores."
+        "is be impossible to use more than this number of CPU cores."
     ),
 )
 @click.option(
@@ -315,7 +317,7 @@ def ascend_tyche_directory(input_directory: Path) -> None:
     default=32,
     help=(
         "The RAM, in Gigabytes, to allocate to the Jupyter server. Note, during the interactive Jupyter runtime, it "
-        "will be impossible to use more than this amount of RAM."
+        "is be impossible to use more than this amount of RAM."
     ),
 )
 @click.option(
@@ -394,3 +396,64 @@ def start_jupyter_server(
 
         # Closes server connection if it is still open
         server.close()
+
+
+@click.command()
+@click.option(
+    "-sp",
+    "--session_path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=True,
+    help="The absolute path to the session directory for which to resolve the dataset integration readiness marker.",
+)
+@click.option(
+    "-c",
+    "--create_processed_directories",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Determines whether to create the processed data hierarchy. This flag should be disabled for most runtimes.",
+)
+@click.option(
+    "-ppp",
+    "--project_processed_path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=False,
+    help=(
+        "The absolute path to the project directory where processed session data is stored, if different from the "
+        "directory used to store raw session data. Typically, this extra argument is only used when processing data "
+        "stored on remote compute server(s)."
+    ),
+)
+@click.option(
+    "-r",
+    "--remove",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help=(
+        "Determines whether the command should create or remove the dataset integration marker. Do not enable this "
+        "flag unless you know what you are doing. It is only safe to enable this flag if the session is not currently "
+        "being integrated into any datasets."
+    ),
+)
+def resolve_dataset_marker(
+    session_path: Path, create_processed_directories: bool, project_processed_path: Path | None, remove: bool
+) -> None:
+    """Depending on configuration, either creates or removes the p53.bin marker from the target session.
+
+    The p53.bin marker determines whether the session is ready for dataset integration. When the marker exists,
+    processing pipelines are not allowed to work with the session data, ensuring that all processed data remains
+    unchanged. If the marker does not exist, dataset integration pipelines are not allowed to work with the session
+    data, enabling processing pipelines to safely modify the data at any time.
+
+    This command is automatically called at the end of each processing runtime to automatically transfer processed
+    sessions to the dataset integration step by creating the p53.bin marker. In contrast, removing the marker can only
+    be done manually.
+    """
+    resolve_p53_marker(
+        session_path=session_path,
+        create_processed_data_directory=create_processed_directories,
+        processed_data_root=project_processed_path,
+        remove=remove,
+    )

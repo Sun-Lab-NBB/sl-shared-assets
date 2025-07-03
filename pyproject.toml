@@ -22,7 +22,7 @@ maintainers = [
     { name = "Ivan Kondratyev", email = "ik278@cornell.edu" },
 ]
 
-keywords = ["sunlab", "data", "assets", "acquisition", "processing"]
+keywords = ["sunlab", "data", "assets", "acquisition", "processing", "server"]
 
 classifiers = [
     # Development status
@@ -70,7 +70,7 @@ Documentation = "https://sl-shared-assets-api-docs.netlify.app/"
 # (OSX ARM64, WIN AMD64, LIN AMD64). This specification is used by ataraxis-automation to resolve as many
 # project dependencies with conda over pip as possible.
 condarun = [
-    "numpy>=2.0.2,<2.3.0",
+    "numpy==2.2.6",
     "appdirs==1.4.4",
     "tqdm==4.67.1",
     "paramiko==3.5.1",
@@ -145,6 +145,7 @@ sl-project-manifest = "sl_shared_assets.cli:generate_project_manifest_file"
 sl-create-server-credentials = "sl_shared_assets.cli:generate_server_credentials_file"
 sl-ascend-tyche = "sl_shared_assets.cli:ascend_tyche_directory"
 sl-start-jupyter = "sl_shared_assets.cli:start_jupyter_server"
+sl-dataset-marker = "sl_shared_assets.cli:resolve_dataset_marker"
 
 # Specifies files that should not be included in the source-code distribution but are also not part of gitignore.
 [tool.hatch.build.targets.sdist]
