@@ -69,7 +69,13 @@ class ProjectManifest:
         This provides a tuple of all sessions, independent of the participating animal, that were recorded as part
         of the target project.
         """
-    def get_sessions_for_animal(self, animal: str | int, exclude_incomplete: bool = True) -> tuple[str, ...]:
+    def get_sessions_for_animal(
+        self,
+        animal: str | int,
+        exclude_incomplete: bool = True,
+        dataset_ready_only: bool = False,
+        not_dataset_ready_only: bool = False,
+    ) -> tuple[str, ...]:
         """Returns all session IDs for the target animal.
 
         This provides a tuple of all sessions performed by the target animal as part of the target project.
@@ -78,6 +84,11 @@ class ProjectManifest:
             animal: The ID of the animal for which to get the session data.
             exclude_incomplete: Determines whether to exclude sessions not marked as 'complete' from the output
                 list.
+            dataset_ready_only: Determines whether to exclude sessions not marked as 'dataset' integration ready from
+                the output list. Enabling this option only shows sessions that can be integrated into a dataset.
+            not_dataset_ready_only: The opposite of 'dataset_ready_only'. Determines whether to exclude sessions marked
+                as 'dataset' integration ready from the output list. Note, when both this and 'dataset_ready_only' are
+                enabled, the 'dataset_ready_only' option takes precedence.
 
         Raises:
             ValueError: If the specified animal is not found in the manifest file.
@@ -93,8 +104,8 @@ class ProjectManifest:
 
         Returns:
             A Polars DataFrame with the following columns: 'animal', 'date', 'notes', 'session', 'type', 'complete',
-            'intensity_verification', 'suite2p_processing', 'behavior_processing', 'video_processing',
-            'dataset_formation'.
+            'intensity_verification', 'suite2p', 'behavior', 'video',
+            'dataset'.
         """
 
 def generate_project_manifest(
@@ -145,4 +156,36 @@ def verify_session_checksum(
         processed_data_root: The root directory where to store the processed data hierarchy. This path has to point to
             the root directory where to store the processed data from all projects, and it will be automatically
             modified to include the project name, the animal name, and the session ID.
+    """
+
+def resolve_p53_marker(
+    session_path: Path,
+    create_processed_data_directory: bool = True,
+    processed_data_root: None | Path = None,
+    remove: bool = False,
+) -> None:
+    """Depending on configuration, either creates or removes the p53.bin marker file for the target session.
+
+    The marker file statically determines whether the session can be targeted by data processing or dataset formation
+    pipelines.
+
+    Notes:
+        Since dataset integration relies on data processing outputs, it is essential to prevent processing pipelines
+        from altering the data while it is integrated into a dataset. The p53.bin marker solves this issue by ensuring
+        that only one type of runtimes (processing or dataset integration) is allowed to work with the session.
+
+        For the p53.bin marker to be created, the session must currently not undergo any processing and must be
+        successfully processed with the minimal set of pipelines for its session type. Removing the p53.bin marker does
+        not have any dependencies and will be executed even if the session is currently undergoing dataset integration.
+        Due to this limitation, it is only possible to call this function with the 'remove' flag manually (via the
+        dedicated CLI).
+
+    Args:
+        session_path: The path to the session directory for which the p53.bin marker needs to be resolved. Note, the
+            input session directory must contain the 'raw_data' subdirectory.
+        create_processed_data_directory: Determines whether to create the processed data hierarchy during runtime.
+        processed_data_root: The root directory where to store the processed data hierarchy. This path has to point to
+            the root directory where to store the processed data from all projects, and it will be automatically
+            modified to include the project name, the animal name, and the session ID.
+        remove: Determines whether this function is called to create or remove the p53.bin marker.
     """

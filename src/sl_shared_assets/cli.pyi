@@ -2,16 +2,23 @@ from pathlib import Path
 
 from .tools import (
     ascend_tyche_data as ascend_tyche_data,
+    resolve_p53_marker as resolve_p53_marker,
     verify_session_checksum as verify_session_checksum,
     generate_project_manifest as generate_project_manifest,
 )
-from .server import generate_server_credentials as generate_server_credentials
+from .server import (
+    Server as Server,
+    JupyterJob as JupyterJob,
+    generate_server_credentials as generate_server_credentials,
+)
 from .data_classes import (
     SessionData as SessionData,
     ProcessingTracker as ProcessingTracker,
 )
 
-def verify_session_integrity(session_path: str, create_processed_directories: bool, processed_data_root: Path) -> None:
+def verify_session_integrity(
+    session_path: Path, create_processed_directories: bool, processed_data_root: Path | None
+) -> None:
     """Checks the integrity of the target session's raw data (contents of the raw_data directory).
 
     This command assumes that the data has been checksummed during acquisition and contains an ax_checksum.txt file
@@ -26,7 +33,7 @@ def verify_session_integrity(session_path: str, create_processed_directories: bo
     """
 
 def generate_project_manifest_file(
-    project_path: str, output_directory: str, project_processed_path: str | None
+    project_path: Path, output_directory: Path, project_processed_path: Path | None
 ) -> None:
     """Generates the manifest .feather file that provides information about the data-processing state of all available
     project sessions.
@@ -37,7 +44,13 @@ def generate_project_manifest_file(
     """
 
 def generate_server_credentials_file(
-    output_directory: str, host: str, username: str, password: str, raw_data_path: str, processed_data_path: str
+    output_directory: Path,
+    host: str,
+    username: str,
+    password: str,
+    storage_root: str,
+    working_root: str,
+    shared_directory_name: str,
 ) -> None:
     """Generates a new server_credentials.yaml file under the specified directory, using input information.
 
@@ -46,7 +59,7 @@ def generate_server_credentials_file(
     lab data processing libraries.
     """
 
-def ascend_tyche_directory(input_directory: str) -> None:
+def ascend_tyche_directory(input_directory: Path) -> None:
     """Restructures old Tyche project data to use the modern Sun lab data structure and uploads them to the processing
     server.
 
@@ -55,4 +68,34 @@ def ascend_tyche_directory(input_directory: str) -> None:
     process expects the input data to be preprocessed using an old Sun lab mesoscope data preprocessing pipeline. It
     will not work for any other project or data. Also, this command will only work on a machine (PC) that belongs to a
     valid Sun lab data acquisition system, such as VRPC of the Mesoscope-VR system.
+    """
+
+def start_jupyter_server(
+    credentials_path: Path, name: str, environment: str, directory: Path, cores: int, memory: int, time: int, port: int
+) -> None:
+    """Starts an interactive Jupyter session on the remote Sun lab server.
+
+    This command should be used to run Jupyter lab and notebooks sessions on the remote Sun lab server. Since all lab
+    data is stored on the server, this allows running light interactive analysis sessions on the same node as the data,
+    while leveraging considerable compute resources of the server.
+
+    Calling this command initializes a SLURM session that runs the interactive Jupyter server. Since this server
+    directly competes for resources with all other headless jobs running on the server, it is imperative that each
+    jupyter runtime uses only the minimum amount of resources and run-time as necessary. Do not use this command to run
+    heavy data processing pipelines! Instead, consult with library documentation and use the headless Job class.
+    """
+
+def resolve_dataset_marker(
+    session_path: Path, create_processed_directories: bool, project_processed_path: Path | None, remove: bool
+) -> None:
+    """Depending on configuration, either creates or remove the p53.bin marker from the target session.
+
+    The p53.bin marker determines whether the session is ready for dataset integration. When the marker exists,
+    processing pipelines are not allowed to work with the session data, ensuring that all processed data remains
+    unchanged. If the marker does not exist, dataset integration pipelines are not allowed to work with the session
+    data, enabling processing pipelines to safely modify the data at any time.
+
+    This command is automatically called at the end of each processing runtime to automatically transfer processed
+    sessions to the dataset integration step by creating the p53.bin marker. In contrast, removing the marker can only
+    be done manually.
     """

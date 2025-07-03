@@ -25,6 +25,14 @@ Command Line Interfaces
    :prog: sl-ascend-tyche
    :nested: full
 
+.. click:: sl_shared_assets.cli:start_jupyter_server
+   :prog: sl-start-jupyter
+   :nested: full
+
+.. click:: sl_shared_assets.cli:resolve_dataset_marker
+   :prog: sl-dataset-marker
+   :nested: full
+
 Tools
 =====
 .. automodule:: sl_shared_assets.tools

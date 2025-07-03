@@ -299,23 +299,21 @@ class ProcessedData:
     behavior_data_path: Path = Path()
     """Stores the path to the directory that contains the non-video and non-brain-activity data extracted from 
     .npz log files by our in-house log parsing pipeline."""
-    job_logs_path: Path = Path()
-    """Stores the path to the directory that stores the standard output and standard error data collected during 
-    server-side data processing pipeline runtimes. This directory is primarily used when running data processing jobs 
-    on the remote server. However, it is possible to configure local runtimes to also redirect log data to files 
-    stored in this directory (by editing ataraxis-base-utilities 'console' variable)."""
     suite2p_processing_tracker_path: Path = Path()
     """Stores the path to the suite2p_processing_tracker.yaml tracker file. This file stores the current state of the 
     sl-suite2p single-day data processing pipeline."""
-    dataset_formation_tracker_path: Path = Path()
-    """Same as suite2p_processing_tracker_path, but stores the current state of the dataset formation process that 
-    includes this session (communicates whether the session has been successfully added to any dataset(s))."""
     behavior_processing_tracker_path: Path = Path()
     """Stores the path to the behavior_processing_tracker.yaml file. This file stores the current state of the 
     behavior (log) data processing pipeline."""
     video_processing_tracker_path: Path = Path()
     """Stores the path to the video_processing_tracker.yaml file. This file stores the current state of the video 
     tracking (DeepLabCut) processing pipeline."""
+    p53_path: Path = Path()
+    """Stores the path to the p53.bin file. This file serves as a lock-in marker that determines whether the session is 
+    in the processing or dataset mode. Specifically, if the file does not exist, the session data cannot be integrated 
+    into any dataset, as it may be actively worked on by processing pipelines. Conversely, if the marker exists, 
+    processing pipelines are not allowed to work with the session, as it may be actively integrated into one or more 
+    datasets."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -333,11 +331,10 @@ class ProcessedData:
         self.camera_data_path = self.processed_data_path.joinpath("camera_data")
         self.mesoscope_data_path = self.processed_data_path.joinpath("mesoscope_data")
         self.behavior_data_path = self.processed_data_path.joinpath("behavior_data")
-        self.job_logs_path = self.processed_data_path.joinpath("job_logs")
         self.suite2p_processing_tracker_path = self.processed_data_path.joinpath("suite2p_processing_tracker.yaml")
-        self.dataset_formation_tracker_path = self.processed_data_path.joinpath("dataset_formation_tracker.yaml")
         self.behavior_processing_tracker_path = self.processed_data_path.joinpath("behavior_processing_tracker.yaml")
         self.video_processing_tracker_path = self.processed_data_path.joinpath("video_processing_tracker.yaml")
+        self.p53_path = self.processed_data_path.joinpath("p53.bin")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
@@ -345,7 +342,6 @@ class ProcessedData:
         ensure_directory_exists(self.processed_data_path)
         ensure_directory_exists(self.camera_data_path)
         ensure_directory_exists(self.behavior_data_path)
-        ensure_directory_exists(self.job_logs_path)
 
 
 @dataclass

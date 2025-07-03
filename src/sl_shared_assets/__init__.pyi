@@ -1,12 +1,12 @@
 from .tools import (
+    resolve_p53_marker as resolve_p53_marker,
     transfer_directory as transfer_directory,
-    verify_session_checksum as verify_session_checksum,
-    generate_project_manifest as generate_project_manifest,
     calculate_directory_checksum as calculate_directory_checksum,
 )
 from .server import (
     Job as Job,
     Server as Server,
+    JupyterJob as JupyterJob,
     ServerCredentials as ServerCredentials,
 )
 from .data_classes import (
@@ -43,6 +43,7 @@ __all__ = [
     "Server",
     "ServerCredentials",
     "Job",
+    "JupyterJob",
     "DrugData",
     "ImplantData",
     "SessionData",
@@ -70,8 +71,7 @@ __all__ = [
     "MesoscopeAdditionalFirmware",
     "get_system_configuration_data",
     "set_system_configuration_file",
+    "resolve_p53_marker",
     "transfer_directory",
-    "generate_project_manifest",
-    "verify_session_checksum",
     "calculate_directory_checksum",
 ]

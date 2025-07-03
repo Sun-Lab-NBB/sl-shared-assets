@@ -76,11 +76,11 @@ class ProjectManifest:
             "session",
             "type",
             "complete",
-            "integrity_verification",
-            "suite2p_processing",
-            "behavior_processing",
-            "video_processing",
-            "dataset_formation",
+            "integrity",
+            "suite2p",
+            "behavior",
+            "video",
+            "dataset",
         ]
 
         # Retrieves the data
@@ -93,7 +93,7 @@ class ProjectManifest:
                 animal = str(animal)
             else:
                 animal = int(animal)
-        df = df.filter(pl.col("animal") == animal)
+            df = df.filter(pl.col("animal") == animal)
 
         # Ensures the data displays properly
         with pl.Config(
@@ -157,7 +157,13 @@ class ProjectManifest:
         """
         return tuple(self._data.select("session").sort("session").to_series().to_list())
 
-    def get_sessions_for_animal(self, animal: str | int, exclude_incomplete: bool = True) -> tuple[str, ...]:
+    def get_sessions_for_animal(
+        self,
+        animal: str | int,
+        exclude_incomplete: bool = True,
+        dataset_ready_only: bool = False,
+        not_dataset_ready_only: bool = False,
+    ) -> tuple[str, ...]:
         """Returns all session IDs for the target animal.
 
         This provides a tuple of all sessions performed by the target animal as part of the target project.
@@ -166,6 +172,11 @@ class ProjectManifest:
             animal: The ID of the animal for which to get the session data.
             exclude_incomplete: Determines whether to exclude sessions not marked as 'complete' from the output
                 list.
+            dataset_ready_only: Determines whether to exclude sessions not marked as 'dataset' integration ready from
+                the output list. Enabling this option only shows sessions that can be integrated into a dataset.
+            not_dataset_ready_only: The opposite of 'dataset_ready_only'. Determines whether to exclude sessions marked
+                as 'dataset' integration ready from the output list. Note, when both this and 'dataset_ready_only' are
+                enabled, the 'dataset_ready_only' option takes precedence.
 
         Raises:
             ValueError: If the specified animal is not found in the manifest file.
@@ -188,6 +199,12 @@ class ProjectManifest:
         if exclude_incomplete:
             data = data.filter(pl.col("complete") == 1)
 
+        # Optionally filters sessions based on their readiness for dataset integration.
+        if dataset_ready_only:  # Dataset-ready option always takes precedence
+            data = data.filter(pl.col("dataset") == 1)
+        elif not_dataset_ready_only:
+            data = data.filter(pl.col("dataset") == 0)
+
         # Formats and returns session IDs to the caller
         sessions = data.select("session").sort("session").to_series().to_list()
         return tuple(sessions)
@@ -203,8 +220,8 @@ class ProjectManifest:
 
         Returns:
             A Polars DataFrame with the following columns: 'animal', 'date', 'notes', 'session', 'type', 'complete',
-            'intensity_verification', 'suite2p_processing', 'behavior_processing', 'video_processing',
-            'dataset_formation'.
+            'intensity_verification', 'suite2p', 'behavior', 'video',
+            'dataset'.
         """
 
         df = self._data
@@ -264,12 +281,12 @@ def generate_project_manifest(
         # Determines whether the session data is complete (ran for the intended duration and has all expected data).
         "complete": [],
         # Determines whether the session data integrity has been verified upon transfer to a storage machine.
-        "integrity_verification": [],
-        "suite2p_processing": [],  # Determines whether the session has been processed with the single-day s2p pipeline.
+        "integrity": [],
+        "suite2p": [],  # Determines whether the session has been processed with the single-day s2p pipeline.
         # Determines whether the session has been processed with the behavior extraction pipeline.
-        "behavior_processing": [],
-        "video_processing": [],  # Determines whether the session has been processed with the DeepLabCut pipeline.
-        "dataset_formation": [],  # Determines whether the session's data has been integrated into a dataset.
+        "behavior": [],
+        "video": [],  # Determines whether the session has been processed with the DeepLabCut pipeline.
+        "dataset": [],  # Determines whether the session's data is ready to be integrated into a dataset.
     }
 
     # Loops over each session of every animal in the project and extracts session ID information and information
@@ -336,33 +353,34 @@ def generate_project_manifest(
 
         # Data verification status
         tracker = ProcessingTracker(file_path=session_data.raw_data.integrity_verification_tracker_path)
-        manifest["integrity_verification"].append(tracker.is_complete)
+        manifest["integrity"].append(tracker.is_complete)
 
         # If the session is incomplete or unverified, marks all processing steps as FALSE, as automatic processing is
         # disabled for incomplete sessions. If the session is unverified, the case is even more severe, as its data may
         # be corrupted.
-        if not manifest["complete"][-1] or not manifest["integrity_verification"][-1]:
-            manifest["suite2p_processing"].append(False)
-            manifest["dataset_formation"].append(False)
-            manifest["behavior_processing"].append(False)
-            manifest["video_processing"].append(False)
+        if not manifest["complete"][-1] or not manifest["integrity"][-1]:
+            manifest["suite2p"].append(False)
+            manifest["dataset"].append(False)
+            manifest["behavior"].append(False)
+            manifest["video"].append(False)
             continue  # Cycles to the next session
 
-        # Suite2p (single-day) status
+        # Suite2p (single-day) processing status.
         tracker = ProcessingTracker(file_path=session_data.processed_data.suite2p_processing_tracker_path)
-        manifest["suite2p_processing"].append(tracker.is_complete)
+        manifest["suite2p"].append(tracker.is_complete)
 
-        # Dataset formation (integration) status. Tracks whether the session has been added to any dataset(s).
-        tracker = ProcessingTracker(file_path=session_data.processed_data.dataset_formation_tracker_path)
-        manifest["dataset_formation"].append(tracker.is_complete)
-
-        # Dataset formation (integration) status. Tracks whether the session has been added to any dataset(s).
+        # Behavior data processing status.
         tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
-        manifest["behavior_processing"].append(tracker.is_complete)
+        manifest["behavior"].append(tracker.is_complete)
 
         # DeepLabCut (video) processing status.
         tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
-        manifest["video_processing"].append(tracker.is_complete)
+        manifest["video"].append(tracker.is_complete)
+
+        # Tracks whether the session's data is ready for dataset integration. To be considered ready, the data must be
+        # successfully processed with all relevant pipelines. Any session currently being processed with any processing
+        # pipeline is considered NOT ready.
+        manifest["dataset"].append(session_data.processed_data.p53_path.exists())
 
     # If all animal IDs are integer-convertible, stores them as numbers to promote proper sorting. Otherwise, stores
     # them as strings. The latter options are primarily kept for compatibility with Tyche data
@@ -382,11 +400,11 @@ def generate_project_manifest(
         "type": pl.String,
         "notes": pl.String,
         "complete": pl.UInt8,
-        "integrity_verification": pl.UInt8,
-        "suite2p_processing": pl.UInt8,
-        "dataset_formation": pl.UInt8,
-        "behavior_processing": pl.UInt8,
-        "video_processing": pl.UInt8,
+        "integrity": pl.UInt8,
+        "suite2p": pl.UInt8,
+        "dataset": pl.UInt8,
+        "behavior": pl.UInt8,
+        "video": pl.UInt8,
     }
     df = pl.DataFrame(manifest, schema=schema, strict=False)
 
@@ -468,3 +486,101 @@ def verify_session_checksum(
         # runtime finished with an error to prevent deadlocking the runtime.
         if tracker.is_running:
             tracker.error()
+
+
+def resolve_p53_marker(
+    session_path: Path,
+    create_processed_data_directory: bool = True,
+    processed_data_root: None | Path = None,
+    remove: bool = False,
+) -> None:
+    """Depending on configuration, either creates or removes the p53.bin marker file for the target session.
+
+    The marker file statically determines whether the session can be targeted by data processing or dataset formation
+    pipelines.
+
+    Notes:
+        Since dataset integration relies on data processing outputs, it is essential to prevent processing pipelines
+        from altering the data while it is integrated into a dataset. The p53.bin marker solves this issue by ensuring
+        that only one type of runtimes (processing or dataset integration) is allowed to work with the session.
+
+        For the p53.bin marker to be created, the session must currently not undergo any processing and must be
+        successfully processed with the minimal set of pipelines for its session type. Removing the p53.bin marker does
+        not have any dependencies and will be executed even if the session is currently undergoing dataset integration.
+        Due to this limitation, it is only possible to call this function with the 'remove' flag manually (via the
+        dedicated CLI).
+
+    Args:
+        session_path: The path to the session directory for which the p53.bin marker needs to be resolved. Note, the
+            input session directory must contain the 'raw_data' subdirectory.
+        create_processed_data_directory: Determines whether to create the processed data hierarchy during runtime.
+        processed_data_root: The root directory where to store the processed data hierarchy. This path has to point to
+            the root directory where to store the processed data from all projects, and it will be automatically
+            modified to include the project name, the animal name, and the session ID.
+        remove: Determines whether this function is called to create or remove the p53.bin marker.
+    """
+
+    # Loads session data layout. If configured to do so, also creates the processed data hierarchy
+    session_data = SessionData.load(
+        session_path=session_path,
+        processed_data_root=processed_data_root,
+        make_processed_data_directory=create_processed_data_directory,
+    )
+
+    # If the p53.bin marker exists and the runtime is configured to remove it, removes the marker file. If the runtime
+    # is configured to create the marker, aborts the runtime (as the marker already exists).
+    if session_data.processed_data.p53_path.exists():
+        if remove:
+            session_data.processed_data.p53_path.unlink()
+            return  # Ends remove runtime
+
+        return  # Ends create runtime
+
+    # If the marker does not exist and the function is called in 'remove' mode, aborts the runtime
+    elif remove:
+        return  # Ends remove runtime
+
+    # The rest of the runtime deals with determining whether it is safe to create the marker file.
+    # Queries the type of the processed session
+    session_type = session_data.session_type
+
+    # If the session type is not supported, aborts with an error
+    if session_type not in _valid_session_types:
+        message = (
+            f"Unable to determine the mandatory processing pipelines for session {session_data.session_name} of animal "
+            f"{session_data.animal_id} and project {session_data.processed_data}. The type of the session "
+            f"{session_type} is not one of the supported session types: {', '.join(_valid_session_types)}."
+        )
+        console.error(message=message, error=ValueError)
+
+    # Window checking sessions are not designed to be integrated into datasets, so they cannot be marked with p53.bin
+    # file. Similarly, any incomplete session is automatically excluded from dataset formation.
+    if session_type == "window checking" or not session_data.raw_data.telomere_path.exists():
+        return
+
+    # Training sessions collect similar data and share processing pipeline requirements
+    if session_type == "lick training" or session_type == "run training":
+        # If the session has not been successfully processed with the behavior processing pipeline, aborts without
+        # creating the marker file. Also ensures that the video tracking pipeline is not actively running, although it
+        # is not required
+        behavior_tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
+        video_tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
+        if not behavior_tracker.is_complete or video_tracker.is_running:
+            # Note, training runtimes do not require suite2p processing.
+            return
+
+    # Mesoscope experiment sessions require additional processing with suite2p
+    if session_type == "mesoscope experiment":
+        behavior_tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
+        suite2p_tracker = ProcessingTracker(file_path=session_data.processed_data.suite2p_processing_tracker_path)
+        video_tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
+
+        # Similar to above, if the session is not processed with the behavior pipeline or the suite2p pipeline, aborts
+        # without creating the marker file. Video tracker is not required for p53 marker creation, but the video
+        # tracking pipeline must not be actively running.
+        if not behavior_tracker.is_complete or not suite2p_tracker.is_complete or video_tracker.is_running:
+            return
+
+    # If the runtime reached this point, the session is eligible for dataset integration. Creates the p53.bin marker
+    # file, preventing the session from being processed again as long as the marker exists.
+    session_data.processed_data.p53_path.touch()

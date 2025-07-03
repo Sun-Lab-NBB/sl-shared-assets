@@ -8,21 +8,21 @@ build-backend = "hatchling.build"
 # Project metdata section. Provides the genral ID information about the project.
 [project]
 name = "sl-shared-assets"
-version = "2.0.1"
-description = "Stores assets shared between multiple Sun (NeuroAI) lab data pipelines."
+version = "3.0.0rc1"
+description = "Provides data acquisition and processing assets shared between Sun (NeuroAI) lab libraries."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
 authors = [
-    {name = "Ivan Kondratyev"},
-    {name = "Kushaan Gupta"},
-    {name = "Natalie Yeung"}
+    { name = "Ivan Kondratyev" },
+    { name = "Kushaan Gupta" },
+    { name = "Natalie Yeung" }
 ]
 maintainers = [
-    {name = "Ivan Kondratyev", email = "ik278@cornell.edu"},
+    { name = "Ivan Kondratyev", email = "ik278@cornell.edu" },
 ]
 
-keywords = ["sunlab", "data", "assets", "acquisition", "processing"]
+keywords = ["sunlab", "data", "assets", "acquisition", "processing", "server"]
 
 classifiers = [
     # Development status
@@ -44,7 +44,7 @@ dependencies = [
     "ataraxis-time==3.0.0",
     "ataraxis-base-utilities==3.0.1",
     "ataraxis-data-structures==3.1.1",
-    "numpy>=2.0.2,<2.3.0",
+    "numpy==2.2.6",
     "appdirs==1.4.4",
     "tqdm==4.67.1",
     "xxhash==3.5.0",
@@ -70,7 +70,7 @@ Documentation = "https://sl-shared-assets-api-docs.netlify.app/"
 # (OSX ARM64, WIN AMD64, LIN AMD64). This specification is used by ataraxis-automation to resolve as many
 # project dependencies with conda over pip as possible.
 condarun = [
-    "numpy>=2.0.2,<2.3.0",
+    "numpy==2.2.6",
     "appdirs==1.4.4",
     "tqdm==4.67.1",
     "paramiko==3.5.1",
@@ -144,6 +144,8 @@ sl-verify-session = "sl_shared_assets.cli:verify_session_integrity"
 sl-project-manifest = "sl_shared_assets.cli:generate_project_manifest_file"
 sl-create-server-credentials = "sl_shared_assets.cli:generate_server_credentials_file"
 sl-ascend-tyche = "sl_shared_assets.cli:ascend_tyche_directory"
+sl-start-jupyter = "sl_shared_assets.cli:start_jupyter_server"
+sl-dataset-marker = "sl_shared_assets.cli:resolve_dataset_marker"
 
 # Specifies files that should not be included in the source-code distribution but are also not part of gitignore.
 [tool.hatch.build.targets.sdist]

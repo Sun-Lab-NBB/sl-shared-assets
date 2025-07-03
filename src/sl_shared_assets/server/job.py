@@ -1,13 +1,51 @@
 """This module provides the core Job class, used as the starting point for all SLURM-managed job executed on lab compute
 server(s). Specifically, the Job class acts as a wrapper around the SLURM configuration and specific logic of each
 job. During runtime, Server class interacts with input job objects to manage their transfer and execution on the
-remote servers."""
+remote servers.
+
+Since version 3.0.0, this module also provides the specialized JupyterJob class used to launch remote Jupyter
+notebook servers.
+"""
 
 # noinspection PyProtectedMember
+import re
 from pathlib import Path
 import datetime
+from dataclasses import dataclass
 
+# noinspection PyProtectedMember
 from simple_slurm import Slurm  # type: ignore
+from ataraxis_base_utilities import LogLevel, console
+
+
+@dataclass
+class _JupyterConnectionInfo:
+    """Stores the data used to establish the connection with a Jupyter notebook server running under SLURM control on a
+    remote Sun lab server.
+
+    More specifically, this class is used to transfer the connection metadata collected on the remote server back to
+    the local machine that requested the server to be established.
+    """
+
+    compute_node: str
+    """The hostname of the compute node where Jupyter is running."""
+
+    port: int
+    """The port number on which Jupyter is listening for communication. Usually, this is the default port 8888 or 9999.
+    """
+
+    token: str
+    """The authentication token for the Jupyter server. This token is used to authenticate the user when establishing 
+    communication with the Jupyter server."""
+
+    @property
+    def localhost_url(self) -> str:
+        """Returns the localhost URL for connecting to the server.
+
+        To use this URL, first set up an SSH tunnel to the server via the specific Jupyter communication port and the
+        remote server access credentials.
+        """
+        return f"http://localhost:{self.port}/?token={self.token}"
 
 
 class Job:
@@ -138,3 +176,193 @@ class Job:
 
         # Returns the script content to caller as a string
         return fixed_script_content
+
+
+class JupyterJob(Job):
+    """Specialized Job instance designed to launch a Jupyter notebook server on SLURM.
+
+    This class extends the base Job class to include Jupyter-specific configuration and commands for starting a
+    notebook server in a SLURM environment. Using this specialized job allows users to set up remote Jupyter servers
+    while still benefitting from SLURM's job management and fair airtime policies.
+
+    Notes:
+        Jupyter servers directly compete for resources with headless data processing jobs. Therefore, it is important
+        to minimize the resource footprint and the runtime of each Jupyter server, if possible.
+
+    Args:
+        job_name: The descriptive name of the Jupyter SLURM job to be created. Primarily, this name is used in terminal
+            printouts to identify the job to human operators.
+        output_log: The absolute path to the .txt file on the processing server, where to store the standard output
+            data of the job.
+        error_log: The absolute path to the .txt file on the processing server, where to store the standard error
+            data of the job.
+        working_directory: The absolute path to the directory where temporary job files will be stored. During runtime,
+            classes from this library use that directory to store files such as the job's shell script. All such files
+            are automatically removed from the directory at the end of a non-errors runtime.
+        conda_environment: The name of the conda environment to activate on the server before running the job logic. The
+            environment should contain the necessary Python packages and CLIs to support running the job's logic. For
+            Jupyter jobs, this necessarily includes the Jupyter notebook and jupyterlab packages.
+        port: The connection port number for Jupyter server. Do not change the default value unless you know what you
+            are doing, as the server has most common communication ports closed for security reasons.
+        notebook_directory: The directory to use as Jupyter's root. During runtime, Jupyter will only have access to
+            items stored in or under this directory. For most runtimes, this should be set to the user's root data or
+            working directory.
+        cpus_to_use: The number of CPUs to allocate to the Jupyter server. Keep this value as small as possible to avoid
+            interfering with headless data processing jobs.
+        ram_gb: The amount of RAM, in GB, to allocate to the Jupyter server. Keep this value as small as possible to
+            avoid interfering with headless data processing jobs.
+        time_limit: The maximum Jupyter server uptime, in minutes. Set this to the expected duration of your jupyter
+            session.
+        jupyter_args: Stores additional arguments to pass to jupyter notebook initialization command.
+
+    Attributes:
+        port: Stores the connection port of the managed Jupyter server.
+        notebook_dir: Stores the absolute path to the directory used as Jupyter's root, relative to the remote server
+            root.
+        connection_info: Stores the JupyterConnectionInfo instance after the Jupyter server is instantiated.
+        host: Stores the hostname of the remote server.
+        user: Stores the username used to connect with the remote server.
+        connection_info_file: The absolute path to the file that stores connection information, relative to the remote
+            server root.
+        _command: Stores the shell command for launching the Jupyter server.
+    """
+
+    def __init__(
+        self,
+        job_name: str,
+        output_log: Path,
+        error_log: Path,
+        working_directory: Path,
+        conda_environment: str,
+        notebook_directory: Path,
+        port: int = 9999,  # Defaults to using port 9999
+        cpus_to_use: int = 2,  # Defaults to 2 CPU cores
+        ram_gb: int = 32,  # Defaults to 32 GB of RAM
+        time_limit: int = 120,  # Defaults to 2 hours of runtime (120 minutes)
+        jupyter_args: str = "",
+    ) -> None:
+        # Initializes parent Job class
+        super().__init__(
+            job_name=job_name,
+            output_log=output_log,
+            error_log=error_log,
+            working_directory=working_directory,
+            conda_environment=conda_environment,
+            cpus_to_use=cpus_to_use,
+            ram_gb=ram_gb,
+            time_limit=time_limit,
+        )
+
+        # Saves important jupyter configuration parameters to class attributes
+        self.port = port
+        self.notebook_dir = notebook_directory
+
+        # Similar to job ID, these attributes initialize to None and are reconfigured as part of the job submission
+        # process.
+        self.connection_info: _JupyterConnectionInfo | None = None
+        self.host: str | None = None
+        self.user: str | None = None
+
+        # Resolves the server-side path to the jupyter server connection info file.
+        self.connection_info_file = working_directory.joinpath(f"{job_name}_connection.txt")
+
+        # Builds Jupyter launch command.
+        self._build_jupyter_command(jupyter_args)
+
+    def _build_jupyter_command(self, jupyter_args: str) -> None:
+        """Builds the command to launch Jupyter notebook server on the remote Sun lab server."""
+
+        # Gets the hostname of the compute node and caches it in the connection data file. Also caches the port name.
+        self.add_command('echo "COMPUTE_NODE: $(hostname)" > {}'.format(self.connection_info_file))
+        self.add_command('echo "PORT: {}" >> {}'.format(self.port, self.connection_info_file))
+
+        # Generates a random access token for security and caches it in the connection data file.
+        self.add_command("TOKEN=$(openssl rand -hex 24)")
+        self.add_command('echo "TOKEN: $TOKEN" >> {}'.format(self.connection_info_file))
+
+        # Builds Jupyter startup command.
+        jupyter_cmd = [
+            "jupyter lab",
+            "--no-browser",
+            f"--port={self.port}",
+            "--ip=0.0.0.0",  # Listen on all interfaces
+            "--ServerApp.allow_origin='*'",  # Allow connections from SSH tunnel
+            "--ServerApp.allow_remote_access=True",  # Enable remote access
+            "--ServerApp.disable_check_xsrf=True",  # Helps with proxy connections
+            f"--ServerApp.root_dir={self.notebook_dir}",  # Root directory (not notebook-dir)
+            "--IdentityProvider.token=$TOKEN",  # Token authentication
+        ]
+
+        # Adds any additional arguments.
+        if jupyter_args:
+            jupyter_cmd.append(jupyter_args)
+
+        # Adds resolved jupyter command to the list of job commands.
+        jupyter_cmd_str = " ".join(jupyter_cmd)
+        self.add_command(jupyter_cmd_str)
+
+    def parse_connection_info(self, info_file: Path) -> None:
+        """Parses the connection information file created by the Jupyter job on the server.
+
+        Use this method to parse the connection file fetched from the server to finalize setting up the Jupyter
+        server job.
+
+        Args:
+            info_file: The path to the .txt file generated by the remote server that stores the Jupyter connection
+                information to be parsed.
+        """
+
+        with open(info_file, "r") as f:
+            content = f.read()
+
+        # Extracts information using regex
+        compute_node_match = re.search(r"COMPUTE_NODE: (.+)", content)
+        port_match = re.search(r"PORT: (\d+)", content)
+        token_match = re.search(r"TOKEN: (.+)", content)
+
+        if not all([compute_node_match, port_match, token_match]):
+            message = f"Could not parse connection information file for the Jupyter server job with id {self.job_id}."
+            console.error(message, ValueError)
+
+        # Stores extracted data inside connection_info attribute as a JupyterConnectionInfo instance.
+        self.connection_info = _JupyterConnectionInfo(
+            compute_node=compute_node_match.group(1).strip(),  # type: ignore
+            port=int(port_match.group(1)),  # type: ignore
+            token=token_match.group(1).strip(),  # type: ignore
+        )
+
+    def print_connection_info(self) -> None:
+        """Constructs and displays the command to set up the SSH tunnel to the server and the link to the localhost
+        server view in the terminal.
+
+        The SSH command should be used via a separate terminal or subprocess call to establish the secure SSH tunnel to
+        the Jupyter server. Once the SSH tunnel is established, the printed localhost url can be used to view the
+        server from the local machine.
+        """
+
+        # If connection information is not available, there is nothing to print
+        if self.connection_info is None:
+            console.echo(
+                message=(
+                    f"No connection information is available for the job {self.job_name}, which indicates that the job "
+                    f"has not been submitted to the server. Submit the job for execution to the remote Sun lab server "
+                    f"to generate the connection information"
+                ),
+                level=LogLevel.WARNING,
+            )
+            return  # No connection information available, so does not proceed with printing.
+
+        # Prints generic connection details to terminal
+        console.echo(f"Jupyter is running on: {self.connection_info.compute_node}")
+        console.echo(f"Port: {self.connection_info.port}")
+        console.echo(f"Token: {self.connection_info.token}")
+
+        # Constructs and displays the SSH tunnel command and the localhost url for connecting to the server
+        tunnel_cmd = (
+            f"ssh -N -L {self.connection_info.port}:{self.connection_info.compute_node}:{self.connection_info.port} "
+            f"{self.user}@{self.host}"
+        )
+        localhost_url = f"http://localhost:{self.connection_info.port}/?token={self.connection_info.token}"
+        print(f"\nTo access locally, run this in a terminal:")
+        print(tunnel_cmd)
+        print(f"\nThen open: {localhost_url}")

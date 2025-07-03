@@ -25,6 +25,19 @@ class ExperimentState:
     state_duration_s: float
 
 @dataclass()
+class TrialCueSequence:
+    """Encapsulates information about the Virtual Reality (VR) wall cue sequence experienced by the animal as part of
+    the given trial.
+
+    All Virtual Reality environments can be broadly conceptualized as repeating motifs (sequences) of wall cues. Since
+    some experimental tasks can use multiple cue sequences as part of the same experiment session, multiple instances of
+    this class can be used to specify supported trial structures. The information stored in this class instance is used
+    during behavior data parsing to assign trial information to data collected from various sources.
+    """
+
+    cue_sequence: tuple[int, ...]
+
+@dataclass()
 class MesoscopeExperimentConfiguration(YamlConfig):
     """Stores the configuration of a single experiment runtime that uses the Mesoscope_VR data acquisition system.
 
@@ -45,6 +58,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
 
     cue_map: dict[int, float] = field(default_factory=Incomplete)
     experiment_states: dict[str, ExperimentState] = field(default_factory=Incomplete)
+    trial_structures: dict[str, TrialCueSequence] = field(default_factory=Incomplete)
 
 @dataclass()
 class MesoscopePaths:

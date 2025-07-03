@@ -1,10 +1,11 @@
 Welcome to sl-shared-assets API documentation page
 ==================================================
 
-sl-shared-assets is a Python library that stores assets shared between multiple Sun (NeuroAI) lab data pipelines.
+sl-shared-assets is a Python library that provides data acquisition and processing assets shared between Sun (NeuroAI)
+lab libraries.
 
 This library is developed in the `Sun lab <https://neuroai.github.io/sunlab/>`_ at Cornell University. The main purpose
-of this library is to provide the tools adn assets used by multiple other data acquisition and processing libraries in
+of this library is to provide the tools and assets used by multiple other data acquisition and processing libraries in
 the lab to avoid cross-dependency issues.
 
 This website only contains the API documentation for the classes and methods offered by this library. See the project
