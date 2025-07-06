@@ -4,7 +4,7 @@ restore the data acquisition and runtime management system to the same state acr
 the same animal.
 """
 
-from dataclasses import dataclass
+from dataclasses import field, dataclass
 
 from ataraxis_data_structures import YamlConfig
 
@@ -88,7 +88,7 @@ class LickTrainingDescriptor(YamlConfig):
     """The weight of the animal, in grams, at the beginning of the session."""
     dispensed_water_volume_ml: float
     """Stores the total water volume, in milliliters, dispensed during runtime."""
-    minimum_reward_delay: int
+    minimum_reward_delay_s: int
     """Stores the minimum delay, in seconds, that can separate the delivery of two consecutive water rewards."""
     maximum_reward_delay_s: int
     """Stores the maximum delay, in seconds, that can separate the delivery of two consecutive water rewards."""
@@ -100,6 +100,11 @@ class LickTrainingDescriptor(YamlConfig):
     """Stores the maximum number of consecutive rewards that can be delivered without the animal consuming them. If 
     the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal 
     consumes the rewards."""
+    system_state_codes: dict[str, int] = field(
+        default_factory=lambda: {"idle": 0, "rest": 1, "run": 2, "lick training": 3, "run training": 4}
+    )
+    """Maps integer state-codes used by the acquisition system to communicate its states to human-readable state 
+    names."""
     experimenter_notes: str = "Replace this with your notes."
     """This field is not set during runtime. It is expected that each experimenter replaces this field with their 
     notes made during runtime."""
@@ -150,6 +155,11 @@ class RunTrainingDescriptor(YamlConfig):
     """Stores the maximum time, in seconds, the animal can dip below the running speed threshold to still receive the 
     reward. This allows animals that 'run' by taking a series of large steps, briefly dipping below speed threshold at 
     the end of each step, to still get water rewards."""
+    system_state_codes: dict[str, int] = field(
+        default_factory=lambda: {"idle": 0, "rest": 1, "run": 2, "lick training": 3, "run training": 4}
+    )
+    """Maps integer state-codes used by the acquisition system to communicate its states to human-readable state 
+    names."""
     experimenter_notes: str = "Replace this with your notes."
     """This field is not set during runtime. It is expected that each experimenter will replace this field with their 
     notes made during runtime."""
@@ -175,6 +185,11 @@ class MesoscopeExperimentDescriptor(YamlConfig):
     """Stores the maximum number of consecutive rewards that can be delivered without the animal consuming them. If 
     the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal 
     consumes the rewards."""
+    system_state_codes: dict[str, int] = field(
+        default_factory=lambda: {"idle": 0, "rest": 1, "run": 2, "lick training": 3, "run training": 4}
+    )
+    """Maps integer state-codes used by the acquisition system to communicate its states to human-readable state 
+    names."""
     experimenter_notes: str = "Replace this with your notes."
     """This field is not set during runtime. It is expected that each experimenter will replace this field with their 
     notes made during runtime."""
