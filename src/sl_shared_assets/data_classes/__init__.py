@@ -24,6 +24,7 @@ from .configuration_data import (
     MesoscopePaths,
     ExperimentState,
     MesoscopeCameras,
+    TrialCueSequence,
     MesoscopeMicroControllers,
     MesoscopeAdditionalFirmware,
     MesoscopeSystemConfiguration,
@@ -60,4 +61,5 @@ __all__ = [
     "MesoscopeMicroControllers",
     "MesoscopeAdditionalFirmware",
     "ProcessingTracker",
+    "TrialCueSequence",
 ]

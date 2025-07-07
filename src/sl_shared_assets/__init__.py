@@ -28,6 +28,7 @@ from .data_classes import (
     ZaberPositions,
     ExperimentState,
     MesoscopeCameras,
+    TrialCueSequence,
     ProcessingTracker,
     MesoscopePositions,
     ProjectConfiguration,
@@ -81,6 +82,7 @@ __all__ = [
     "MesoscopeAdditionalFirmware",
     "get_system_configuration_data",
     "set_system_configuration_file",
+    "TrialCueSequence",
     # Tools package
     "resolve_p53_marker",
     "transfer_directory",
