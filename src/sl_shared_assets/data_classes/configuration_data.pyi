@@ -23,6 +23,9 @@ class ExperimentState:
     experiment_state_code: int
     system_state_code: int
     state_duration_s: float
+    initial_guided_trials: int = ...
+    failed_trial_threshold: int = ...
+    recovery_guided_trials: int = ...
 
 @dataclass()
 class TrialCueSequence:
@@ -36,6 +39,8 @@ class TrialCueSequence:
     """
 
     cue_sequence: tuple[int, ...]
+    trial_length_unity_unit: float = ...
+    trial_length_cm: float = ...
 
 @dataclass()
 class MesoscopeExperimentConfiguration(YamlConfig):

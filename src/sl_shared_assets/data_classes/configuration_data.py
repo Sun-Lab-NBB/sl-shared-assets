@@ -39,6 +39,20 @@ class ExperimentState:
     system currently support two system state codes: REST (1) and RUN (2)."""
     state_duration_s: float
     """The time, in seconds, to maintain the current combination of the experiment and system states."""
+    initial_guided_trials: int = 3
+    """Specifies the number of trials (laps) at the onset of the experiment state, for which lick guidance will be 
+    automatically enabled. Specifically, if the experiment state supports running linearized Virtual Reality track, the 
+    system will enable lick guidance for this many trials at the beginning of the experiment state and automatically 
+    disable it for the following trials."""
+    failed_trial_threshold: int = 6
+    """Specifies the number of failed (non-rewarded) non-guided trials (laps), after which the system will re-enable 
+    guidance for the 'recovery_guided_trials' number of following trials. For this to take effect, the trials must be 
+    failed this many times in a row."""
+    recovery_guided_trials: int = 3
+    """Specifies the number of trials (laps) for which the system will re-enable lick guidance, when the animal 
+    repeatedly fails 'failed_trial_threshold' number of trials. This field works similar to the 'initial_guided_trials' 
+    field, but is triggered by repeated performance failures, rather than experiment state onset. After the animal 
+    runs this many guided trials, the system will automatically disable guidance for the following trials."""
 
 
 @dataclass()
@@ -54,6 +68,10 @@ class TrialCueSequence:
 
     cue_sequence: tuple[int, ...]
     """Specifies the sequence of wall cues experienced by the animal while running this trial."""
+    trial_length_unity_unit: float = 24.0
+    """The length of the trial cue sequence, in Unity units."""
+    trial_length_cm: float = 240.0
+    """The length of the trial cue sequence in centimeters."""
 
 
 # noinspection PyArgumentList
@@ -90,7 +108,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     """A dictionary that uses human-readable state-names as keys and ExperimentState instances as values. Each 
     ExperimentState instance represents a phase of the experiment."""
     trial_structures: dict[str, TrialCueSequence] = field(
-        default_factory=lambda: {"circular_4cue": TrialCueSequence(cue_sequence=(0, 1, 0, 2, 0, 3, 0, 4))}
+        default_factory=lambda: {"circular 4 cue": TrialCueSequence(cue_sequence=(0, 1, 0, 2, 0, 3, 0, 4))}
     )
     """A dictionary that maps human-readable trial structure names as keys and TrialCueSequence instances as values. 
     Each TrialCueSequence instance represents a specific VR wall cue sequence used by a given trial structure."""

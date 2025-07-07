@@ -216,6 +216,20 @@ class Server:
             local_file_path: The path to the file that needs to be copied to the remote server.
             remote_file_path: The path to the file on the remote server (where to copy the file).
         """
+    def pull_directory(self, local_directory_path: Path, remote_directory_path: Path) -> None:
+        """Recursively downloads the entire target directory from the remote server to the local machine.
+
+        Args:
+            local_directory_path: The path to the local directory where the remote directory will be copied.
+            remote_directory_path: The path to the directory on the remote server to be downloaded.
+        """
+    def push_directory(self, local_directory_path: Path, remote_directory_path: Path) -> None:
+        """Recursively uploads the entire target directory from the local machine to the remote server.
+
+        Args:
+            local_directory_path: The path to the local directory to be uploaded.
+            remote_directory_path: The path on the remote server where the directory will be copied.
+        """
     def remove(self, remote_path: Path, is_dir: bool) -> None:
         """Removes the specified file or directory from the remote server.
 
