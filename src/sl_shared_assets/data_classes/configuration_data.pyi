@@ -38,7 +38,7 @@ class TrialCueSequence:
     during behavior data parsing to assign trial information to data collected from various sources.
     """
 
-    cue_sequence: tuple[int, ...]
+    cue_sequence: list[int]
     trial_length_unity_unit: float
     trial_length_cm: float
 
@@ -77,6 +77,13 @@ class MesoscopePaths:
     nas_directory: Path = ...
     mesoscope_directory: Path = ...
     harvesters_cti_path: Path = ...
+
+@dataclass()
+class MesoscopeSheets:
+    """Stores the IDs of Google Sheets used by the Mesoscope-VR data acquisition system."""
+
+    surgery_sheet_id: str = ...
+    water_log_sheet_id: str = ...
 
 @dataclass()
 class MesoscopeCameras:
@@ -155,6 +162,7 @@ class MesoscopeSystemConfiguration(YamlConfig):
 
     name: str = ...
     paths: MesoscopePaths = field(default_factory=MesoscopePaths)
+    sheets: MesoscopeSheets = field(default_factory=MesoscopeSheets)
     cameras: MesoscopeCameras = field(default_factory=MesoscopeCameras)
     microcontrollers: MesoscopeMicroControllers = field(default_factory=MesoscopeMicroControllers)
     additional_firmware: MesoscopeAdditionalFirmware = field(default_factory=MesoscopeAdditionalFirmware)

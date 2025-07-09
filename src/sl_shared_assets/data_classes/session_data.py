@@ -5,7 +5,6 @@ classes, which are also stored as .yaml files inside each session's raw_data and
 these classes contain all necessary information to restore the data hierarchy on any machine. All other Sun lab
 libraries use these classes to work with all lab-generated data."""
 
-import re
 import copy
 import shutil as sh
 from pathlib import Path
@@ -20,127 +19,6 @@ from .configuration_data import get_system_configuration_data
 
 # Stores all supported input for SessionData class 'session_type' fields.
 _valid_session_types = {"lick training", "run training", "mesoscope experiment", "window checking"}
-
-
-@dataclass()
-class VersionData(YamlConfig):
-    """Stores information about the versions of important Sun lab libraries used to acquire the session's data."""
-
-    python_version: str = ""
-    """Stores the Python version used by the environment that acquired the data."""
-    sl_experiment_version: str = ""
-    """Stores the version of the sl-experiment library that was used to acquire the data."""
-
-
-@dataclass()
-class ProjectConfiguration(YamlConfig):
-    """Stores the project-specific configuration parameters that do not change between different animals and runtime
-    sessions.
-
-    An instance of this class is generated and saved as a .yaml file in the 'configuration' directory of each project
-    when it is created. After that, the stored data is reused for every runtime (training or experiment session) carried
-    out for each animal of the project. Additionally, a copy of the most actual configuration file is saved inside each
-    runtime session's 'raw_data' folder, providing seamless integration between the managed data and various Sun lab
-    (sl-) libraries.
-
-    Notes:
-        Together with SessionData, this class forms the entry point for all interactions with the data acquired in the
-        Sun lab. The fields of this class are used to flexibly configure the runtime behavior of major data acquisition
-        (sl-experiment) and processing (sl-forgery) libraries, adapting them for any project in the lab.
-    """
-
-    project_name: str = ""
-    """Stores the descriptive name of the project. This name is used to create the root directory for the project and 
-    to initialize SessionData instances each time any Sun lab library interacts with the session's data."""
-    surgery_sheet_id: str = ""
-    """The ID of the Google Sheet file that stores information about surgical interventions performed on all animals 
-    participating in the managed project. This log sheet is used to parse and write the surgical intervention data for 
-    each animal into every runtime session raw_data folder, so that the surgery data is always kept together with the 
-    rest of the training and experiment data."""
-    water_log_sheet_id: str = ""
-    """The ID of the Google Sheet file that stores information about water restriction (and behavior tracker) 
-    information for all animals participating in the managed project. This is used to synchronize the information 
-    inside the water restriction log with the state of the animal at the end of each training or experiment session.
-    """
-
-    @classmethod
-    def load(cls, configuration_path: Path) -> "ProjectConfiguration":
-        """Loads the project configuration parameters from the specified project_configuration.yaml file.
-
-        This method is called during each interaction with any runtime session's data, including the creation of a new
-        session.
-
-        Args:
-            configuration_path: The path to the project_configuration.yaml file from which to load the data.
-
-        Returns:
-            The initialized ProjectConfiguration instance that stores the configuration data for the target project.
-
-        Raise:
-            FileNotFoundError: If the specified configuration file does not exist or is not a valid YAML file.
-        """
-
-        # Prevents loading non-existent files.
-        if configuration_path.suffix != ".yaml" or not configuration_path.exists():
-            message = (
-                f"Unable to load the project configuration data from the specified path: {configuration_path}. Valid "
-                f"configuration file paths should use the '.yaml' extension and point to an existing file."
-            )
-            console.error(message=message, error=FileNotFoundError)
-
-        # Loads the data from the YAML file and initializes the class instance.
-        instance: ProjectConfiguration = cls.from_yaml(file_path=configuration_path)  # type: ignore
-
-        # Verifies the loaded data. Most importantly, this step does not allow proceeding if the user did not
-        # replace the surgery log and water restriction log placeholders with valid ID values.
-        instance._verify_data()
-
-        # Returns the initialized class instance to caller
-        return instance
-
-    def save(self, path: Path) -> None:
-        """Saves class instance data to disk as a project_configuration.yaml file.
-
-        This method is automatically called from the 'sl_experiment' library when a new project is created. After this
-        method's runtime, all future project initialization calls will use the load() method to reuse configuration data
-        saved to the .yaml file created by this method.
-
-        Args:
-            path: The path to the .yaml file to save the data to.
-        """
-
-        # Saves the data to the YAML file
-        self.to_yaml(file_path=path)
-
-    def _verify_data(self) -> None:
-        """Verifies the user-modified data loaded from the project_configuration.yaml file.
-
-        Since this class is explicitly designed to be modified by the user, this verification step is carried out to
-        ensure that the loaded data matches expectations. This reduces the potential for user errors to impact the
-        runtime behavior of the libraries using this class. This internal method is automatically called by the load()
-        method.
-
-        Raises:
-            ValueError: If the loaded data does not match expected formats or values.
-        """
-
-        # Verifies Google Sheet ID formatting. Google Sheet IDs are usually 44 characters long, containing letters,
-        # numbers, hyphens, and underscores
-        pattern = r"^[a-zA-Z0-9_-]{44}$"
-        if not re.match(pattern, self.surgery_sheet_id):
-            message = (
-                f"Unable to verify the surgery_sheet_id field loaded from the 'project_configuration.yaml' file. "
-                f"Expected a string with 44 characters, using letters, numbers, hyphens, and underscores, but found: "
-                f"{self.surgery_sheet_id}."
-            )
-            console.error(message=message, error=ValueError)
-        if not re.match(pattern, self.water_log_sheet_id):
-            message = (
-                f"Unable to verify the surgery_sheet_id field loaded from the 'project_configuration.yaml' file. "
-                f"Expected a string with 44 characters, using letters, numbers, hyphens, and underscores, but found: "
-                f"{self.water_log_sheet_id}."
-            )
-            console.error(message=message, error=ValueError)
 
 
 @dataclass()
@@ -384,6 +262,10 @@ class SessionData(YamlConfig):
     field is not None (null), it communicates the specific experiment configuration used by the session. During runtime,
     the name stored here is used to load the specific experiment configuration data stored in a .yaml file with the 
     same name. If the session is not an experiment session, this field is ignored."""
+    python_version: str = "3.11.13"
+    """Stores the Python version used to acquire raw session data."""
+    sl_experiment_version: str = "2.0.0"
+    """Stores the version of the sl-experiment library that was used to acquire the raw session data."""
     raw_data: RawData = field(default_factory=lambda: RawData())
     """Stores the paths to all subfolders and files found under the /project/animal/session/raw_data directory of any 
     PC used to work with Sun lab data."""

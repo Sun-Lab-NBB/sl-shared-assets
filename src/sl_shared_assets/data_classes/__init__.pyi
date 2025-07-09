@@ -9,10 +9,8 @@ from .runtime_data import (
 from .session_data import (
     RawData as RawData,
     SessionData as SessionData,
-    VersionData as VersionData,
     ProcessedData as ProcessedData,
     ProcessingTracker as ProcessingTracker,
-    ProjectConfiguration as ProjectConfiguration,
 )
 from .surgery_data import (
     DrugData as DrugData,
@@ -40,7 +38,6 @@ __all__ = [
     "ImplantData",
     "SessionData",
     "RawData",
-    "VersionData",
     "ProcessedData",
     "SubjectData",
     "SurgeryData",
@@ -49,7 +46,6 @@ __all__ = [
     "ZaberPositions",
     "ExperimentState",
     "MesoscopePositions",
-    "ProjectConfiguration",
     "MesoscopeHardwareState",
     "RunTrainingDescriptor",
     "LickTrainingDescriptor",

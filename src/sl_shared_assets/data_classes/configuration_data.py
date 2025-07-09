@@ -66,7 +66,7 @@ class TrialCueSequence:
     during behavior data parsing to assign trial information to data collected from various sources.
     """
 
-    cue_sequence: tuple[int, ...]
+    cue_sequence: list[int]
     """Specifies the sequence of wall cues experienced by the animal while running this trial."""
     trial_length_unity_unit: float
     """The length of the trial cue sequence, in Unity units."""
@@ -131,7 +131,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     trial_structures: dict[str, TrialCueSequence] = field(
         default_factory=lambda: {
             "circular 4 cue": TrialCueSequence(
-                cue_sequence=(0, 1, 0, 2, 0, 3, 0, 4), trial_length_unity_unit=24.0, trial_length_cm=240.0
+                cue_sequence=[0, 1, 0, 2, 0, 3, 0, 4], trial_length_unity_unit=24.0, trial_length_cm=240.0
             )
         }
     )
@@ -174,6 +174,22 @@ class MesoscopePaths:
     sharing protocol, such as SMB."""
     harvesters_cti_path: Path = Path("/opt/mvIMPACT_Acquire/lib/x86_64/mvGenTLProducer.cti")
     """The path to the GeniCam CTI file used to connect to Harvesters-managed cameras."""
+
+
+@dataclass()
+class MesoscopeSheets:
+    """Stores the IDs of Google Sheets used by the Mesoscope-VR data acquisition system."""
+
+    surgery_sheet_id: str = ""
+    """The ID of the Google Sheet file that stores information about surgical interventions performed on all animals 
+    participating in each lab project. This log sheet is used to parse and write the surgical intervention data for 
+    each animal into every runtime session raw_data folder, so that the surgery data is always kept together with the 
+    rest of the training and experiment data."""
+    water_log_sheet_id: str = ""
+    """The ID of the Google Sheet file that stores information about water restriction (and behavior tracker) 
+    information for all animals participating in the managed project. This is used to synchronize the information 
+    inside the water restriction log with the state of the animal at the end of each training or experiment session.
+    """
 
 
 @dataclass()
@@ -226,7 +242,7 @@ class MesoscopeMicroControllers:
     at maximum voltage (break is fully engaged)."""
     wheel_diameter_cm: float = 15.0333
     """The diameter of the running wheel connected to the break and torque sensor, in centimeters."""
-    lick_threshold_adc: int = 500
+    lick_threshold_adc: int = 850
     """The threshold voltage, in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC), interpreted 
     as the animal's tongue contacting the sensor. Note, 12-bit ADC only supports values between 0 and 4095, so setting 
     the threshold above 4095 will result in no licks being reported to Unity."""
@@ -255,10 +271,10 @@ class MesoscopeMicroControllers:
     torque_report_ccw: bool = True
     """Determines whether the sensor should report torque in the Counter-Clockwise (CCW) direction. This direction 
     corresponds to the animal trying to move the wheel forward."""
-    torque_signal_threshold_adc: int = 300
+    torque_signal_threshold_adc: int = 100
     """The minimum voltage, in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC), reported to the
     PC as a non-zero value. Voltages below this level are interpreted as noise and are always pulled to 0."""
-    torque_delta_threshold_adc: int = 300
+    torque_delta_threshold_adc: int = 70
     """The minimum absolute difference in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC) for 
     the change to be reported to the PC. This is used to prevent reporting repeated static torque readouts to the 
     PC, conserving communication bandwidth."""
@@ -293,10 +309,10 @@ class MesoscopeMicroControllers:
     encoder uses a dedicated parameter, as the encoder needs to be sampled at a higher frequency than all other sensors.
     """
     valve_calibration_data: dict[int | float, int | float] | tuple[tuple[int | float, int | float], ...] = (
-        (15000, 1.75),
-        (30000, 3.85),
-        (45000, 7.95),
-        (60000, 12.65),
+        (15000, 1.10),
+        (30000, 3.00),
+        (45000, 6.25),
+        (60000, 10.90),
     )
     """A tuple of tuples that maps water delivery solenoid valve open times, in microseconds, to the dispensed volume 
     of water, in microliters. During training and experiment runtimes, this data is used by the ValveModule to translate
@@ -341,6 +357,8 @@ class MesoscopeSystemConfiguration(YamlConfig):
     """Stores the descriptive name of the data acquisition system."""
     paths: MesoscopePaths = field(default_factory=MesoscopePaths)
     """Stores the filesystem configuration parameters for the Mesoscope-VR data acquisition system."""
+    sheets: MesoscopeSheets = field(default_factory=MesoscopeSheets)
+    """Stores the IDs of Google Sheets used by the Mesoscope-VR data acquisition system."""
     cameras: MesoscopeCameras = field(default_factory=MesoscopeCameras)
     """Stores the configuration parameters for the cameras used by the Mesoscope-VR system to record behavior videos."""
     microcontrollers: MesoscopeMicroControllers = field(default_factory=MesoscopeMicroControllers)

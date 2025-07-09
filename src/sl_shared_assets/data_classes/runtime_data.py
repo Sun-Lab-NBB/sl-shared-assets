@@ -4,7 +4,7 @@ restore the data acquisition and runtime management system to the same state acr
 the same animal.
 """
 
-from dataclasses import field, dataclass
+from dataclasses import dataclass
 
 from ataraxis_data_structures import YamlConfig
 
@@ -76,6 +76,9 @@ class MesoscopeHardwareState(YamlConfig):
     recorded_mesoscope_ttl: bool | None = None
     """TTLInterface instance property. A boolean flag that determines whether the processed session recorded brain 
     activity data with the mesoscope."""
+    system_state_codes: dict[str, int] | None = None
+    """A MesoscopeVRSystem property. A dictionary that maps integer state-codes used by the Mesoscope-VR system to 
+    communicate its states to human-readable state names."""
 
 
 @dataclass()
@@ -87,7 +90,8 @@ class LickTrainingDescriptor(YamlConfig):
     mouse_weight_g: float
     """The weight of the animal, in grams, at the beginning of the session."""
     dispensed_water_volume_ml: float
-    """Stores the total water volume, in milliliters, dispensed during runtime."""
+    """Stores the total water volume, in milliliters, dispensed during runtime. This excludes the water volume 
+    dispensed during the paused (idle) state."""
     minimum_reward_delay_s: int
     """Stores the minimum delay, in seconds, that can separate the delivery of two consecutive water rewards."""
     maximum_reward_delay_s: int
@@ -100,11 +104,8 @@ class LickTrainingDescriptor(YamlConfig):
     """Stores the maximum number of consecutive rewards that can be delivered without the animal consuming them. If 
     the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal 
     consumes the rewards."""
-    system_state_codes: dict[str, int] = field(
-        default_factory=lambda: {"idle": 0, "rest": 1, "run": 2, "lick training": 3, "run training": 4}
-    )
-    """Maps integer state-codes used by the acquisition system to communicate its states to human-readable state 
-    names."""
+    pause_dispensed_water_volume_ml: float = 0.0
+    """Stores the total water volume, in milliliters, dispensed during the paused (idle) state."""
     experimenter_notes: str = "Replace this with your notes."
     """This field is not set during runtime. It is expected that each experimenter replaces this field with their 
     notes made during runtime."""
@@ -155,11 +156,8 @@ class RunTrainingDescriptor(YamlConfig):
     """Stores the maximum time, in seconds, the animal can dip below the running speed threshold to still receive the 
     reward. This allows animals that 'run' by taking a series of large steps, briefly dipping below speed threshold at 
     the end of each step, to still get water rewards."""
-    system_state_codes: dict[str, int] = field(
-        default_factory=lambda: {"idle": 0, "rest": 1, "run": 2, "lick training": 3, "run training": 4}
-    )
-    """Maps integer state-codes used by the acquisition system to communicate its states to human-readable state 
-    names."""
+    pause_dispensed_water_volume_ml: float = 0.0
+    """Stores the total water volume, in milliliters, dispensed during the paused (idle) state."""
     experimenter_notes: str = "Replace this with your notes."
     """This field is not set during runtime. It is expected that each experimenter will replace this field with their 
     notes made during runtime."""
@@ -185,14 +183,11 @@ class MesoscopeExperimentDescriptor(YamlConfig):
     """Stores the maximum number of consecutive rewards that can be delivered without the animal consuming them. If 
     the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal 
     consumes the rewards."""
-    system_state_codes: dict[str, int] = field(
-        default_factory=lambda: {"idle": 0, "rest": 1, "run": 2, "lick training": 3, "run training": 4}
-    )
-    """Maps integer state-codes used by the acquisition system to communicate its states to human-readable state 
-    names."""
     experimenter_notes: str = "Replace this with your notes."
     """This field is not set during runtime. It is expected that each experimenter will replace this field with their 
     notes made during runtime."""
+    pause_dispensed_water_volume_ml: float = 0.0
+    """Stores the total water volume, in milliliters, dispensed during the paused (idle) state."""
     experimenter_given_water_volume_ml: float = 0.0
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the session.
     """
@@ -229,15 +224,15 @@ class ZaberPositions(YamlConfig):
     """The absolute position, in native motor units, of the HeadBar pitch-axis motor."""
     headbar_roll: int = 0
     """The absolute position, in native motor units, of the HeadBar roll-axis motor."""
-    wheel_x: int = 0
-    """The absolute position, in native motor units, of the running wheel platform x-axis motor. Although this motor is
-    not itself part of the HeadBar assembly, it is controlled through the HeadBar controller port."""
     lickport_z: int = 0
     """The absolute position, in native motor units, of the LickPort z-axis motor."""
     lickport_x: int = 0
     """The absolute position, in native motor units, of the LickPort x-axis motor."""
     lickport_y: int = 0
     """The absolute position, in native motor units, of the LickPort y-axis motor."""
+    wheel_x: int = 0
+    """The absolute position, in native motor units, of the running wheel platform x-axis motor. Although this motor is
+    not itself part of the HeadBar assembly, it is controlled through the HeadBar controller port."""
 
 
 @dataclass()

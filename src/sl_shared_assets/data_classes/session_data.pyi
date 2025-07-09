@@ -9,71 +9,6 @@ from .configuration_data import get_system_configuration_data as get_system_conf
 _valid_session_types: Incomplete
 
 @dataclass()
-class VersionData(YamlConfig):
-    """Stores information about the versions of important Sun lab libraries used to acquire the session's data."""
-
-    python_version: str = ...
-    sl_experiment_version: str = ...
-
-@dataclass()
-class ProjectConfiguration(YamlConfig):
-    """Stores the project-specific configuration parameters that do not change between different animals and runtime
-    sessions.
-
-    An instance of this class is generated and saved as a .yaml file in the 'configuration' directory of each project
-    when it is created. After that, the stored data is reused for every runtime (training or experiment session) carried
-    out for each animal of the project. Additionally, a copy of the most actual configuration file is saved inside each
-    runtime session's 'raw_data' folder, providing seamless integration between the managed data and various Sun lab
-    (sl-) libraries.
-
-    Notes:
-        Together with SessionData, this class forms the entry point for all interactions with the data acquired in the
-        Sun lab. The fields of this class are used to flexibly configure the runtime behavior of major data acquisition
-        (sl-experiment) and processing (sl-forgery) libraries, adapting them for any project in the lab.
-    """
-
-    project_name: str = ...
-    surgery_sheet_id: str = ...
-    water_log_sheet_id: str = ...
-    @classmethod
-    def load(cls, configuration_path: Path) -> ProjectConfiguration:
-        """Loads the project configuration parameters from the specified project_configuration.yaml file.
-
-        This method is called during each interaction with any runtime session's data, including the creation of a new
-        session.
-
-        Args:
-            configuration_path: The path to the project_configuration.yaml file from which to load the data.
-
-        Returns:
-            The initialized ProjectConfiguration instance that stores the configuration data for the target project.
-
-        Raise:
-            FileNotFoundError: If the specified configuration file does not exist or is not a valid YAML file.
-        """
-    def save(self, path: Path) -> None:
-        """Saves class instance data to disk as a project_configuration.yaml file.
-
-        This method is automatically called from the 'sl_experiment' library when a new project is created. After this
-        method's runtime, all future project initialization calls will use the load() method to reuse configuration data
-        saved to the .yaml file created by this method.
-
-        Args:
-            path: The path to the .yaml file to save the data to.
-        """
-    def _verify_data(self) -> None:
-        """Verifies the user-modified data loaded from the project_configuration.yaml file.
-
-        Since this class is explicitly designed to be modified by the user, this verification step is carried out to
-        ensure that the loaded data matches expectations. This reduces the potential for user errors to impact the
-        runtime behavior of the libraries using this class. This internal method is automatically called by the load()
-        method.
-
-        Raises:
-            ValueError: If the loaded data does not match expected formats or values.
-        """
-
-@dataclass()
 class RawData:
     """Stores the paths to the directories and files that make up the 'raw_data' session-specific directory.
 
@@ -178,6 +113,8 @@ class SessionData(YamlConfig):
     session_type: str
     acquisition_system: str
     experiment_name: str | None
+    python_version: str = ...
+    sl_experiment_version: str = ...
     raw_data: RawData = field(default_factory=Incomplete)
     processed_data: ProcessedData = field(default_factory=Incomplete)
     def __post_init__(self) -> None:
