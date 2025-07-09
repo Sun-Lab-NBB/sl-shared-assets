@@ -289,6 +289,8 @@ class SessionData(YamlConfig):
         session_type: str,
         experiment_name: str | None = None,
         session_name: str | None = None,
+        python_version: str = "3.11.13",
+        sl_experiment_version: str = "2.0.0",
     ) -> "SessionData":
         """Creates a new SessionData object and generates the new session's data structure on the local PC.
 
@@ -315,6 +317,10 @@ class SessionData(YamlConfig):
                 sessions. When provided, the method uses this name instead of generating a new timestamp-based name.
                 This is only used during the 'ascension' runtime to convert old data structures to the modern
                 lab standards.
+            python_version: The string that specifies the Python version used to collect raw session data. Has to be
+                specified using the major.minor.patch version format.
+            sl_experiment_version: The string that specifies the version of the sl-experiment library used to collect
+                raw session data. Has to be specified using the major.minor.patch version format.
 
         Returns:
             An initialized SessionData instance that stores the layout of the newly created session's data.
@@ -387,6 +393,8 @@ class SessionData(YamlConfig):
             raw_data=raw_data,
             processed_data=processed_data,
             experiment_name=experiment_name,
+            python_version=python_version,
+            sl_experiment_version=sl_experiment_version,
         )
 
         # Saves the configured instance data to the session's folder, so that it can be reused during processing or
