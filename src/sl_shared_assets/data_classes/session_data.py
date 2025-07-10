@@ -68,9 +68,6 @@ class RawData:
     surgery_metadata_path: Path = Path()
     """Stores the path to the surgery_metadata.yaml file. This file contains the most actual information about the 
     surgical intervention(s) performed on the animal prior to the session."""
-    project_configuration_path: Path = Path()
-    """Stores the path to the project_configuration.yaml file. This file contains the snapshot of the configuration 
-    parameters for the session's project."""
     session_data_path: Path = Path()
     """Stores the path to the session_data.yaml file. This path is used by the SessionData instance to save itself to 
     disk as a .yaml file. The file contains the paths to all raw and processed data directories used during data 
@@ -110,9 +107,6 @@ class RawData:
     """Stores the path to the integrity_verification.yaml tracker file. This file stores the current state of the data 
     integrity verification pipeline. It prevents more than one instance of the pipeline from working with the data 
     at a given time and communicates the outcome (success or failure) of the most recent pipeline runtime."""
-    version_data_path: Path = Path()
-    """Stores the path to the version_data.yaml file. This file contains the snapshot of Python and sl-experiment 
-    library versions that were used when the data was acquired."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -135,7 +129,6 @@ class RawData:
         self.session_descriptor_path = self.raw_data_path.joinpath("session_descriptor.yaml")
         self.hardware_state_path = self.raw_data_path.joinpath("hardware_state.yaml")
         self.surgery_metadata_path = self.raw_data_path.joinpath("surgery_metadata.yaml")
-        self.project_configuration_path = self.raw_data_path.joinpath("project_configuration.yaml")
         self.session_data_path = self.raw_data_path.joinpath("session_data.yaml")
         self.experiment_configuration_path = self.raw_data_path.joinpath("experiment_configuration.yaml")
         self.mesoscope_positions_path = self.raw_data_path.joinpath("mesoscope_positions.yaml")
@@ -145,7 +138,6 @@ class RawData:
         self.telomere_path = self.raw_data_path.joinpath("telomere.bin")
         self.ubiquitin_path = self.raw_data_path.joinpath("ubiquitin.bin")
         self.integrity_verification_tracker_path = self.raw_data_path.joinpath("integrity_verification_tracker.yaml")
-        self.version_data_path = self.raw_data_path.joinpath("version_data.yaml")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
@@ -302,9 +294,9 @@ class SessionData(YamlConfig):
 
             This method automatically dumps the data of the created SessionData instance into the session_data.yaml file
             inside the root raw_data directory of the created hierarchy. It also finds and dumps other configuration
-            files, such as project_configuration.yaml, experiment_configuration.yaml, and system_configuration.yaml into
-            the same raw_data directory. This ensures that if the session's runtime is interrupted unexpectedly, the
-            acquired data can still be processed.
+            files, such as experiment_configuration.yaml and system_configuration.yaml into the same raw_data directory.
+            This ensures that if the session's runtime is interrupted unexpectedly, the acquired data can still be
+            processed.
 
         Args:
             project_name: The name of the project for which the data is acquired.
@@ -401,14 +393,8 @@ class SessionData(YamlConfig):
         # preprocessing.
         instance._save()
 
-        # Also saves the ProjectConfiguration, SystemConfiguration, and ExperimentConfiguration instances to the same
-        # folder using the paths resolved for the RawData instance above.
-
-        # Copies the project_configuration.yaml file to session's folder
-        project_configuration_path = acquisition_system.paths.root_directory.joinpath(
-            project_name, "configuration", "project_configuration.yaml"
-        )
-        sh.copy2(project_configuration_path, instance.raw_data.project_configuration_path)
+        # Also saves the SystemConfiguration and ExperimentConfiguration instances to the same folder using the paths
+        # resolved for the RawData instance above.
 
         # Dumps the acquisition system's configuration data to session's folder
         acquisition_system.save(path=instance.raw_data.system_configuration_path)
