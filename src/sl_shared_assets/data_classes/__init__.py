@@ -23,8 +23,8 @@ from .surgery_data import (
 from .configuration_data import (
     MesoscopePaths,
     ExperimentState,
+    ExperimentTrial,
     MesoscopeCameras,
-    TrialCueSequence,
     MesoscopeMicroControllers,
     MesoscopeAdditionalFirmware,
     MesoscopeSystemConfiguration,
@@ -59,5 +59,5 @@ __all__ = [
     "MesoscopeMicroControllers",
     "MesoscopeAdditionalFirmware",
     "ProcessingTracker",
-    "TrialCueSequence",
+    "ExperimentTrial",
 ]

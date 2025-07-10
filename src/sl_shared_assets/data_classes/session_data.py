@@ -103,6 +103,13 @@ class RawData:
     the long-term storage destinations (NAS and Server) and the integrity of the moved data is verified on at least one 
     destination. During 'purge' sl-experiment runtimes, the library discovers and removes all session data marked with 
     'ubiquitin.bin' files from the machine that runs the code."""
+    nk_path: Path = Path()
+    """Stores the path to the nk.bin file. This file is used during new data acquisition by the sl-experiment library
+    to mark sessions going through initial runtime initialization. Since runtime initialization is a complex process 
+    that may fail at many different time-points, it is important to know whether the runtime initialized before 
+    encountering an error. The presence of an nk.bin marker notifies post-runtime processes that the runtime failed to 
+    initialize, marking that session's data for immediate deletion from all sources, as it does not contain any valid 
+    information."""
     integrity_verification_tracker_path: Path = Path()
     """Stores the path to the integrity_verification.yaml tracker file. This file stores the current state of the data 
     integrity verification pipeline. It prevents more than one instance of the pipeline from working with the data 
@@ -137,6 +144,7 @@ class RawData:
         self.system_configuration_path = self.raw_data_path.joinpath("system_configuration.yaml")
         self.telomere_path = self.raw_data_path.joinpath("telomere.bin")
         self.ubiquitin_path = self.raw_data_path.joinpath("ubiquitin.bin")
+        self.nk_path = self.raw_data_path.joinpath("nk.bin")
         self.integrity_verification_tracker_path = self.raw_data_path.joinpath("integrity_verification_tracker.yaml")
 
     def make_directories(self) -> None:

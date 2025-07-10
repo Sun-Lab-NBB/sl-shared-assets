@@ -56,14 +56,14 @@ class ExperimentState:
 
 
 @dataclass()
-class TrialCueSequence:
-    """Encapsulates information about the Virtual Reality (VR) wall cue sequence experienced by the animal as part of
-    the given trial.
+class ExperimentTrial:
+    """Encapsulates information about a single experiment trial.
 
-    All Virtual Reality environments can be broadly conceptualized as repeating motifs (sequences) of wall cues. Since
-    some experimental tasks can use multiple cue sequences as part of the same experiment session, multiple instances of
-    this class can be used to specify supported trial structures. The information stored in this class instance is used
-    during behavior data parsing to assign trial information to data collected from various sources.
+    All Virtual Reality tasks can be broadly conceptualized as repeating motifs (sequences) of wall cues,
+    associated with a specific rewarded goal. These repeated motifs are typically used to define experiment trials
+    during analysis. Since some experiments can use multiple trial types as part of the same experiment session,
+    multiple instances of this class can be used to specify supported trial structures and trial parameters for a
+    given experiment.
     """
 
     cue_sequence: list[int]
@@ -72,6 +72,8 @@ class TrialCueSequence:
     """The length of the trial cue sequence, in Unity units."""
     trial_length_cm: float
     """The length of the trial cue sequence in centimeters."""
+    trial_reward_size_ul: float = 5.0
+    """The volume of water, in microliters, to be dispensed when the animal successfully completes the trial task."""
 
 
 # noinspection PyArgumentList
@@ -98,6 +100,14 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     """A dictionary that maps each integer-code associated with a wall cue used in the Virtual Reality experiment 
     environment to its length in real-world centimeters. It is used to map each VR cue to the distance the animal needs
     to travel to fully traverse the wall cue region from start to end."""
+    cue_offset_cm: float = 10.0
+    """Specifies the positive offset distance, in centimeters, by which the animal's starting position is shifted 
+    relative to experiment environment onset. Due to how the VR environment is revealed to the animal, most runtimes 
+    need to shift the animal slightly forward relative to the track origin (0), to prevent it from seeing the area 
+    before the first VR wall cue when the task starts and when the animal is teleported to the beginning of the track. 
+    This offset statically shifts the entire track (in centimeters) against the set of VR wall cues used during 
+    runtime. Storing this static offset as part of experiment configuration is crucial for correctly interpreting the 
+    data acquiring during runtime."""
     experiment_states: dict[str, ExperimentState] = field(
         default_factory=lambda: {
             "baseline": ExperimentState(
@@ -128,15 +138,19 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     )
     """A dictionary that uses human-readable state-names as keys and ExperimentState instances as values. Each 
     ExperimentState instance represents a phase of the experiment."""
-    trial_structures: dict[str, TrialCueSequence] = field(
+    trial_structures: dict[str, ExperimentTrial] = field(
         default_factory=lambda: {
-            "circular 4 cue": TrialCueSequence(
-                cue_sequence=[0, 1, 0, 2, 0, 3, 0, 4], trial_length_unity_unit=24.0, trial_length_cm=240.0
+            "cyclic_4_cue": ExperimentTrial(
+                cue_sequence=[0, 1, 0, 2, 0, 3, 0, 4],
+                trial_length_unity_unit=24.0,
+                trial_length_cm=240.0,
+                trial_reward_size_ul=5.0,
             )
         }
     )
-    """A dictionary that maps human-readable trial structure names as keys and TrialCueSequence instances as values. 
-    Each TrialCueSequence instance represents a specific VR wall cue sequence used by a given trial structure."""
+    """A dictionary that maps human-readable trial structure names as keys and ExperimentTrial instances as values. 
+    Each ExperimentTrial instance specifies the Virtual Reality layout and runtime parameters associated with a single 
+    type of trials supported by the experiment runtime."""
 
 
 @dataclass()

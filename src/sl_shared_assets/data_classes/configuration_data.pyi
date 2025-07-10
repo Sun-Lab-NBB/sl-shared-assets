@@ -28,19 +28,20 @@ class ExperimentState:
     recovery_guided_trials: int
 
 @dataclass()
-class TrialCueSequence:
-    """Encapsulates information about the Virtual Reality (VR) wall cue sequence experienced by the animal as part of
-    the given trial.
+class ExperimentTrial:
+    """Encapsulates information about a single experiment trial.
 
-    All Virtual Reality environments can be broadly conceptualized as repeating motifs (sequences) of wall cues. Since
-    some experimental tasks can use multiple cue sequences as part of the same experiment session, multiple instances of
-    this class can be used to specify supported trial structures. The information stored in this class instance is used
-    during behavior data parsing to assign trial information to data collected from various sources.
+    All Virtual Reality tasks can be broadly conceptualized as repeating motifs (sequences) of wall cues,
+    associated with a specific rewarded goal. These repeated motifs are typically used to define experiment trials
+    during analysis. Since some experiments can use multiple trial types as part of the same experiment session,
+    multiple instances of this class can be used to specify supported trial structures and trial parameters for a
+    given experiment.
     """
 
     cue_sequence: list[int]
     trial_length_unity_unit: float
     trial_length_cm: float
+    trial_reward_size_ul: float = ...
 
 @dataclass()
 class MesoscopeExperimentConfiguration(YamlConfig):
@@ -62,8 +63,9 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     """
 
     cue_map: dict[int, float] = field(default_factory=Incomplete)
+    cue_offset_cm: float = ...
     experiment_states: dict[str, ExperimentState] = field(default_factory=Incomplete)
-    trial_structures: dict[str, TrialCueSequence] = field(default_factory=Incomplete)
+    trial_structures: dict[str, ExperimentTrial] = field(default_factory=Incomplete)
 
 @dataclass()
 class MesoscopePaths:

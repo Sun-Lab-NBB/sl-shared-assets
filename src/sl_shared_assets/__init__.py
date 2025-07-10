@@ -26,8 +26,8 @@ from .data_classes import (
     MesoscopePaths,
     ZaberPositions,
     ExperimentState,
+    ExperimentTrial,
     MesoscopeCameras,
-    TrialCueSequence,
     ProcessingTracker,
     MesoscopePositions,
     RunTrainingDescriptor,
@@ -78,7 +78,7 @@ __all__ = [
     "MesoscopeAdditionalFirmware",
     "get_system_configuration_data",
     "set_system_configuration_file",
-    "TrialCueSequence",
+    "ExperimentTrial",
     # Tools package
     "resolve_p53_marker",
     "transfer_directory",
