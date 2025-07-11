@@ -72,8 +72,15 @@ class ExperimentTrial:
     """The length of the trial cue sequence, in Unity units."""
     trial_length_cm: float
     """The length of the trial cue sequence in centimeters."""
-    trial_reward_size_ul: float = 5.0
+    trial_reward_size_ul: float
     """The volume of water, in microliters, to be dispensed when the animal successfully completes the trial task."""
+    reward_zone_start_cm: float
+    """Specifies the starting boundary of the trial reward zone, in centimeters."""
+    reward_zone_end_cm: float
+    """Specifies the ending boundary of the trial reward zone, in centimeters."""
+    guidance_trigger_location_cm: float
+    """Specifies the location of the invisible boundary (wall) with which the animal must collide to elicit automated 
+    water reward during guided trials."""
 
 
 # noinspection PyArgumentList
@@ -101,7 +108,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     environment to its length in real-world centimeters. It is used to map each VR cue to the distance the animal needs
     to travel to fully traverse the wall cue region from start to end."""
     cue_offset_cm: float = 10.0
-    """Specifies the positive offset distance, in centimeters, by which the animal's starting position is shifted 
+    """Specifies the positive offset distance, in centimeters, by which the animal's running track is shifted 
     relative to experiment environment onset. Due to how the VR environment is revealed to the animal, most runtimes 
     need to shift the animal slightly forward relative to the track origin (0), to prevent it from seeing the area 
     before the first VR wall cue when the task starts and when the animal is teleported to the beginning of the track. 
@@ -141,10 +148,13 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     trial_structures: dict[str, ExperimentTrial] = field(
         default_factory=lambda: {
             "cyclic_4_cue": ExperimentTrial(
-                cue_sequence=[0, 1, 0, 2, 0, 3, 0, 4],
+                cue_sequence=[1, 0, 2, 0, 3, 0, 4, 0],
                 trial_length_unity_unit=24.0,
                 trial_length_cm=240.0,
                 trial_reward_size_ul=5.0,
+                reward_zone_start_cm=208.0,
+                reward_zone_end_cm=222.0,
+                guidance_trigger_location_cm=208.0,
             )
         }
     )
@@ -245,9 +255,6 @@ class MesoscopeMicroControllers:
     """Determines whether to run the managed acquisition system in the 'debug mode'. This mode should be disabled 
     during most runtimes. It is used during initial system calibration and testing and prints a lot of generally 
     redundant information into the terminal."""
-    mesoscope_ttl_pulse_duration_ms: int = 10
-    """The duration of the HIGH phase of all outgoing TTL pulses that target the Mesoscope (enable or disable mesoscope
-    frame acquisition), in milliseconds."""
     minimum_break_strength_g_cm: float = 43.2047
     """The minimum torque applied by the running wheel break in gram centimeter. This is the torque the break delivers 
     at minimum voltage (break is disabled)."""
@@ -267,8 +274,10 @@ class MesoscopeMicroControllers:
     """The minimum absolute difference in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC) for 
     the change to be reported to the PC. This is used to prevent reporting repeated non-lick or lick readouts to the 
     PC, conserving communication bandwidth."""
-    lick_averaging_pool_size: int = 10
-    """The number of lick sensor readouts to average together to produce the final lick sensor readout value."""
+    lick_averaging_pool_size: int = 1
+    """The number of lick sensor readouts to average together to produce the final lick sensor readout value. Note, 
+    when using a Teensy controller, this number is multiplied by the built-in analog readout averaging (default is 4).
+    """
     torque_baseline_voltage_adc: int = 2046
     """The voltage level, in raw analog units measured by 3.3v Analog-to-Digital-Converter (ADC) at 12-bit resolution 
     after the AD620 amplifier, that corresponds to no (0) torque readout. Usually, for a 3.3v ADC, this would be 
@@ -292,8 +301,10 @@ class MesoscopeMicroControllers:
     """The minimum absolute difference in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC) for 
     the change to be reported to the PC. This is used to prevent reporting repeated static torque readouts to the 
     PC, conserving communication bandwidth."""
-    torque_averaging_pool_size: int = 10
-    """The number of torque sensor readouts to average together to produce the final torque sensor readout value."""
+    torque_averaging_pool_size: int = 1
+    """The number of torque sensor readouts to average together to produce the final torque sensor readout value. Note, 
+    when using a Teensy controller, this number is multiplied by the built-in analog readout averaging (default is 4).
+    """
     wheel_encoder_ppr: int = 8192
     """The resolution of the managed quadrature encoder, in Pulses Per Revolution (PPR). This is the number of 
     quadrature pulses the encoder emits per full 360-degree rotation."""

@@ -192,6 +192,13 @@ class SessionData(YamlConfig):
             FileNotFoundError: If the 'session_data.yaml' file is not found under the session_path/raw_data/ subfolder.
 
         """
+    def mark_initialization(self) -> None:
+        """Ensures that the 'nk.bin' marker file is removed from the session's raw_dat folder.
+
+        This marker is generated as part of the SessionData initialization (creation) process to mark sessions that did
+        not fully initialize during runtime. Call this method after fully initializing the data acquisition runtime
+        control class to ensure that the session is not marker for automated deletion upon runtime completion.
+        """
     def _save(self) -> None:
         """Saves the instance data to the 'raw_data' directory of the managed session as a 'session_data.yaml' file.
 

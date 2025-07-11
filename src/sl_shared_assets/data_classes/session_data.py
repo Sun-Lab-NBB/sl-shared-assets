@@ -414,6 +414,11 @@ class SessionData(YamlConfig):
             )
             sh.copy2(experiment_configuration_path, instance.raw_data.experiment_configuration_path)
 
+        # All newly created sessions are marked with the 'nk.bin' file. If the marker is not removed during runtime,
+        # the session becomes a valid target for deletion (purging) runtimes operating from the main acquisition
+        # machine of any data acquisition system.
+        instance.raw_data.nk_path.touch()
+
         # Returns the initialized SessionData instance to caller
         return instance
 
@@ -492,6 +497,15 @@ class SessionData(YamlConfig):
 
         # Returns the initialized SessionData instance to caller
         return instance
+
+    def mark_initialization(self) -> None:
+        """Ensures that the 'nk.bin' marker file is removed from the session's raw_dat folder.
+
+        This marker is generated as part of the SessionData initialization (creation) process to mark sessions that did
+        not fully initialize during runtime. Call this method after fully initializing the data acquisition runtime
+        control class to ensure that the session is not marker for automated deletion upon runtime completion.
+        """
+        self.raw_data.nk_path.unlink(missing_ok=True)
 
     def _save(self) -> None:
         """Saves the instance data to the 'raw_data' directory of the managed session as a 'session_data.yaml' file.
