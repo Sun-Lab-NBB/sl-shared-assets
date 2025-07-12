@@ -6,6 +6,7 @@ these classes contain all necessary information to restore the data hierarchy on
 libraries use these classes to work with all lab-generated data."""
 
 import copy
+from enum import StrEnum
 import shutil as sh
 from pathlib import Path
 from dataclasses import field, dataclass
@@ -15,18 +16,43 @@ from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
 
-from .configuration_data import get_system_configuration_data
+from .configuration_data import AcquisitionSystems, get_system_configuration_data
 
-# Stores all supported input for SessionData class 'session_type' fields.
-_valid_session_types = {"lick training", "run training", "mesoscope experiment", "window checking"}
+
+class SessionTypes(StrEnum):
+    """Defines the set of data acquisition session types supported by various data acquisition systems used in the
+    Sun lab.
+
+    A data acquisition session broadly encompasses a recording session carried out to either: acquire experiment data,
+    train the animal for the upcoming experiments, or to assess the quality of surgical or other pre-experiment
+    intervention.
+
+    Notes:
+        This enumeration does not differentiate between different acquisition systems. Different acquisition systems
+        support different session types, and may not be suited for acquiring some of the session types listed in this
+        enumeration.
+    """
+
+    LICK_TRAINING = "lick training"
+    """Mesoscope-VR session designed to teach animals to use the water delivery port while being head-fixed."""
+    RUN_TRAINING = "run training"
+    """Mesoscope-VR session designed to teach animals how to run on the treadmill while being head-fixed."""
+    MESOSCOPE_EXPERIMENT = "mesoscope experiment"
+    """Mesoscope-VR experiment session. The session uses Unity game engine to run experiments in virtual reality task 
+    environments and collects brain activity data using Mesoscope."""
+    WINDOW_CHECKING = "window checking"
+    """A special Mesoscope-VR session designed to evaluate the suitability of the given animal to be included into the
+    experiment dataset. Specifically, the session involves using the Mesoscope to check the quality of the cell 
+    activity data."""
 
 
 @dataclass()
 class RawData:
     """Stores the paths to the directories and files that make up the 'raw_data' session-specific directory.
 
-    The raw_data directory stores the data acquired during the session runtime before and after preprocessing. Since
-    preprocessing does not alter the data, any data in that folder is considered 'raw'.
+    The raw_data directory stores the data acquired during the session data acquisition runtime, before and after
+    preprocessing. Since preprocessing does not irreversibly alter the data, any data in that folder is considered
+    'raw,' event if preprocessing losslessly re-compresses the data for efficient transfer.
 
     Notes:
         Sun lab data management strategy primarily relies on keeping multiple redundant copies of the raw_data for
@@ -43,35 +69,34 @@ class RawData:
     includes .mp4 video files from each recorded camera."""
     mesoscope_data_path: Path = Path()
     """Stores the path to the directory that contains all Mesoscope data acquired during the session. Primarily, this 
-    includes the mesoscope-acquired .tiff files (brain activity data) and the motion estimation data. This directory is
-    created for all sessions, but is only used (filled) by the sessions that use the Mesoscope-VR system to acquire 
-    brain activity data."""
+    includes the mesoscope-acquired .tiff files (brain activity data) and the MotionEstimator.me file (motion 
+    estimation data). This directory is created for all sessions, but is only used (filled) by the sessions that use 
+    the Mesoscope-VR system to acquire brain activity data."""
     behavior_data_path: Path = Path()
     """Stores the path to the directory that contains all non-video behavior data acquired during the session. 
     Primarily, this includes the .npz log files that store serialized data acquired by all hardware components of the 
-    data acquisition system other than cameras and brain activity data acquisition devices (such as the Mesoscope).
-    The reason why the directory is called 'behavior' is primarily because all .npz files are parsed to infer the 
-    behavior of the animal, in contrast to brain (cell) activity data."""
+    data acquisition system other than cameras and brain activity data acquisition devices (such as the Mesoscope)."""
     zaber_positions_path: Path = Path()
     """Stores the path to the zaber_positions.yaml file. This file contains the snapshot of all Zaber motor positions 
-    at the end of the session. Zaber motors are used to position the LickPort and the HeadBar manipulators, which is 
-    essential for supporting proper brain imaging and animal's running behavior during the session. This file is only 
-    created for sessions that use the Mesoscope-VR system."""
+    at the end of the session. Zaber motors are used to position the LickPort, HeadBar, and Wheel Mesoscope-VR modules
+    to support proper brain activity recording and behavior during the session. This file is only created for sessions 
+    that use the Mesoscope-VR system."""
     session_descriptor_path: Path = Path()
-    """Stores the path to the session_descriptor.yaml file. This file is partially filled by the system during runtime 
-    and partially by the experimenter after the runtime. It contains session-specific information, such as the specific
-    task parameters and the notes made by the experimenter during runtime."""
+    """Stores the path to the session_descriptor.yaml file. This file is filled jointly by the data acquisition system 
+    and the experimenter. It contains session-specific information, such as the specific task parameters and the notes 
+    made by the experimenter during runtime. Each supported session type uses a unique SessionDescriptor class to define
+    the format and content of the session_descriptor.yaml file."""
     hardware_state_path: Path = Path()
     """Stores the path to the hardware_state.yaml file. This file contains the partial snapshot of the calibration 
-    parameters used by the data acquisition and runtime management system modules during the session. Primarily, 
-    this is used during data processing to read the .npz data log files generated during runtime."""
+    parameters used by the data acquisition system modules during the session. Primarily, it is used during data 
+    processing to interpret the raw data stored inside .npz log files."""
     surgery_metadata_path: Path = Path()
     """Stores the path to the surgery_metadata.yaml file. This file contains the most actual information about the 
     surgical intervention(s) performed on the animal prior to the session."""
     session_data_path: Path = Path()
     """Stores the path to the session_data.yaml file. This path is used by the SessionData instance to save itself to 
-    disk as a .yaml file. The file contains the paths to all raw and processed data directories used during data 
-    acquisition or processing runtime."""
+    disk as a .yaml file. In turn, the cached data is reused to reinstate the same data hierarchy across all supported 
+    destinations, enabling various libraries to interface with the session data."""
     experiment_configuration_path: Path = Path()
     """Stores the path to the experiment_configuration.yaml file. This file contains the snapshot of the 
     experiment runtime configuration used by the session. This file is only created for experiment sessions."""
@@ -81,13 +106,13 @@ class RawData:
     the 'virtual' tip, tilt, and fastZ positions set via ScanImage software. This file is only created for sessions that
     use the Mesoscope-VR system to acquire brain activity data."""
     window_screenshot_path: Path = Path()
-    """Stores the path to the .png screenshot of the ScanImagePC screen. The screenshot should contain the image of the 
-    cranial window and the red-dot alignment windows. This is used to generate a visual snapshot of the cranial window
-    alignment and appearance for each experiment session. This file is only created for sessions that use the 
-    Mesoscope-VR system to acquire brain activity data."""
+    """Stores the path to the .png screenshot of the ScanImagePC screen. As a minimum, the screenshot should contain the
+    image of the imaging plane and the red-dot alignment window. This is used to generate a visual snapshot of the 
+    cranial window alignment and cell appearance for each experiment session. This file is only created for sessions 
+    that use the Mesoscope-VR system to acquire brain activity data."""
     system_configuration_path: Path = Path()
     """Stores the path to the system_configuration.yaml file. This file contains the exact snapshot of the data 
-    acquisition and runtime management system configuration parameters used to acquire session data."""
+    acquisition system configuration parameters used to acquire session data."""
     checksum_path: Path = Path()
     """Stores the path to the ax_checksum.txt file. This file is generated as part of packaging the data for 
     transmission and stores the xxHash-128 checksum of the data. It is used to verify that the transmission did not 
@@ -98,18 +123,16 @@ class RawData:
     telomere.bin file are considered 'incomplete' and are excluded from all automated processing, as they may contain 
     corrupted, incomplete, or otherwise unusable data."""
     ubiquitin_path: Path = Path()
-    """Stores the path to the ubiquitin.bin file. This file is primarily used by the sl-experiment libraries to mark 
+    """Stores the path to the ubiquitin.bin file. This file is primarily used by the sl-experiment library to mark 
     local session data directories for deletion (purging). Typically, it is created once the data is safely moved to 
     the long-term storage destinations (NAS and Server) and the integrity of the moved data is verified on at least one 
-    destination. During 'purge' sl-experiment runtimes, the library discovers and removes all session data marked with 
-    'ubiquitin.bin' files from the machine that runs the code."""
+    destination. During 'sl-purge' sl-experiment runtimes, the library discovers and removes all session data marked 
+    with 'ubiquitin.bin' files from the machine that runs the command."""
     nk_path: Path = Path()
-    """Stores the path to the nk.bin file. This file is used during new data acquisition by the sl-experiment library
-    to mark sessions going through initial runtime initialization. Since runtime initialization is a complex process 
-    that may fail at many different time-points, it is important to know whether the runtime initialized before 
-    encountering an error. The presence of an nk.bin marker notifies post-runtime processes that the runtime failed to 
-    initialize, marking that session's data for immediate deletion from all sources, as it does not contain any valid 
-    information."""
+    """Stores the path to the nk.bin file. This file is used by the sl-experiment library to mark sessions undergoing
+    runtime initialization. Since runtime initialization is a complex process that may encounter a runtime error, the 
+    marker is used to discover sessions that failed to initialize. Since uninitialized sessions by definition do not 
+    contain any valuable data, they are marked for immediate deletion from all managed destinations."""
     integrity_verification_tracker_path: Path = Path()
     """Stores the path to the integrity_verification.yaml tracker file. This file stores the current state of the data 
     integrity verification pipeline. It prevents more than one instance of the pipeline from working with the data 
@@ -118,13 +141,12 @@ class RawData:
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
 
-        This method is called each time the class is instantiated to regenerate the managed path hierarchy on any
-        machine that instantiates the class.
+        This method is called each time the (wrapper) SessionData class is instantiated to regenerate the managed path
+        hierarchy on any machine that instantiates the class.
 
         Args:
-            root_directory_path: The path to the top-level directory of the local hierarchy. Depending on the managed
-                hierarchy, this has to point to a directory under the main /session, /animal, or /project directory of
-                the managed session.
+            root_directory_path: The path to the top-level directory of the session. Typically, this path is assembled
+                using the following hierarchy: root/project/animal/session_id
         """
 
         # Generates the managed paths
@@ -148,7 +170,11 @@ class RawData:
         self.integrity_verification_tracker_path = self.raw_data_path.joinpath("integrity_verification_tracker.yaml")
 
     def make_directories(self) -> None:
-        """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
+        """Ensures that all major subdirectories and the root directory exist, creating any missing directories.
+
+        This method is called each time the (wrapper) SessionData class is instantiated and allowed to generate
+        missing data directories.
+        """
         ensure_directory_exists(self.raw_data_path)
         ensure_directory_exists(self.camera_data_path)
         ensure_directory_exists(self.mesoscope_data_path)
@@ -165,30 +191,30 @@ class ProcessedData:
     """
 
     processed_data_path: Path = Path()
-    """Stores the path to the root processed_data directory of the session. This directory stores the processed data 
-    as it is generated by various data processing pipelines."""
+    """Stores the path to the root processed_data directory of the session. This directory stores the processed session 
+    data, generated from raw_data directory contents by various data processing pipelines."""
     camera_data_path: Path = Path()
-    """Stores the path to the directory that contains video tracking data generated by our DeepLabCut-based video 
-    processing pipelines."""
+    """Stores the path to the directory that contains video tracking data generated by the Sun lab DeepLabCut-based 
+    video processing pipeline(s)."""
     mesoscope_data_path: Path = Path()
-    """Stores path to the directory that contains processed brain activity (cell) data generated by our suite2p-based 
-    photometry processing pipelines (single-day and multi-day). This directory is only used by sessions acquired with 
-    the Mesoscope-VR system. For all other sessions, it will be created, but kept empty."""
+    """Stores path to the directory that contains processed brain activity (cell) data generated by sl-suite2p 
+    processing pipelines (single-day and multi-day). This directory is only used by sessions acquired with 
+    the Mesoscope-VR system."""
     behavior_data_path: Path = Path()
     """Stores the path to the directory that contains the non-video and non-brain-activity data extracted from 
-    .npz log files by our in-house log parsing pipeline."""
+    .npz log files by the sl-behavior log processing pipeline."""
     suite2p_processing_tracker_path: Path = Path()
-    """Stores the path to the suite2p_processing_tracker.yaml tracker file. This file stores the current state of the 
-    sl-suite2p single-day data processing pipeline."""
+    """Stores the path to the suite2p_processing_tracker.yaml tracker file. This file stores the current state of 
+    processing the session with the sl-suite2p single-day pipeline."""
     behavior_processing_tracker_path: Path = Path()
-    """Stores the path to the behavior_processing_tracker.yaml file. This file stores the current state of the 
-    behavior (log) data processing pipeline."""
+    """Stores the path to the behavior_processing_tracker.yaml file. This file stores the current state of processing 
+    the session with the sl-behavior log-parsing pipeline."""
     video_processing_tracker_path: Path = Path()
-    """Stores the path to the video_processing_tracker.yaml file. This file stores the current state of the video 
-    tracking (DeepLabCut) processing pipeline."""
+    """Stores the path to the video_processing_tracker.yaml file. This file stores the current state of processing 
+    the session with the DeepLabCut-based video processing pipeline."""
     p53_path: Path = Path()
     """Stores the path to the p53.bin file. This file serves as a lock-in marker that determines whether the session is 
-    in the processing or dataset mode. Specifically, if the file does not exist, the session data cannot be integrated 
+    in the processing or dataset state. Specifically, if the file does not exist, the session data cannot be integrated 
     into any dataset, as it may be actively worked on by processing pipelines. Conversely, if the marker exists, 
     processing pipelines are not allowed to work with the session, as it may be actively integrated into one or more 
     datasets."""
@@ -196,13 +222,12 @@ class ProcessedData:
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
 
-        This method is called each time the class is instantiated to regenerate the managed path hierarchy on any
-        machine that instantiates the class.
+        This method is called each time the (wrapper) SessionData class is instantiated to regenerate the managed path
+        hierarchy on any machine that instantiates the class.
 
         Args:
-            root_directory_path: The path to the top-level directory of the local hierarchy. Depending on the managed
-                hierarchy, this has to point to a directory under the main /session, /animal, or /project directory of
-                the managed session.
+            root_directory_path: The path to the top-level directory of the session. Typically, this path is assembled
+                using the following hierarchy: root/project/animal/session_id
         """
         # Generates the managed paths
         self.processed_data_path = root_directory_path
@@ -215,7 +240,11 @@ class ProcessedData:
         self.p53_path = self.processed_data_path.joinpath("p53.bin")
 
     def make_directories(self) -> None:
-        """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
+        """Ensures that all major subdirectories and the root directory exist, creating any missing directories.
+
+        This method is called each time the (wrapper) SessionData class is instantiated and allowed to generate
+        missing data directories.
+        """
 
         ensure_directory_exists(self.processed_data_path)
         ensure_directory_exists(self.camera_data_path)
@@ -224,54 +253,51 @@ class ProcessedData:
 
 @dataclass
 class SessionData(YamlConfig):
-    """Stores and manages the data layout of a single training or experiment session acquired in the Sun lab.
+    """Stores and manages the data layout of a single Sun lab data acquisition session.
 
-    The primary purpose of this class is to maintain the session data structure across all supported destinations and
-    during all processing stages. It generates the paths used by all other classes from all Sun lab libraries that
-    interact with the session's data from the point of its creation and until the data is integrated into an
-    analysis dataset.
-
-    When necessary, the class can be used to either generate a new session or load the layout of an already existing
-    session. When the class is used to create a new session, it generates the new session's name using the current
-    UTC timestamp, accurate to microseconds. This ensures that each session name is unique and preserves the overall
-    session order.
+    The primary purpose of this class is to maintain the session data structure across all supported destinations and to
+    provide a unified data access interface shared by all Sun lab libraries. The class can be used to either generate a
+    new session or load the layout of an already existing session. When the class is used to create a new session, it
+    generates the new session's name using the current UTC timestamp, accurate to microseconds. This ensures that each
+    session 'name' is unique and preserves the overall session order.
 
     Notes:
         This class is specifically designed for working with the data from a single session, performed by a single
         animal under the specific experiment. The class is used to manage both raw and processed data. It follows the
-        data through acquisition, preprocessing and processing stages of the Sun lab data workflow. Together with
-        ProjectConfiguration class, this class serves as an entry point for all interactions with the managed session's
-        data.
+        data through acquisition, preprocessing and processing stages of the Sun lab data workflow. This class serves as
+        an entry point for all interactions with the managed session's data.
     """
 
     project_name: str
-    """Stores the name of the managed session's project."""
+    """Stores the name of the project for which the session was acquired."""
     animal_id: str
-    """Stores the unique identifier of the animal that participates in the managed session."""
+    """Stores the unique identifier of the animal that participates in the session."""
     session_name: str
-    """Stores the name (timestamp-based ID) of the managed session."""
-    session_type: str
-    """Stores the type of the session. Primarily, this determines how to read the session_descriptor.yaml file. Has 
-    to be set to one of the supported types: 'lick training', 'run training', 'window checking' or 
-    'mesoscope experiment'.
+    """Stores the name (timestamp-based ID) of the session."""
+    session_type: str | SessionTypes
+    """Stores the type of the session. Has to be set to one of the supported session types, defined in the SessionTypes
+    enumeration exposed by the sl-shared-assets library.
     """
-    acquisition_system: str
-    """Stores the name of the data acquisition and runtime management system that acquired the data."""
+    acquisition_system: str | AcquisitionSystems
+    """Stores the name of the data acquisition system that acquired the data. Has to be set to one of the supported 
+    acquisition systems, defined in the AcquisitionSystems enumeration exposed by the sl-shared-assets library."""
     experiment_name: str | None
-    """Stores the name of the experiment configuration file. If the session_type field is set to 'Experiment' and this 
-    field is not None (null), it communicates the specific experiment configuration used by the session. During runtime,
-    the name stored here is used to load the specific experiment configuration data stored in a .yaml file with the 
-    same name. If the session is not an experiment session, this field is ignored."""
+    """Stores the name of the experiment performed during the session. If the session_type field indicates that the 
+    session is an experiment, this field communicates the specific experiment configuration used by the session. During 
+    runtime, this name is used to load the specific experiment configuration data stored in a .yaml file with the same 
+    name. If the session is not an experiment session, this field should be left as Null (None)."""
     python_version: str = "3.11.13"
-    """Stores the Python version used to acquire raw session data."""
+    """Stores the Python version that was used to acquire session data."""
     sl_experiment_version: str = "2.0.0"
-    """Stores the version of the sl-experiment library that was used to acquire the raw session data."""
+    """Stores the version of the sl-experiment library that was used to acquire the session data."""
     raw_data: RawData = field(default_factory=lambda: RawData())
-    """Stores the paths to all subfolders and files found under the /project/animal/session/raw_data directory of any 
-    PC used to work with Sun lab data."""
+    """Stores absolute paths to all directories and files that jointly make the session's raw data hierarchy. This 
+    directory structure is resolved for each machine that creates or loads the SessionData class to ensure that all 
+    Sun lab data can be accessed via the same API on any destination."""
     processed_data: ProcessedData = field(default_factory=lambda: ProcessedData())
-    """Stores the paths to all subfolders and files found under the /project/animal/session/processed_data directory of 
-    any PC used to work with Sun lab data."""
+    """Stores absolute paths to all directories and files that jointly make the session's processed data hierarchy. 
+    Typically, this hierarchy is only used on the lab's processing server(s), but it can also be used to run local 
+    testing on end-user machines."""
 
     def __post_init__(self) -> None:
         """Ensures raw_data and processed_data are always instances of RawData and ProcessedData."""
@@ -286,7 +312,7 @@ class SessionData(YamlConfig):
         cls,
         project_name: str,
         animal_id: str,
-        session_type: str,
+        session_type: SessionTypes | str,
         experiment_name: str | None = None,
         session_name: str | None = None,
         python_version: str = "3.11.13",
@@ -301,35 +327,37 @@ class SessionData(YamlConfig):
             To load an already existing session data structure, use the load() method instead.
 
             This method automatically dumps the data of the created SessionData instance into the session_data.yaml file
-            inside the root raw_data directory of the created hierarchy. It also finds and dumps other configuration
-            files, such as experiment_configuration.yaml and system_configuration.yaml into the same raw_data directory.
-            This ensures that if the session's runtime is interrupted unexpectedly, the acquired data can still be
-            processed.
+            inside the root 'raw_data' directory of the created hierarchy. It also finds and dumps other configuration
+            files, such as experiment_configuration.yaml and system_configuration.yaml into the same 'raw_data'
+            directory. If the session's runtime is interrupted unexpectedly, the acquired data can still be processed
+            using these pre-saved class instances.
 
         Args:
-            project_name: The name of the project for which the data is acquired.
-            animal_id: The ID code of the animal for which the data is acquired.
-            session_type: The type of the session. Primarily, this determines how to read the session_descriptor.yaml
-                file. Valid options are 'Lick training', 'Run training', 'Window checking', or 'Experiment'.
-            experiment_name: The name of the experiment executed during managed session. This optional argument is only
-                used for 'Experiment' session types. It is used to find the experiment configuration .YAML file.
-            session_name: An optional session_name override. Generally, this argument should not be provided for most
+            project_name: The name of the project for which the session is carried out.
+            animal_id: The ID code of the animal participating in the session.
+            session_type: The type of the session. Has to be one of the supported session types exposed by the
+                SessionTypes enumeration.
+            experiment_name: The name of the experiment executed during the session. This optional argument is only
+                used for experiment sessions. Note! The name passed to this argument has to match the name of the
+                experiment configuration .yaml file.
+            session_name: An optional session name override. Generally, this argument should not be provided for most
                 sessions. When provided, the method uses this name instead of generating a new timestamp-based name.
                 This is only used during the 'ascension' runtime to convert old data structures to the modern
                 lab standards.
-            python_version: The string that specifies the Python version used to collect raw session data. Has to be
+            python_version: The string that specifies the Python version used to collect session data. Has to be
                 specified using the major.minor.patch version format.
             sl_experiment_version: The string that specifies the version of the sl-experiment library used to collect
-                raw session data. Has to be specified using the major.minor.patch version format.
+                session data. Has to be specified using the major.minor.patch version format.
 
         Returns:
             An initialized SessionData instance that stores the layout of the newly created session's data.
         """
 
-        if session_type.lower() not in _valid_session_types:
+        # Need to convert to tuple to support Python 3.11
+        if session_type not in tuple(SessionTypes):
             message = (
-                f"Invalid session type '{session_type.lower()}' encountered when creating a new SessionData instance. "
-                f"Use one of the supported session types: {_valid_session_types}"
+                f"Invalid session type '{session_type}' encountered when creating a new SessionData instance. "
+                f"Use one of the supported session types from the SessionTypes enumeration."
             )
             console.error(message=message, error=ValueError)
 
@@ -388,7 +416,7 @@ class SessionData(YamlConfig):
             project_name=project_name,
             animal_id=animal_id,
             session_name=session_name,
-            session_type=session_type.lower(),
+            session_type=session_type,
             acquisition_system=acquisition_system.name,
             raw_data=raw_data,
             processed_data=processed_data,
@@ -432,9 +460,9 @@ class SessionData(YamlConfig):
         """Loads the SessionData instance from the target session's session_data.yaml file.
 
         This method is used to load the data layout information of an already existing session. Primarily, this is used
-        when preprocessing or processing session data. Due to how SessionData is stored and used in the lab, this
-        method always loads the data layout from the session_data.yaml file stored inside the raw_data session
-        subfolder. Currently, all interactions with Sun lab data require access to the 'raw_data' folder.
+        when processing session data. Due to how SessionData is stored and used in the lab, this method always loads the
+        data layout from the session_data.yaml file stored inside the 'raw_data' session subfolder. Currently, all
+        interactions with Sun lab data require access to the 'raw_data' folder of each session.
 
         Notes:
             To create a new session, use the create() method instead.
@@ -501,16 +529,16 @@ class SessionData(YamlConfig):
     def runtime_initialized(self) -> None:
         """Ensures that the 'nk.bin' marker file is removed from the session's raw_data folder.
 
-        This marker is generated as part of the SessionData initialization (creation) process to mark sessions that did
-        not fully initialize during runtime. This service method is designed to be called by the inner runtime control
-        functions and classes of the sl-experiment library and generally should not be called by end-users.
+        The 'nk.bin' marker is generated as part of the SessionData initialization (creation) process to mark sessions
+        that did not fully initialize during runtime. This service method is designed to be called by the sl-experiment
+        library classes to remove the 'nk.bin' marker when it is safe to do so. It should not be called by end-users.
         """
         self.raw_data.nk_path.unlink(missing_ok=True)
 
     def _save(self) -> None:
         """Saves the instance data to the 'raw_data' directory of the managed session as a 'session_data.yaml' file.
 
-        This is used to save the data stored in the instance to disk, so that it can be reused during preprocessing or
+        This is used to save the data stored in the instance to disk, so that it can be reused during further stages of
         data processing. The method is intended to only be used by the SessionData instance itself during its
         create() method runtime.
         """
@@ -560,6 +588,16 @@ class ProcessingTracker(YamlConfig):
             self._lock_path = str(self.file_path.with_suffix(self.file_path.suffix + ".lock"))
         else:
             self._lock_path = ""
+
+    def __del__(self) -> None:
+        """If the instance is garbage-collected without calling the stop() method, assumes this is due to a runtime
+        error.
+
+        It is essential to always resolve the runtime as either 'stopped' or 'erred' to avoid deadlocking the session
+        data.
+        """
+        if self._is_running:
+            self.error()
 
     def _load_state(self) -> None:
         """Reads the current processing state from the wrapped .YAML file."""
@@ -671,7 +709,11 @@ class ProcessingTracker(YamlConfig):
             raise Timeout(message)  # Fallback to appease mypy, should not be reachable
 
     def stop(self) -> None:
-        """Mark processing as started.
+        """Configures the tracker file to indicate that the tracked processing runtime has been completed successfully.
+
+        After this method returns, it is UNSAFE to do any further processing from the process that calls this method.
+        Any process that calls the 'start' method of this class is expected to also call this method or 'error' method
+        at the end of the runtime.
 
         Raises:
             TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
@@ -713,7 +755,7 @@ class ProcessingTracker(YamlConfig):
     @property
     def is_complete(self) -> bool:
         """Returns True if the tracker wrapped by the instance indicates that the processing runtime has been completed
-        successfully and False otherwise."""
+        successfully at least once and that there is no ongoing processing that uses the target session."""
         try:
             # Acquires the lock
             lock = FileLock(self._lock_path)
@@ -734,8 +776,8 @@ class ProcessingTracker(YamlConfig):
 
     @property
     def encountered_error(self) -> bool:
-        """Returns True if the tracker wrapped by the instance indicates that the processing runtime aborted due to
-        encountering an error and False otherwise."""
+        """Returns True if the tracker wrapped by the instance indicates that the processing runtime for the target
+        session has aborted due to encountering an error."""
         try:
             # Acquires the lock
             lock = FileLock(self._lock_path)
@@ -757,7 +799,7 @@ class ProcessingTracker(YamlConfig):
     @property
     def is_running(self) -> bool:
         """Returns True if the tracker wrapped by the instance indicates that the processing runtime is currently
-        running and False otherwise."""
+        running for the target session."""
         try:
             # Acquires the lock
             lock = FileLock(self._lock_path)

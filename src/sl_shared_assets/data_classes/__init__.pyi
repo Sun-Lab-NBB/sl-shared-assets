@@ -9,6 +9,7 @@ from .runtime_data import (
 from .session_data import (
     RawData as RawData,
     SessionData as SessionData,
+    SessionTypes as SessionTypes,
     ProcessedData as ProcessedData,
     ProcessingTracker as ProcessingTracker,
 )
@@ -25,6 +26,7 @@ from .configuration_data import (
     ExperimentState as ExperimentState,
     ExperimentTrial as ExperimentTrial,
     MesoscopeCameras as MesoscopeCameras,
+    AcquisitionSystems as AcquisitionSystems,
     MesoscopeMicroControllers as MesoscopeMicroControllers,
     MesoscopeAdditionalFirmware as MesoscopeAdditionalFirmware,
     MesoscopeSystemConfiguration as MesoscopeSystemConfiguration,
@@ -60,4 +62,6 @@ __all__ = [
     "MesoscopeAdditionalFirmware",
     "ProcessingTracker",
     "ExperimentTrial",
+    "AcquisitionSystems",
+    "SessionTypes",
 ]

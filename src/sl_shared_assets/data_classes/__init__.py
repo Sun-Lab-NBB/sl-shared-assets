@@ -11,7 +11,7 @@ from .runtime_data import (
     MesoscopeHardwareState,
     MesoscopeExperimentDescriptor,
 )
-from .session_data import RawData, SessionData, ProcessedData, ProcessingTracker
+from .session_data import RawData, SessionData, SessionTypes, ProcessedData, ProcessingTracker
 from .surgery_data import (
     DrugData,
     ImplantData,
@@ -25,6 +25,7 @@ from .configuration_data import (
     ExperimentState,
     ExperimentTrial,
     MesoscopeCameras,
+    AcquisitionSystems,
     MesoscopeMicroControllers,
     MesoscopeAdditionalFirmware,
     MesoscopeSystemConfiguration,
@@ -60,4 +61,6 @@ __all__ = [
     "MesoscopeAdditionalFirmware",
     "ProcessingTracker",
     "ExperimentTrial",
+    "AcquisitionSystems",
+    "SessionTypes",
 ]

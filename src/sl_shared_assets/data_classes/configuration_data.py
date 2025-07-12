@@ -3,6 +3,7 @@ projects use classes from this module to configure experiment runtimes and deter
 particular data acquisition and runtime management system (hardware) they run on."""
 
 import copy
+from enum import StrEnum
 from pathlib import Path
 from dataclasses import field, dataclass
 
@@ -11,16 +12,23 @@ from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 
 
+class AcquisitionSystems(StrEnum):
+    """Defines the set of data acquisition systems used in the Sun lab and supported by all data-related libraries."""
+
+    MESOSCOPE_VR = "mesoscope-vr"
+    """The Mesoscope-VR data acquisition system. It is built around 2-Photon Random Access Mesoscope (2P-RAM) and 
+    relies on Unity-backed virtual reality task-environments to conduct experiments."""
+
+
 @dataclass()
 class ExperimentState:
     """Encapsulates the information used to set and maintain the desired experiment and system state.
 
-    Broadly, each experiment runtime can be conceptualized as a two state-system. The first state is that of the
-    experimental task, which reflects the behavior goal, the rules for achieving the goal, and the reward for
-    achieving the goal. The second state is that of the data acquisition and experiment control system, which is a
-    snapshot of all hardware module states that make up the system that acquires the data and controls the task
-    environment. Overall, experiment state is about 'what the animal is doing', while the system state is about
-    'what the hardware is doing'.
+    Broadly, each experiment runtime can be conceptualized as a two state-system. The first is the experiment task,
+    which reflects the behavior goal, the rules for achieving the goal, and the reward for achieving the goal. The
+    second is the data acquisition system state, which is a snapshot of all hardware module states that make up the
+    system that acquires the data and controls the task environment. Overall, experiment state is about
+    'what the animal is doing', while the system state is about 'what the hardware is doing'.
 
     Note:
         This class is acquisition-system-agnostic. It can be used to define the ExperimentConfiguration class for any
@@ -35,24 +43,25 @@ class ExperimentState:
     while maintaining the same experiment state."""
     system_state_code: int
     """One of the supported system state-codes. Note, the meaning of each system state code depends on the specific 
-    data acquisition and experiment control system used by the project. For example, projects using the 'mesoscope-vr' 
-    system currently support two system state codes: REST (1) and RUN (2)."""
+    data acquisition and experiment control system used by the project. For details on available system-states, see 
+    the sl-experiment library documentation."""
     state_duration_s: float
-    """The time, in seconds, to maintain the current combination of the experiment and system states."""
+    """The time, in seconds, to maintain the experiment and system state combination specified by this instance."""
     initial_guided_trials: int
-    """Specifies the number of trials (laps) at the onset of the experiment state, for which lick guidance will be 
-    automatically enabled. Specifically, if the experiment state supports running linearized Virtual Reality track, the 
-    system will enable lick guidance for this many trials at the beginning of the experiment state and automatically 
-    disable it for the following trials."""
+    """The number of trials (laps) at the onset of the experiment state, for which to enable lick guidance. This 
+    determines the number of trials, counting from the onset of the experiment state, for which the animal will receive 
+    water rewards from entering the reward zone. Once the specified number of guided trial passes, the system disables 
+    guidance, requiring the animal to lick in the reward zone to get water rewards."""
     recovery_failed_trial_threshold: int
-    """Specifies the number of failed (non-rewarded) non-guided trials (laps), after which the system will re-enable 
-    guidance for the 'recovery_guided_trials' number of following trials. For this to take effect, the trials must be 
-    failed this many times in a row."""
+    """Specifies the number of failed (non-rewarded) trials (laps), after which the system will re-enable lick guidance 
+    for the 'recovery_guided_trials' number of following trials. Note, engaging the recovery guided trial system 
+    requires the specified number of failed trials to occur sequentially."""
     recovery_guided_trials: int
-    """Specifies the number of trials (laps) for which the system will re-enable lick guidance, when the animal 
-    repeatedly fails 'failed_trial_threshold' number of trials. This field works similar to the 'initial_guided_trials' 
-    field, but is triggered by repeated performance failures, rather than experiment state onset. After the animal 
-    runs this many guided trials, the system will automatically disable guidance for the following trials."""
+    """Specifies the number of trials (laps) for which the system should re-enable lick guidance, when the animal 
+    sequentially fails 'failed_trial_threshold' number of trials. This field works similar to the 
+    'initial_guided_trials' field, but is triggered by repeated performance failures, rather than experiment state 
+    onset. After the animal runs this many guided trials, the system automatically disables guidance for the following 
+    trials."""
 
 
 @dataclass()
@@ -60,16 +69,15 @@ class ExperimentTrial:
     """Encapsulates information about a single experiment trial.
 
     All Virtual Reality tasks can be broadly conceptualized as repeating motifs (sequences) of wall cues,
-    associated with a specific rewarded goal. These repeated motifs are typically used to define experiment trials
-    during analysis. Since some experiments can use multiple trial types as part of the same experiment session,
-    multiple instances of this class can be used to specify supported trial structures and trial parameters for a
-    given experiment.
+    associated with a specific goal, for which animals receive water rewards. Since some experiments can use multiple
+    trial types as part of the same experiment session, multiple instances of this class can be used to specify
+    supported trial structures and trial parameters for a given experiment.
     """
 
     cue_sequence: list[int]
-    """Specifies the sequence of wall cues experienced by the animal while running this trial."""
-    trial_length_unity_unit: float
-    """The length of the trial cue sequence, in Unity units."""
+    """Specifies the sequence of wall cues experienced by the animal while running this trial. Note, the cues must be 
+    specified as integer-codes, where each code has the same meaning as in the 'cue_map' dictionary of the main 
+    ExperimentConfiguration class for that experiment."""
     trial_length_cm: float
     """The length of the trial cue sequence in centimeters."""
     trial_reward_size_ul: float
@@ -89,10 +97,11 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     """Stores the configuration of a single experiment runtime that uses the Mesoscope_VR data acquisition system.
 
     Primarily, this includes the sequence of experiment and system states that defines the flow of the experiment
-    runtime. During runtime, the main runtime control function traverses the sequence of states stored in this class
-    instance start-to-end in the exact order specified by the user. Together with custom Unity projects that define
-    the task logic (how the system responds to animal interactions with the VR system) this class allows flexibly
-    implementing a wide range of experiments using the Mesoscope-VR system.
+    runtime and the configuration of various trials supported by the experiment runtime. During runtime, the main
+    runtime control function traverses the sequence of states stored in this class instance start-to-end in the exact
+    order specified by the user. Together with custom Unity projects that define the task logic (how the system
+    responds to animal interactions with the VR system) this class allows flexibly implementing a wide range of
+    experiments using the Mesoscope-VR system.
 
     Each project should define one or more experiment configurations and save them as .yaml files inside the project
     'configuration' folder. The name for each configuration file is defined by the user and is used to identify and load
@@ -101,6 +110,8 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     Notes:
         This class is designed exclusively for the Mesoscope-VR system. Any other system needs to define a separate
         ExperimentConfiguration class to specify its experiment runtimes and additional data.
+
+        To create a new experiment configuration, use the 'sl-create-experiment' CLI command.
     """
 
     cue_map: dict[int, float] = field(default_factory=lambda: {0: 30.0, 1: 30.0, 2: 30.0, 3: 30.0, 4: 30.0})
@@ -109,12 +120,12 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     to travel to fully traverse the wall cue region from start to end."""
     cue_offset_cm: float = 10.0
     """Specifies the positive offset distance, in centimeters, by which the animal's running track is shifted 
-    relative to experiment environment onset. Due to how the VR environment is revealed to the animal, most runtimes 
-    need to shift the animal slightly forward relative to the track origin (0), to prevent it from seeing the area 
-    before the first VR wall cue when the task starts and when the animal is teleported to the beginning of the track. 
-    This offset statically shifts the entire track (in centimeters) against the set of VR wall cues used during 
-    runtime. Storing this static offset as part of experiment configuration is crucial for correctly interpreting the 
-    data acquiring during runtime."""
+    relative to VR wall cue sequence. Due to how the VR environment is revealed to the animal, most runtimes 
+    need to shift the animal slightly forward relative to the VR cue sequence origin (0), to prevent it from seeing the 
+    area before the first VR wall cue when the task starts and when the animal is teleported to the beginning of the 
+    track. This offset statically shifts the entire track (in centimeters) against the set of VR wall cues used during 
+    runtime. Storing this static offset as part of experiment configuration is crucial for correctly mapping what the 
+    animal sees during runtime to the real-world distance it travels on the running wheel."""
     experiment_states: dict[str, ExperimentState] = field(
         default_factory=lambda: {
             "baseline": ExperimentState(
@@ -149,7 +160,6 @@ class MesoscopeExperimentConfiguration(YamlConfig):
         default_factory=lambda: {
             "cyclic_4_cue": ExperimentTrial(
                 cue_sequence=[1, 0, 2, 0, 3, 0, 4, 0],
-                trial_length_unity_unit=24.0,
                 trial_length_cm=240.0,
                 trial_reward_size_ul=5.0,
                 reward_zone_start_cm=208.0,
@@ -158,7 +168,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
             )
         }
     )
-    """A dictionary that maps human-readable trial structure names as keys and ExperimentTrial instances as values. 
+    """A dictionary that uses human-readable trial structure names as keys and ExperimentTrial instances as values. 
     Each ExperimentTrial instance specifies the Virtual Reality layout and runtime parameters associated with a single 
     type of trials supported by the experiment runtime."""
 

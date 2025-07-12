@@ -10,7 +10,7 @@ import numpy as np
 from ataraxis_base_utilities import LogLevel, console
 from ataraxis_time.time_helpers import extract_timestamp_from_bytes
 
-from ..data_classes import SessionData, get_system_configuration_data
+from ..data_classes import SessionData, SessionTypes, get_system_configuration_data
 from .transfer_tools import transfer_directory
 from .packaging_tools import calculate_directory_checksum
 
@@ -222,7 +222,7 @@ def ascend_tyche_data(root_directory: Path) -> None:
                     project_name=project_name,
                     session_name=session_name,
                     animal_id=animal_name,
-                    session_type="mesoscope experiment",
+                    session_type=SessionTypes.MESOSCOPE_EXPERIMENT,
                     experiment_name=None,
                 )
 

@@ -1,19 +1,41 @@
+from enum import StrEnum
 from pathlib import Path
 from dataclasses import field, dataclass
 
 from _typeshed import Incomplete
 from ataraxis_data_structures import YamlConfig
 
-from .configuration_data import get_system_configuration_data as get_system_configuration_data
+from .configuration_data import (
+    AcquisitionSystems as AcquisitionSystems,
+    get_system_configuration_data as get_system_configuration_data,
+)
 
-_valid_session_types: Incomplete
+class SessionTypes(StrEnum):
+    """Defines the set of data acquisition session types supported by various data acquisition systems used in the
+    Sun lab.
+
+    A data acquisition session broadly encompasses a recording session carried out to either: acquire experiment data,
+    train the animal for the upcoming experiments, or to assess the quality of surgical or other pre-experiment
+    intervention.
+
+    Notes:
+        This enumeration does not differentiate between different acquisition systems. Different acquisition systems
+        support different session types, and may not be suited for acquiring some of the session types listed in this
+        enumeration.
+    """
+
+    LICK_TRAINING = "lick training"
+    RUN_TRAINING = "run training"
+    MESOSCOPE_EXPERIMENT = "mesoscope experiment"
+    WINDOW_CHECKING = "window checking"
 
 @dataclass()
 class RawData:
     """Stores the paths to the directories and files that make up the 'raw_data' session-specific directory.
 
-    The raw_data directory stores the data acquired during the session runtime before and after preprocessing. Since
-    preprocessing does not alter the data, any data in that folder is considered 'raw'.
+    The raw_data directory stores the data acquired during the session data acquisition runtime, before and after
+    preprocessing. Since preprocessing does not irreversibly alter the data, any data in that folder is considered
+    'raw,' event if preprocessing losslessly re-compresses the data for efficient transfer.
 
     Notes:
         Sun lab data management strategy primarily relies on keeping multiple redundant copies of the raw_data for
@@ -42,16 +64,19 @@ class RawData:
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
 
-        This method is called each time the class is instantiated to regenerate the managed path hierarchy on any
-        machine that instantiates the class.
+        This method is called each time the (wrapper) SessionData class is instantiated to regenerate the managed path
+        hierarchy on any machine that instantiates the class.
 
         Args:
-            root_directory_path: The path to the top-level directory of the local hierarchy. Depending on the managed
-                hierarchy, this has to point to a directory under the main /session, /animal, or /project directory of
-                the managed session.
+            root_directory_path: The path to the top-level directory of the session. Typically, this path is assembled
+                using the following hierarchy: root/project/animal/session_id
         """
     def make_directories(self) -> None:
-        """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
+        """Ensures that all major subdirectories and the root directory exist, creating any missing directories.
+
+        This method is called each time the (wrapper) SessionData class is instantiated and allowed to generate
+        missing data directories.
+        """
 
 @dataclass()
 class ProcessedData:
@@ -73,44 +98,42 @@ class ProcessedData:
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
 
-        This method is called each time the class is instantiated to regenerate the managed path hierarchy on any
-        machine that instantiates the class.
+        This method is called each time the (wrapper) SessionData class is instantiated to regenerate the managed path
+        hierarchy on any machine that instantiates the class.
 
         Args:
-            root_directory_path: The path to the top-level directory of the local hierarchy. Depending on the managed
-                hierarchy, this has to point to a directory under the main /session, /animal, or /project directory of
-                the managed session.
+            root_directory_path: The path to the top-level directory of the session. Typically, this path is assembled
+                using the following hierarchy: root/project/animal/session_id
         """
     def make_directories(self) -> None:
-        """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
+        """Ensures that all major subdirectories and the root directory exist, creating any missing directories.
+
+        This method is called each time the (wrapper) SessionData class is instantiated and allowed to generate
+        missing data directories.
+        """
 
 @dataclass
 class SessionData(YamlConfig):
-    """Stores and manages the data layout of a single training or experiment session acquired in the Sun lab.
+    """Stores and manages the data layout of a single Sun lab data acquisition session.
 
-    The primary purpose of this class is to maintain the session data structure across all supported destinations and
-    during all processing stages. It generates the paths used by all other classes from all Sun lab libraries that
-    interact with the session's data from the point of its creation and until the data is integrated into an
-    analysis dataset.
-
-    When necessary, the class can be used to either generate a new session or load the layout of an already existing
-    session. When the class is used to create a new session, it generates the new session's name using the current
-    UTC timestamp, accurate to microseconds. This ensures that each session name is unique and preserves the overall
-    session order.
+    The primary purpose of this class is to maintain the session data structure across all supported destinations and to
+    provide a unified data access interface shared by all Sun lab libraries. The class can be used to either generate a
+    new session or load the layout of an already existing session. When the class is used to create a new session, it
+    generates the new session's name using the current UTC timestamp, accurate to microseconds. This ensures that each
+    session 'name' is unique and preserves the overall session order.
 
     Notes:
         This class is specifically designed for working with the data from a single session, performed by a single
         animal under the specific experiment. The class is used to manage both raw and processed data. It follows the
-        data through acquisition, preprocessing and processing stages of the Sun lab data workflow. Together with
-        ProjectConfiguration class, this class serves as an entry point for all interactions with the managed session's
-        data.
+        data through acquisition, preprocessing and processing stages of the Sun lab data workflow. This class serves as
+        an entry point for all interactions with the managed session's data.
     """
 
     project_name: str
     animal_id: str
     session_name: str
-    session_type: str
-    acquisition_system: str
+    session_type: str | SessionTypes
+    acquisition_system: str | AcquisitionSystems
     experiment_name: str | None
     python_version: str = ...
     sl_experiment_version: str = ...
@@ -123,7 +146,7 @@ class SessionData(YamlConfig):
         cls,
         project_name: str,
         animal_id: str,
-        session_type: str,
+        session_type: SessionTypes | str,
         experiment_name: str | None = None,
         session_name: str | None = None,
         python_version: str = "3.11.13",
@@ -138,26 +161,27 @@ class SessionData(YamlConfig):
             To load an already existing session data structure, use the load() method instead.
 
             This method automatically dumps the data of the created SessionData instance into the session_data.yaml file
-            inside the root raw_data directory of the created hierarchy. It also finds and dumps other configuration
-            files, such as experiment_configuration.yaml and system_configuration.yaml into the same raw_data directory.
-            This ensures that if the session's runtime is interrupted unexpectedly, the acquired data can still be
-            processed.
+            inside the root 'raw_data' directory of the created hierarchy. It also finds and dumps other configuration
+            files, such as experiment_configuration.yaml and system_configuration.yaml into the same 'raw_data'
+            directory. If the session's runtime is interrupted unexpectedly, the acquired data can still be processed
+            using these pre-saved class instances.
 
         Args:
-            project_name: The name of the project for which the data is acquired.
-            animal_id: The ID code of the animal for which the data is acquired.
-            session_type: The type of the session. Primarily, this determines how to read the session_descriptor.yaml
-                file. Valid options are 'Lick training', 'Run training', 'Window checking', or 'Experiment'.
-            experiment_name: The name of the experiment executed during managed session. This optional argument is only
-                used for 'Experiment' session types. It is used to find the experiment configuration .YAML file.
-            session_name: An optional session_name override. Generally, this argument should not be provided for most
+            project_name: The name of the project for which the session is carried out.
+            animal_id: The ID code of the animal participating in the session.
+            session_type: The type of the session. Has to be one of the supported session types exposed by the
+                SessionTypes enumeration.
+            experiment_name: The name of the experiment executed during the session. This optional argument is only
+                used for experiment sessions. Note! The name passed to this argument has to match the name of the
+                experiment configuration .yaml file.
+            session_name: An optional session name override. Generally, this argument should not be provided for most
                 sessions. When provided, the method uses this name instead of generating a new timestamp-based name.
                 This is only used during the 'ascension' runtime to convert old data structures to the modern
                 lab standards.
-            python_version: The string that specifies the Python version used to collect raw session data. Has to be
+            python_version: The string that specifies the Python version used to collect session data. Has to be
                 specified using the major.minor.patch version format.
             sl_experiment_version: The string that specifies the version of the sl-experiment library used to collect
-                raw session data. Has to be specified using the major.minor.patch version format.
+                session data. Has to be specified using the major.minor.patch version format.
 
         Returns:
             An initialized SessionData instance that stores the layout of the newly created session's data.
@@ -169,9 +193,9 @@ class SessionData(YamlConfig):
         """Loads the SessionData instance from the target session's session_data.yaml file.
 
         This method is used to load the data layout information of an already existing session. Primarily, this is used
-        when preprocessing or processing session data. Due to how SessionData is stored and used in the lab, this
-        method always loads the data layout from the session_data.yaml file stored inside the raw_data session
-        subfolder. Currently, all interactions with Sun lab data require access to the 'raw_data' folder.
+        when processing session data. Due to how SessionData is stored and used in the lab, this method always loads the
+        data layout from the session_data.yaml file stored inside the 'raw_data' session subfolder. Currently, all
+        interactions with Sun lab data require access to the 'raw_data' folder of each session.
 
         Notes:
             To create a new session, use the create() method instead.
@@ -195,14 +219,14 @@ class SessionData(YamlConfig):
     def runtime_initialized(self) -> None:
         """Ensures that the 'nk.bin' marker file is removed from the session's raw_data folder.
 
-        This marker is generated as part of the SessionData initialization (creation) process to mark sessions that did
-        not fully initialize during runtime. This service method is designed to be called by the inner runtime control
-        functions and classes of the sl-experiment library and generally should not be called by end-users.
+        The 'nk.bin' marker is generated as part of the SessionData initialization (creation) process to mark sessions
+        that did not fully initialize during runtime. This service method is designed to be called by the sl-experiment
+        library classes to remove the 'nk.bin' marker when it is safe to do so. It should not be called by end-users.
         """
     def _save(self) -> None:
         """Saves the instance data to the 'raw_data' directory of the managed session as a 'session_data.yaml' file.
 
-        This is used to save the data stored in the instance to disk, so that it can be reused during preprocessing or
+        This is used to save the data stored in the instance to disk, so that it can be reused during further stages of
         data processing. The method is intended to only be used by the SessionData instance itself during its
         create() method runtime.
         """
@@ -222,6 +246,13 @@ class ProcessingTracker(YamlConfig):
     _is_running: bool = ...
     _lock_path: str = field(init=False)
     def __post_init__(self) -> None: ...
+    def __del__(self) -> None:
+        """If the instance is garbage-collected without calling the stop() method, assumes this is due to a runtime
+        error.
+
+        It is essential to always resolve the runtime as either 'stopped' or 'erred' to avoid deadlocking the session
+        data.
+        """
     def _load_state(self) -> None:
         """Reads the current processing state from the wrapped .YAML file."""
     def _save_state(self) -> None:
@@ -248,7 +279,11 @@ class ProcessingTracker(YamlConfig):
             TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
         """
     def stop(self) -> None:
-        """Mark processing as started.
+        """Configures the tracker file to indicate that the tracked processing runtime has been completed successfully.
+
+        After this method returns, it is UNSAFE to do any further processing from the process that calls this method.
+        Any process that calls the 'start' method of this class is expected to also call this method or 'error' method
+        at the end of the runtime.
 
         Raises:
             TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
@@ -256,12 +291,12 @@ class ProcessingTracker(YamlConfig):
     @property
     def is_complete(self) -> bool:
         """Returns True if the tracker wrapped by the instance indicates that the processing runtime has been completed
-        successfully and False otherwise."""
+        successfully at least once and that there is no ongoing processing that uses the target session."""
     @property
     def encountered_error(self) -> bool:
-        """Returns True if the tracker wrapped by the instance indicates that the processing runtime aborted due to
-        encountering an error and False otherwise."""
+        """Returns True if the tracker wrapped by the instance indicates that the processing runtime for the target
+        session has aborted due to encountering an error."""
     @property
     def is_running(self) -> bool:
         """Returns True if the tracker wrapped by the instance indicates that the processing runtime is currently
-        running and False otherwise."""
+        running for the target session."""
