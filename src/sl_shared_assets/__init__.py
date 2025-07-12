@@ -35,6 +35,7 @@ from .data_classes import (
     RunTrainingDescriptor,
     LickTrainingDescriptor,
     MesoscopeHardwareState,
+    WindowCheckingDescriptor,
     MesoscopeMicroControllers,
     MesoscopeAdditionalFirmware,
     MesoscopeSystemConfiguration,
@@ -83,6 +84,7 @@ __all__ = [
     "ExperimentTrial",
     "SessionTypes",
     "AcquisitionSystems",
+    "WindowCheckingDescriptor",
     # Tools package
     "resolve_p53_marker",
     "transfer_directory",

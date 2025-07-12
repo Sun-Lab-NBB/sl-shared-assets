@@ -9,6 +9,7 @@ from .runtime_data import (
     RunTrainingDescriptor,
     LickTrainingDescriptor,
     MesoscopeHardwareState,
+    WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor,
 )
 from .session_data import RawData, SessionData, SessionTypes, ProcessedData, ProcessingTracker
@@ -63,4 +64,5 @@ __all__ = [
     "ExperimentTrial",
     "AcquisitionSystems",
     "SessionTypes",
+    "WindowCheckingDescriptor",
 ]
