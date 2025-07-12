@@ -498,12 +498,12 @@ class SessionData(YamlConfig):
         # Returns the initialized SessionData instance to caller
         return instance
 
-    def mark_initialization(self) -> None:
-        """Ensures that the 'nk.bin' marker file is removed from the session's raw_dat folder.
+    def runtime_initialized(self) -> None:
+        """Ensures that the 'nk.bin' marker file is removed from the session's raw_data folder.
 
         This marker is generated as part of the SessionData initialization (creation) process to mark sessions that did
-        not fully initialize during runtime. Call this method after fully initializing the data acquisition runtime
-        control class to ensure that the session is not marker for automated deletion upon runtime completion.
+        not fully initialize during runtime. This service method is designed to be called by the inner runtime control
+        functions and classes of the sl-experiment library and generally should not be called by end-users.
         """
         self.raw_data.nk_path.unlink(missing_ok=True)
 

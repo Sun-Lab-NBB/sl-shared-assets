@@ -205,10 +205,6 @@ class ZaberPositions(YamlConfig):
     Zaber motor positions across consecutive runtimes for the same project and animal combination.
 
     Notes:
-        The HeadBar axis (connection) also manages the motor that moves the running wheel along the x-axis. While the
-        motor itself is not part of the HeadBar assembly, it is related to positioning the mouse in the VR system. This
-        is in contrast to the LickPort group, which is related to positioning the lick tube relative to the mouse.
-
         All positions are saved using native motor units. All class fields initialize to default placeholders that are
         likely NOT safe to apply to the VR system. Do not apply the positions loaded from the file unless you are
         certain they are safe to use.
@@ -226,13 +222,12 @@ class ZaberPositions(YamlConfig):
     """The absolute position, in native motor units, of the HeadBar roll-axis motor."""
     lickport_z: int = 0
     """The absolute position, in native motor units, of the LickPort z-axis motor."""
-    lickport_x: int = 0
-    """The absolute position, in native motor units, of the LickPort x-axis motor."""
     lickport_y: int = 0
     """The absolute position, in native motor units, of the LickPort y-axis motor."""
+    lickport_x: int = 0
+    """The absolute position, in native motor units, of the LickPort x-axis motor."""
     wheel_x: int = 0
-    """The absolute position, in native motor units, of the running wheel platform x-axis motor. Although this motor is
-    not itself part of the HeadBar assembly, it is controlled through the HeadBar controller port."""
+    """The absolute position, in native motor units, of the running wheel platform x-axis motor."""
 
 
 @dataclass()
@@ -240,9 +235,9 @@ class MesoscopePositions(YamlConfig):
     """Stores real and virtual Mesoscope objective positions reused between experiment sessions that use the
     Mesoscope-VR system.
 
-    Primarily, the class is used to help the experimenter to position the Mesoscope at the same position across
+    Primarily, the class is used to help the experimenter to position the Mesoscope on the same imaging plane across
     multiple imaging sessions. It stores both the physical (real) position of the objective along the motorized
-    X, Y, Z, and Roll axes and the virtual (ScanImage software) tip, tilt, and fastZ focus axes.
+    X, Y, Z, and Roll axes, and the virtual (ScanImage software) tip, tilt, and fastZ focus axes.
 
     Notes:
         Since the API to read and write these positions automatically is currently not available, this class relies on
@@ -250,16 +245,18 @@ class MesoscopePositions(YamlConfig):
     """
 
     mesoscope_x: float = 0.0
-    """The X-axis position, in centimeters, of the Mesoscope objective used during session runtime."""
+    """The X-axis position, in centimeters, of the Mesoscope objective."""
     mesoscope_y: float = 0.0
-    """The Y-axis position, in centimeters, of the Mesoscope objective used during session runtime."""
+    """The Y-axis position, in centimeters, of the Mesoscope objective."""
     mesoscope_roll: float = 0.0
-    """The Roll-axis position, in degrees, of the Mesoscope objective used during session runtime."""
+    """The Roll-axis position, in degrees, of the Mesoscope objective."""
     mesoscope_z: float = 0.0
-    """The Z-axis position, in centimeters, of the Mesoscope objective used during session runtime."""
+    """The Z-axis position, in centimeters, of the Mesoscope objective."""
     mesoscope_fast_z: float = 0.0
-    """The Fast-Z-axis position, in micrometers, of the Mesoscope objective used during session runtime."""
+    """The Fast-Z-axis (virtual Z) position, in micrometers."""
     mesoscope_tip: float = 0.0
-    """The Tilt-axis position, in degrees, of the Mesoscope objective used during session runtime."""
+    """The Tilt-axis (software) position, in degrees.."""
     mesoscope_tilt: float = 0.0
-    """The Tip-axis position, in degrees, of the Mesoscope objective used during session runtime."""
+    """The Tip-axis (software) position, in degrees."""
+    laser_power_mw: float = 0.0
+    """The excitation laser power delivered to the sample, in milliwatts."""

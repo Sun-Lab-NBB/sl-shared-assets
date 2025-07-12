@@ -227,7 +227,7 @@ def ascend_tyche_data(root_directory: Path) -> None:
                 )
 
                 # Since this runtime reprocesses already acquired data, marks the session as fully initialized.
-                session_data.mark_initialization()
+                session_data.runtime_initialized()
 
                 # Moves the data from the old hierarchy to the new hierarchy. If the process runs as expected, and
                 # fully empties the source acquisition folder, destroys the folder. Otherwise, notifies the user that

@@ -24,7 +24,7 @@ class ExperimentState:
     system_state_code: int
     state_duration_s: float
     initial_guided_trials: int
-    failed_trial_threshold: int
+    recovery_failed_trial_threshold: int
     recovery_guided_trials: int
 
 @dataclass()

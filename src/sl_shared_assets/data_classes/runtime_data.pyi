@@ -106,10 +106,6 @@ class ZaberPositions(YamlConfig):
     Zaber motor positions across consecutive runtimes for the same project and animal combination.
 
     Notes:
-        The HeadBar axis (connection) also manages the motor that moves the running wheel along the x-axis. While the
-        motor itself is not part of the HeadBar assembly, it is related to positioning the mouse in the VR system. This
-        is in contrast to the LickPort group, which is related to positioning the lick tube relative to the mouse.
-
         All positions are saved using native motor units. All class fields initialize to default placeholders that are
         likely NOT safe to apply to the VR system. Do not apply the positions loaded from the file unless you are
         certain they are safe to use.
@@ -123,8 +119,8 @@ class ZaberPositions(YamlConfig):
     headbar_pitch: int = ...
     headbar_roll: int = ...
     lickport_z: int = ...
-    lickport_x: int = ...
     lickport_y: int = ...
+    lickport_x: int = ...
     wheel_x: int = ...
 
 @dataclass()
@@ -132,9 +128,9 @@ class MesoscopePositions(YamlConfig):
     """Stores real and virtual Mesoscope objective positions reused between experiment sessions that use the
     Mesoscope-VR system.
 
-    Primarily, the class is used to help the experimenter to position the Mesoscope at the same position across
+    Primarily, the class is used to help the experimenter to position the Mesoscope on the same imaging plane across
     multiple imaging sessions. It stores both the physical (real) position of the objective along the motorized
-    X, Y, Z, and Roll axes and the virtual (ScanImage software) tip, tilt, and fastZ focus axes.
+    X, Y, Z, and Roll axes, and the virtual (ScanImage software) tip, tilt, and fastZ focus axes.
 
     Notes:
         Since the API to read and write these positions automatically is currently not available, this class relies on
@@ -148,3 +144,4 @@ class MesoscopePositions(YamlConfig):
     mesoscope_fast_z: float = ...
     mesoscope_tip: float = ...
     mesoscope_tilt: float = ...
+    laser_power_mw: float = ...

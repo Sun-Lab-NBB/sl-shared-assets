@@ -44,7 +44,7 @@ class ExperimentState:
     automatically enabled. Specifically, if the experiment state supports running linearized Virtual Reality track, the 
     system will enable lick guidance for this many trials at the beginning of the experiment state and automatically 
     disable it for the following trials."""
-    failed_trial_threshold: int
+    recovery_failed_trial_threshold: int
     """Specifies the number of failed (non-rewarded) non-guided trials (laps), after which the system will re-enable 
     guidance for the 'recovery_guided_trials' number of following trials. For this to take effect, the trials must be 
     failed this many times in a row."""
@@ -122,7 +122,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
                 system_state_code=1,
                 state_duration_s=30,
                 initial_guided_trials=0,
-                failed_trial_threshold=0,
+                recovery_failed_trial_threshold=0,
                 recovery_guided_trials=0,
             ),
             "experiment": ExperimentState(
@@ -130,7 +130,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
                 system_state_code=2,
                 state_duration_s=120,
                 initial_guided_trials=3,
-                failed_trial_threshold=6,
+                recovery_failed_trial_threshold=6,
                 recovery_guided_trials=3,
             ),
             "cooldown": ExperimentState(
@@ -138,7 +138,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
                 system_state_code=1,
                 state_duration_s=15,
                 initial_guided_trials=1000000,
-                failed_trial_threshold=0,
+                recovery_failed_trial_threshold=0,
                 recovery_guided_trials=0,
             ),
         }
