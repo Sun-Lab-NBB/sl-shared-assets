@@ -553,6 +553,10 @@ class SessionData(YamlConfig):
         origin.raw_data = None  # type: ignore
         origin.processed_data = None  # type: ignore
 
+        # Converts StringEnum instances to strings
+        origin.session_type = str(origin.session_type)
+        origin.animal_id = str(origin.acquisition_system)
+
         # Saves instance data as a .YAML file
         origin.to_yaml(file_path=self.raw_data.session_data_path)
 

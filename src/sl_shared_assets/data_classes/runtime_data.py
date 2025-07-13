@@ -257,13 +257,13 @@ class MesoscopePositions(YamlConfig):
     """
 
     mesoscope_x: float = 0.0
-    """The Mesoscope objective X-axis position, in centimeters."""
+    """The Mesoscope objective X-axis position, in micrometers."""
     mesoscope_y: float = 0.0
-    """The Mesoscope objective Y-axis position, in centimeters."""
+    """The Mesoscope objective Y-axis position, in micrometers."""
     mesoscope_roll: float = 0.0
     """The Mesoscope objective Roll-axis position, in degrees."""
     mesoscope_z: float = 0.0
-    """The Mesoscope objective Z-axis position, in centimeters."""
+    """The Mesoscope objective Z-axis position, in micrometers."""
     mesoscope_fast_z: float = 0.0
     """The ScanImage FastZ (virtual Z-axis) position, in micrometers."""
     mesoscope_tip: float = 0.0
@@ -272,3 +272,5 @@ class MesoscopePositions(YamlConfig):
     """The ScanImage Tip position, in degrees."""
     laser_power_mw: float = 0.0
     """The laser excitation power at the sample, in milliwatts."""
+    red_dot_alignment_z: float = 0.0
+    """The Mesoscope objective Z-axis position, in micrometers, used for red-dot alignment procedure."""
