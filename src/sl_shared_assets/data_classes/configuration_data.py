@@ -126,6 +126,9 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     track. This offset statically shifts the entire track (in centimeters) against the set of VR wall cues used during 
     runtime. Storing this static offset as part of experiment configuration is crucial for correctly mapping what the 
     animal sees during runtime to the real-world distance it travels on the running wheel."""
+    unity_scene_name: str = "IvanScene"
+    """The name of the Virtual Reality task (Unity Scene) used during experiment. This is used as an extra security 
+    measure to ensure that Unity game engine is running the correct scene when starting the experiment runtime."""
     experiment_states: dict[str, ExperimentState] = field(
         default_factory=lambda: {
             "baseline": ExperimentState(

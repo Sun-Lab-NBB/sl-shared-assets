@@ -18,6 +18,7 @@ _excluded_files = {
     "ubiquitin.bin",
     "telomere.bin",
     "p53.bin",
+    "nk.bin",
     "suite2p_processing_tracker.yaml",
     "dataset_formation_tracker.yaml",
     "video_processing_tracker.yaml",

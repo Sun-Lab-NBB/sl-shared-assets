@@ -446,10 +446,6 @@ def resolve_dataset_marker(
     processing pipelines are not allowed to work with the session data, ensuring that all processed data remains
     unchanged. If the marker does not exist, dataset integration pipelines are not allowed to work with the session
     data, enabling processing pipelines to safely modify the data at any time.
-
-    This command is automatically called at the end of each processing runtime to automatically transfer processed
-    sessions to the dataset integration step by creating the p53.bin marker. In contrast, removing the marker can only
-    be done manually.
     """
     resolve_p53_marker(
         session_path=session_path,

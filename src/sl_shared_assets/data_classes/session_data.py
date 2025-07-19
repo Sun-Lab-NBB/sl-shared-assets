@@ -288,7 +288,7 @@ class SessionData(YamlConfig):
     name. If the session is not an experiment session, this field should be left as Null (None)."""
     python_version: str = "3.11.13"
     """Stores the Python version that was used to acquire session data."""
-    sl_experiment_version: str = "2.0.0"
+    sl_experiment_version: str = "3.0.0"
     """Stores the version of the sl-experiment library that was used to acquire the session data."""
     raw_data: RawData = field(default_factory=lambda: RawData())
     """Stores absolute paths to all directories and files that jointly make the session's raw data hierarchy. This 
