@@ -11,14 +11,14 @@ from ataraxis_base_utilities import console
 
 from ..data_classes import (
     SessionData,
+    SessionTypes,
     ProcessingTracker,
     RunTrainingDescriptor,
     LickTrainingDescriptor,
+    WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor,
 )
 from .packaging_tools import calculate_directory_checksum
-
-_valid_session_types = {"lick training", "run training", "mesoscope experiment", "window checking"}
 
 
 class ProjectManifest:
@@ -220,8 +220,7 @@ class ProjectManifest:
 
         Returns:
             A Polars DataFrame with the following columns: 'animal', 'date', 'notes', 'session', 'type', 'complete',
-            'intensity_verification', 'suite2p', 'behavior', 'video',
-            'dataset'.
+            'intensity_verification', 'suite2p', 'behavior', 'video', 'dataset'.
         """
 
         df = self._data
@@ -330,23 +329,31 @@ def generate_project_manifest(
 
         # Depending on the session type, instantiates the appropriate descriptor instance and uses it to read the
         # experimenter notes
-        if session_data.session_type == "lick training":
+        if session_data.session_type == SessionTypes.LICK_TRAINING:
             descriptor: LickTrainingDescriptor = LickTrainingDescriptor.from_yaml(  # type: ignore
                 file_path=session_data.raw_data.session_descriptor_path
             )
             manifest["notes"].append(descriptor.experimenter_notes)
-        elif session_data.session_type == "run training":
+        elif session_data.session_type == SessionTypes.RUN_TRAINING:
             descriptor: RunTrainingDescriptor = RunTrainingDescriptor.from_yaml(  # type: ignore
                 file_path=session_data.raw_data.session_descriptor_path
             )
             manifest["notes"].append(descriptor.experimenter_notes)
-        elif session_data.session_type == "mesoscope experiment":
+        elif session_data.session_type == SessionTypes.MESOSCOPE_EXPERIMENT:
             descriptor: MesoscopeExperimentDescriptor = MesoscopeExperimentDescriptor.from_yaml(  # type: ignore
                 file_path=session_data.raw_data.session_descriptor_path
             )
             manifest["notes"].append(descriptor.experimenter_notes)
-        elif session_data.session_type == "window checking":
-            manifest["notes"].append("N/A")
+        elif session_data.session_type == SessionTypes.WINDOW_CHECKING:
+            # sl-experiment version 3.0.0 added session descriptors to Window Checking runtimes. Since the file does not
+            # exist in prior versions, this section is written to statically handle the discrepancy.
+            try:
+                descriptor: WindowCheckingDescriptor = WindowCheckingDescriptor.from_yaml(  # type: ignore
+                    file_path=session_data.raw_data.session_descriptor_path
+                )
+                manifest["notes"].append(descriptor.experimenter_notes)
+            except Exception:
+                manifest["notes"].append("N/A")
 
         # If the session raw_data folder contains the telomere.bin file, marks the session as complete.
         manifest["complete"].append(session_data.raw_data.telomere_path.exists())
@@ -377,9 +384,7 @@ def generate_project_manifest(
         tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
         manifest["video"].append(tracker.is_complete)
 
-        # Tracks whether the session's data is ready for dataset integration. To be considered ready, the data must be
-        # successfully processed with all relevant pipelines. Any session currently being processed with any processing
-        # pipeline is considered NOT ready.
+        # Tracks whether the session's data is currently in the processing or dataset integration mode.
         manifest["dataset"].append(session_data.processed_data.p53_path.exists())
 
     # If all animal IDs are integer-convertible, stores them as numbers to promote proper sorting. Otherwise, stores
@@ -504,11 +509,9 @@ def resolve_p53_marker(
         from altering the data while it is integrated into a dataset. The p53.bin marker solves this issue by ensuring
         that only one type of runtimes (processing or dataset integration) is allowed to work with the session.
 
-        For the p53.bin marker to be created, the session must currently not undergo any processing and must be
-        successfully processed with the minimal set of pipelines for its session type. Removing the p53.bin marker does
-        not have any dependencies and will be executed even if the session is currently undergoing dataset integration.
-        Due to this limitation, it is only possible to call this function with the 'remove' flag manually (via the
-        dedicated CLI).
+        For the p53.bin marker to be created, the session must currently not undergo any processing. Removing the
+        p53.bin marker does not have any dependencies and will be executed even if the session is currently undergoing
+        dataset integration. This is due to data access hierarchy limitations of the Sun lab BioHPC server.
 
     Args:
         session_path: The path to the session directory for which the p53.bin marker needs to be resolved. Note, the
@@ -544,41 +547,28 @@ def resolve_p53_marker(
     # Queries the type of the processed session
     session_type = session_data.session_type
 
-    # If the session type is not supported, aborts with an error
-    if session_type not in _valid_session_types:
-        message = (
-            f"Unable to determine the mandatory processing pipelines for session {session_data.session_name} of animal "
-            f"{session_data.animal_id} and project {session_data.processed_data}. The type of the session "
-            f"{session_type} is not one of the supported session types: {', '.join(_valid_session_types)}."
-        )
-        console.error(message=message, error=ValueError)
-
     # Window checking sessions are not designed to be integrated into datasets, so they cannot be marked with p53.bin
     # file. Similarly, any incomplete session is automatically excluded from dataset formation.
-    if session_type == "window checking" or not session_data.raw_data.telomere_path.exists():
+    if session_type == SessionTypes.WINDOW_CHECKING or not session_data.raw_data.telomere_path.exists():
         return
 
     # Training sessions collect similar data and share processing pipeline requirements
-    if session_type == "lick training" or session_type == "run training":
-        # If the session has not been successfully processed with the behavior processing pipeline, aborts without
-        # creating the marker file. Also ensures that the video tracking pipeline is not actively running, although it
-        # is not required
+    if session_type == SessionTypes.LICK_TRAINING or session_type == SessionTypes.RUN_TRAINING:
+        # Ensures that the session is not being processed with one of the supported pipelines.
         behavior_tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
         video_tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
-        if not behavior_tracker.is_complete or video_tracker.is_running:
+        if behavior_tracker.is_running or video_tracker.is_running:
             # Note, training runtimes do not require suite2p processing.
             return
 
     # Mesoscope experiment sessions require additional processing with suite2p
-    if session_type == "mesoscope experiment":
+    if session_type == SessionTypes.MESOSCOPE_EXPERIMENT:
         behavior_tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
         suite2p_tracker = ProcessingTracker(file_path=session_data.processed_data.suite2p_processing_tracker_path)
         video_tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
 
-        # Similar to above, if the session is not processed with the behavior pipeline or the suite2p pipeline, aborts
-        # without creating the marker file. Video tracker is not required for p53 marker creation, but the video
-        # tracking pipeline must not be actively running.
-        if not behavior_tracker.is_complete or not suite2p_tracker.is_complete or video_tracker.is_running:
+        # Similar to above, ensures that the session is not being processed with one of the supported pipelines.
+        if behavior_tracker.is_running or suite2p_tracker.is_running or video_tracker.is_running:
             return
 
     # If the runtime reached this point, the session is eligible for dataset integration. Creates the p53.bin marker

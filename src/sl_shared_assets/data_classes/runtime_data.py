@@ -19,15 +19,15 @@ class MesoscopeHardwareState(YamlConfig):
 
     Notes:
         This class stores 'static' Mesoscope-VR system configuration that does not change during experiment or training
-        session runtime. This is in contrast to MesoscopeExperimentState class, which reflects the 'dynamic' state of
-        the Mesoscope-VR system.
+        session runtime. This is in contrast to MesoscopeExperimentConfiguration class, which reflects the 'dynamic'
+        state of the Mesoscope-VR system during each experiment.
 
         This class partially overlaps with the MesoscopeSystemConfiguration class, which is also stored in the
         raw_data folder of each session. The primary reason to keep both classes is to ensure that the math (rounding)
         used during runtime matches the math (rounding) used during data processing. MesoscopeSystemConfiguration does
-        not do any rounding or otherwise attempt to be repeatable, which is in contrast to hardware module that read
-        those parameters. Reading values from this class guarantees the read value exactly matches the value used
-        during runtime.
+        not do any rounding or otherwise attempt to be repeatable, which is in contrast to hardware modules that read
+        and apply those parameters. Reading values from this class guarantees the read value exactly matches the value
+        used during runtime.
 
     Notes:
         All fields in this dataclass initialize to None. During log processing, any log associated with a hardware
@@ -35,17 +35,14 @@ class MesoscopeHardwareState(YamlConfig):
         any field in this dataclass to None also functions as a flag for whether to parse the log associated with the
         module that provides this field's information.
 
-        This class is automatically configured by _MesoscopeExperiment and _BehaviorTraining classes from sl-experiment
-        library to facilitate log parsing.
+        This class is automatically configured by _MesoscopeVRSystem class from sl-experiment library to facilitate
+        proper log parsing.
     """
 
-    cue_map: dict[int, float] | None = None
-    """MesoscopeExperiment instance property. Stores the dictionary that maps the integer id-codes associated with each 
-    wall cue in the Virtual Reality task environment with distances in real-world centimeters animals should run on the 
-    wheel to fully traverse the cue region on a linearized track."""
     cm_per_pulse: float | None = None
     """EncoderInterface instance property. Stores the conversion factor used to translate encoder pulses into 
-    real-world centimeters."""
+    real-world centimeters. This conversion factor is fixed for each data acquisition system and does not change 
+    between experiments."""
     maximum_break_strength: float | None = None
     """BreakInterface instance property. Stores the breaking torque, in Newton centimeters, applied by the break to 
     the edge of the running wheel when it is engaged at 100% strength."""
@@ -75,7 +72,11 @@ class MesoscopeHardwareState(YamlConfig):
     the session runtime."""
     recorded_mesoscope_ttl: bool | None = None
     """TTLInterface instance property. A boolean flag that determines whether the processed session recorded brain 
-    activity data with the mesoscope."""
+    activity data with the mesoscope. In that case, attempts to parse the Mesoscope frame scanning TTL pulse data to 
+    synchronize Mesoscope data to behavior data."""
+    system_state_codes: dict[str, int] | None = None
+    """A _MesoscopeVRSystem instance property. A dictionary that maps integer state-codes used by the Mesoscope-VR 
+    system to communicate its states (system states) to human-readable state names."""
 
 
 @dataclass()
@@ -87,8 +88,9 @@ class LickTrainingDescriptor(YamlConfig):
     mouse_weight_g: float
     """The weight of the animal, in grams, at the beginning of the session."""
     dispensed_water_volume_ml: float
-    """Stores the total water volume, in milliliters, dispensed during runtime."""
-    minimum_reward_delay: int
+    """Stores the total water volume, in milliliters, dispensed during runtime. This excludes the water volume 
+    dispensed during the paused (idle) state."""
+    minimum_reward_delay_s: int
     """Stores the minimum delay, in seconds, that can separate the delivery of two consecutive water rewards."""
     maximum_reward_delay_s: int
     """Stores the maximum delay, in seconds, that can separate the delivery of two consecutive water rewards."""
@@ -100,6 +102,8 @@ class LickTrainingDescriptor(YamlConfig):
     """Stores the maximum number of consecutive rewards that can be delivered without the animal consuming them. If 
     the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal 
     consumes the rewards."""
+    pause_dispensed_water_volume_ml: float = 0.0
+    """Stores the total water volume, in milliliters, dispensed during the paused (idle) state."""
     experimenter_notes: str = "Replace this with your notes."
     """This field is not set during runtime. It is expected that each experimenter replaces this field with their 
     notes made during runtime."""
@@ -150,6 +154,8 @@ class RunTrainingDescriptor(YamlConfig):
     """Stores the maximum time, in seconds, the animal can dip below the running speed threshold to still receive the 
     reward. This allows animals that 'run' by taking a series of large steps, briefly dipping below speed threshold at 
     the end of each step, to still get water rewards."""
+    pause_dispensed_water_volume_ml: float = 0.0
+    """Stores the total water volume, in milliliters, dispensed during the paused (idle) state."""
     experimenter_notes: str = "Replace this with your notes."
     """This field is not set during runtime. It is expected that each experimenter will replace this field with their 
     notes made during runtime."""
@@ -178,6 +184,8 @@ class MesoscopeExperimentDescriptor(YamlConfig):
     experimenter_notes: str = "Replace this with your notes."
     """This field is not set during runtime. It is expected that each experimenter will replace this field with their 
     notes made during runtime."""
+    pause_dispensed_water_volume_ml: float = 0.0
+    """Stores the total water volume, in milliliters, dispensed during the paused (idle) state."""
     experimenter_given_water_volume_ml: float = 0.0
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the session.
     """
@@ -187,25 +195,39 @@ class MesoscopeExperimentDescriptor(YamlConfig):
 
 
 @dataclass()
+class WindowCheckingDescriptor(YamlConfig):
+    """Stores the outcome information specific to window checking sessions that use the Mesoscope-VR system.
+
+    Notes:
+        Window Checking sessions are different from all other sessions. Unlike other sessions, their purpose is not to
+        generate data, but rather to assess the suitability of the particular animal to be included in training and
+        experiment cohorts. These sessions are automatically excluded from any automated data processing and analysis.
+    """
+
+    experimenter: str
+    """The ID of the experimenter running the session."""
+    experimenter_notes: str = "Replace this with your notes."
+    """The notes on the quality of the cranial window and animal's suitability for the target project."""
+    surgery_quality: int = 0
+    """The quality of the cranial window and surgical intervention on a scale from 0 (non-usable) to 
+    3 (high-tier publication grade) inclusive."""
+    incomplete: bool = True
+    """Window checking sessions are always considered 'incomplete', as they do not contain the full range of 
+    information collected as part of a 'standard' behavior training or experiment session."""
+
+
+@dataclass()
 class ZaberPositions(YamlConfig):
     """Stores Zaber motor positions reused between experiment sessions that use the Mesoscope-VR system.
 
-    The class is specifically designed to store, save, and load the positions of the LickPort and HeadBar motors
-    (axes). It is used to both store Zaber motor positions for each session for future analysis and to restore the same
-    Zaber motor positions across consecutive runtimes for the same project and animal combination.
+    The class is specifically designed to store, save, and load the positions of the LickPort, HeadBar, and Wheel motors
+    (axes). It is used to both store Zaber motor positions for each session for future analysis and to restore the
+    Zaber motors to the same positions across consecutive runtimes for the same project and animal combination.
 
     Notes:
-        The HeadBar axis (connection) also manages the motor that moves the running wheel along the x-axis. While the
-        motor itself is not part of the HeadBar assembly, it is related to positioning the mouse in the VR system. This
-        is in contrast to the LickPort group, which is related to positioning the lick tube relative to the mouse.
-
-        All positions are saved using native motor units. All class fields initialize to default placeholders that are
-        likely NOT safe to apply to the VR system. Do not apply the positions loaded from the file unless you are
-        certain they are safe to use.
-
-        Exercise caution when working with Zaber motors. The motors are powerful enough to damage the surrounding
-        equipment and manipulated objects. Do not modify the data stored inside the .yaml file unless you know what you
-        are doing.
+        By default, the class initializes all fields to 0, which is the position of the home sensor for each motor. The
+        class assumes that the motor groups are assembled and arranged in a way that ensures all motors can safely move
+        to the home sensor positions from any runtime configuration.
     """
 
     headbar_z: int = 0
@@ -214,42 +236,41 @@ class ZaberPositions(YamlConfig):
     """The absolute position, in native motor units, of the HeadBar pitch-axis motor."""
     headbar_roll: int = 0
     """The absolute position, in native motor units, of the HeadBar roll-axis motor."""
-    wheel_x: int = 0
-    """The absolute position, in native motor units, of the running wheel platform x-axis motor. Although this motor is
-    not itself part of the HeadBar assembly, it is controlled through the HeadBar controller port."""
     lickport_z: int = 0
     """The absolute position, in native motor units, of the LickPort z-axis motor."""
-    lickport_x: int = 0
-    """The absolute position, in native motor units, of the LickPort x-axis motor."""
     lickport_y: int = 0
     """The absolute position, in native motor units, of the LickPort y-axis motor."""
+    lickport_x: int = 0
+    """The absolute position, in native motor units, of the LickPort x-axis motor."""
+    wheel_x: int = 0
+    """The absolute position, in native motor units, of the running wheel platform x-axis motor."""
 
 
 @dataclass()
 class MesoscopePositions(YamlConfig):
-    """Stores real and virtual Mesoscope objective positions reused between experiment sessions that use the
+    """Stores the positions of real and virtual Mesoscope objective axes reused between experiment sessions that use the
     Mesoscope-VR system.
 
-    Primarily, the class is used to help the experimenter to position the Mesoscope at the same position across
-    multiple imaging sessions. It stores both the physical (real) position of the objective along the motorized
-    X, Y, Z, and Roll axes and the virtual (ScanImage software) tip, tilt, and fastZ focus axes.
-
-    Notes:
-        Since the API to read and write these positions automatically is currently not available, this class relies on
-        the experimenter manually entering all positions and setting the mesoscope to these positions when necessary.
+    This class is designed to help the experimenter move the Mesoscope to the same imaging plane across imaging
+    sessions. It stores both the physical (real) position of the objective along the motorized X, Y, Z, and Roll axes,
+    and the virtual (ScanImage software) tip, tilt, and fastZ (virtual zoom) axes.
     """
 
     mesoscope_x: float = 0.0
-    """The X-axis position, in centimeters, of the Mesoscope objective used during session runtime."""
+    """The Mesoscope objective X-axis position, in micrometers."""
     mesoscope_y: float = 0.0
-    """The Y-axis position, in centimeters, of the Mesoscope objective used during session runtime."""
+    """The Mesoscope objective Y-axis position, in micrometers."""
     mesoscope_roll: float = 0.0
-    """The Roll-axis position, in degrees, of the Mesoscope objective used during session runtime."""
+    """The Mesoscope objective Roll-axis position, in degrees."""
     mesoscope_z: float = 0.0
-    """The Z-axis position, in centimeters, of the Mesoscope objective used during session runtime."""
+    """The Mesoscope objective Z-axis position, in micrometers."""
     mesoscope_fast_z: float = 0.0
-    """The Fast-Z-axis position, in micrometers, of the Mesoscope objective used during session runtime."""
+    """The ScanImage FastZ (virtual Z-axis) position, in micrometers."""
     mesoscope_tip: float = 0.0
-    """The Tilt-axis position, in degrees, of the Mesoscope objective used during session runtime."""
+    """The ScanImage Tilt position, in degrees.."""
     mesoscope_tilt: float = 0.0
-    """The Tip-axis position, in degrees, of the Mesoscope objective used during session runtime."""
+    """The ScanImage Tip position, in degrees."""
+    laser_power_mw: float = 0.0
+    """The laser excitation power at the sample, in milliwatts."""
+    red_dot_alignment_z: float = 0.0
+    """The Mesoscope objective Z-axis position, in micrometers, used for red-dot alignment procedure."""

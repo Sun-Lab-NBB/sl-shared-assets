@@ -4,6 +4,7 @@ the running job status. All lab processing and analysis pipelines use this inter
 resources.
 """
 
+import stat
 from random import randint
 from pathlib import Path
 import tempfile
@@ -483,6 +484,71 @@ class Server:
         sftp = self._client.open_sftp()
         try:
             sftp.put(localpath=local_file_path, remotepath=str(remote_file_path))
+        finally:
+            sftp.close()
+
+    def pull_directory(self, local_directory_path: Path, remote_directory_path: Path) -> None:
+        """Recursively downloads the entire target directory from the remote server to the local machine.
+
+        Args:
+            local_directory_path: The path to the local directory where the remote directory will be copied.
+            remote_directory_path: The path to the directory on the remote server to be downloaded.
+        """
+        sftp = self._client.open_sftp()
+
+        try:
+            # Creates the local directory if it doesn't exist
+            local_directory_path.mkdir(parents=True, exist_ok=True)
+
+            # Gets the list of items in the remote directory
+            remote_items = sftp.listdir_attr(str(remote_directory_path))
+
+            for item in remote_items:
+                remote_item_path = remote_directory_path.joinpath(item.filename)
+                local_item_path = local_directory_path.joinpath(item.filename)
+
+                # Checks if item is a directory
+                if stat.S_ISDIR(item.st_mode):  # type: ignore
+                    # Recursively pulls the subdirectory
+                    self.pull_directory(local_item_path, remote_item_path)
+                else:
+                    # Pulls the individual file using existing method
+                    sftp.get(localpath=str(local_item_path), remotepath=str(remote_item_path))
+
+        finally:
+            sftp.close()
+
+    def push_directory(self, local_directory_path: Path, remote_directory_path: Path) -> None:
+        """Recursively uploads the entire target directory from the local machine to the remote server.
+
+        Args:
+            local_directory_path: The path to the local directory to be uploaded.
+            remote_directory_path: The path on the remote server where the directory will be copied.
+        """
+        if not local_directory_path.exists() or not local_directory_path.is_dir():
+            message = (
+                f"Unable to upload the target local directory {local_directory_path} to the server, as it does not "
+                f"exist."
+            )
+            console.error(message=message, error=FileNotFoundError)
+
+        sftp = self._client.open_sftp()
+
+        try:
+            # Creates the remote directory using existing method
+            self.create_directory(remote_directory_path, parents=True)
+
+            # Iterates through all items in the local directory
+            for local_item_path in local_directory_path.iterdir():
+                remote_item_path = remote_directory_path.joinpath(local_item_path.name)
+
+                if local_item_path.is_dir():
+                    # Recursively pushes subdirectory
+                    self.push_directory(local_item_path, remote_item_path)
+                else:
+                    # Pushes the individual file using existing method
+                    sftp.put(localpath=str(local_item_path), remotepath=str(remote_item_path))
+
         finally:
             sftp.close()
 

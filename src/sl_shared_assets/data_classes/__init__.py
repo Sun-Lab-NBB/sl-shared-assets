@@ -9,9 +9,10 @@ from .runtime_data import (
     RunTrainingDescriptor,
     LickTrainingDescriptor,
     MesoscopeHardwareState,
+    WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor,
 )
-from .session_data import RawData, SessionData, VersionData, ProcessedData, ProcessingTracker, ProjectConfiguration
+from .session_data import RawData, SessionData, SessionTypes, ProcessedData, ProcessingTracker
 from .surgery_data import (
     DrugData,
     ImplantData,
@@ -23,7 +24,9 @@ from .surgery_data import (
 from .configuration_data import (
     MesoscopePaths,
     ExperimentState,
+    ExperimentTrial,
     MesoscopeCameras,
+    AcquisitionSystems,
     MesoscopeMicroControllers,
     MesoscopeAdditionalFirmware,
     MesoscopeSystemConfiguration,
@@ -37,7 +40,6 @@ __all__ = [
     "ImplantData",
     "SessionData",
     "RawData",
-    "VersionData",
     "ProcessedData",
     "SubjectData",
     "SurgeryData",
@@ -46,7 +48,6 @@ __all__ = [
     "ZaberPositions",
     "ExperimentState",
     "MesoscopePositions",
-    "ProjectConfiguration",
     "MesoscopeHardwareState",
     "RunTrainingDescriptor",
     "LickTrainingDescriptor",
@@ -60,4 +61,8 @@ __all__ = [
     "MesoscopeMicroControllers",
     "MesoscopeAdditionalFirmware",
     "ProcessingTracker",
+    "ExperimentTrial",
+    "AcquisitionSystems",
+    "SessionTypes",
+    "WindowCheckingDescriptor",
 ]

@@ -1,19 +1,24 @@
+from enum import StrEnum
 from pathlib import Path
 from dataclasses import field, dataclass
 
 from _typeshed import Incomplete
 from ataraxis_data_structures import YamlConfig
 
+class AcquisitionSystems(StrEnum):
+    """Defines the set of data acquisition systems used in the Sun lab and supported by all data-related libraries."""
+
+    MESOSCOPE_VR = "mesoscope-vr"
+
 @dataclass()
 class ExperimentState:
     """Encapsulates the information used to set and maintain the desired experiment and system state.
 
-    Broadly, each experiment runtime can be conceptualized as a two state-system. The first state is that of the
-    experimental task, which reflects the behavior goal, the rules for achieving the goal, and the reward for
-    achieving the goal. The second state is that of the data acquisition and experiment control system, which is a
-    snapshot of all hardware module states that make up the system that acquires the data and controls the task
-    environment. Overall, experiment state is about 'what the animal is doing', while the system state is about
-    'what the hardware is doing'.
+    Broadly, each experiment runtime can be conceptualized as a two state-system. The first is the experiment task,
+    which reflects the behavior goal, the rules for achieving the goal, and the reward for achieving the goal. The
+    second is the data acquisition system state, which is a snapshot of all hardware module states that make up the
+    system that acquires the data and controls the task environment. Overall, experiment state is about
+    'what the animal is doing', while the system state is about 'what the hardware is doing'.
 
     Note:
         This class is acquisition-system-agnostic. It can be used to define the ExperimentConfiguration class for any
@@ -23,29 +28,37 @@ class ExperimentState:
     experiment_state_code: int
     system_state_code: int
     state_duration_s: float
+    initial_guided_trials: int
+    recovery_failed_trial_threshold: int
+    recovery_guided_trials: int
 
 @dataclass()
-class TrialCueSequence:
-    """Encapsulates information about the Virtual Reality (VR) wall cue sequence experienced by the animal as part of
-    the given trial.
+class ExperimentTrial:
+    """Encapsulates information about a single experiment trial.
 
-    All Virtual Reality environments can be broadly conceptualized as repeating motifs (sequences) of wall cues. Since
-    some experimental tasks can use multiple cue sequences as part of the same experiment session, multiple instances of
-    this class can be used to specify supported trial structures. The information stored in this class instance is used
-    during behavior data parsing to assign trial information to data collected from various sources.
+    All Virtual Reality tasks can be broadly conceptualized as repeating motifs (sequences) of wall cues,
+    associated with a specific goal, for which animals receive water rewards. Since some experiments can use multiple
+    trial types as part of the same experiment session, multiple instances of this class can be used to specify
+    supported trial structures and trial parameters for a given experiment.
     """
 
-    cue_sequence: tuple[int, ...]
+    cue_sequence: list[int]
+    trial_length_cm: float
+    trial_reward_size_ul: float
+    reward_zone_start_cm: float
+    reward_zone_end_cm: float
+    guidance_trigger_location_cm: float
 
 @dataclass()
 class MesoscopeExperimentConfiguration(YamlConfig):
     """Stores the configuration of a single experiment runtime that uses the Mesoscope_VR data acquisition system.
 
     Primarily, this includes the sequence of experiment and system states that defines the flow of the experiment
-    runtime. During runtime, the main runtime control function traverses the sequence of states stored in this class
-    instance start-to-end in the exact order specified by the user. Together with custom Unity projects that define
-    the task logic (how the system responds to animal interactions with the VR system) this class allows flexibly
-    implementing a wide range of experiments using the Mesoscope-VR system.
+    runtime and the configuration of various trials supported by the experiment runtime. During runtime, the main
+    runtime control function traverses the sequence of states stored in this class instance start-to-end in the exact
+    order specified by the user. Together with custom Unity projects that define the task logic (how the system
+    responds to animal interactions with the VR system) this class allows flexibly implementing a wide range of
+    experiments using the Mesoscope-VR system.
 
     Each project should define one or more experiment configurations and save them as .yaml files inside the project
     'configuration' folder. The name for each configuration file is defined by the user and is used to identify and load
@@ -54,11 +67,15 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     Notes:
         This class is designed exclusively for the Mesoscope-VR system. Any other system needs to define a separate
         ExperimentConfiguration class to specify its experiment runtimes and additional data.
+
+        To create a new experiment configuration, use the 'sl-create-experiment' CLI command.
     """
 
     cue_map: dict[int, float] = field(default_factory=Incomplete)
+    cue_offset_cm: float = ...
+    unity_scene_name: str = ...
     experiment_states: dict[str, ExperimentState] = field(default_factory=Incomplete)
-    trial_structures: dict[str, TrialCueSequence] = field(default_factory=Incomplete)
+    trial_structures: dict[str, ExperimentTrial] = field(default_factory=Incomplete)
 
 @dataclass()
 class MesoscopePaths:
@@ -72,6 +89,13 @@ class MesoscopePaths:
     nas_directory: Path = ...
     mesoscope_directory: Path = ...
     harvesters_cti_path: Path = ...
+
+@dataclass()
+class MesoscopeSheets:
+    """Stores the IDs of Google Sheets used by the Mesoscope-VR data acquisition system."""
+
+    surgery_sheet_id: str = ...
+    water_log_sheet_id: str = ...
 
 @dataclass()
 class MesoscopeCameras:
@@ -93,7 +117,6 @@ class MesoscopeMicroControllers:
     sensor_port: str = ...
     encoder_port: str = ...
     debug: bool = ...
-    mesoscope_ttl_pulse_duration_ms: int = ...
     minimum_break_strength_g_cm: float = ...
     maximum_break_strength_g_cm: float = ...
     wheel_diameter_cm: float = ...
@@ -150,6 +173,7 @@ class MesoscopeSystemConfiguration(YamlConfig):
 
     name: str = ...
     paths: MesoscopePaths = field(default_factory=MesoscopePaths)
+    sheets: MesoscopeSheets = field(default_factory=MesoscopeSheets)
     cameras: MesoscopeCameras = field(default_factory=MesoscopeCameras)
     microcontrollers: MesoscopeMicroControllers = field(default_factory=MesoscopeMicroControllers)
     additional_firmware: MesoscopeAdditionalFirmware = field(default_factory=MesoscopeAdditionalFirmware)

@@ -1,18 +1,17 @@
 from pathlib import Path
 
 import polars as pl
-from _typeshed import Incomplete
 
 from ..data_classes import (
     SessionData as SessionData,
+    SessionTypes as SessionTypes,
     ProcessingTracker as ProcessingTracker,
     RunTrainingDescriptor as RunTrainingDescriptor,
     LickTrainingDescriptor as LickTrainingDescriptor,
+    WindowCheckingDescriptor as WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor as MesoscopeExperimentDescriptor,
 )
 from .packaging_tools import calculate_directory_checksum as calculate_directory_checksum
-
-_valid_session_types: Incomplete
 
 class ProjectManifest:
     """Wraps the contents of a Sun lab project manifest .feather file and exposes methods for visualizing and
@@ -104,8 +103,7 @@ class ProjectManifest:
 
         Returns:
             A Polars DataFrame with the following columns: 'animal', 'date', 'notes', 'session', 'type', 'complete',
-            'intensity_verification', 'suite2p', 'behavior', 'video',
-            'dataset'.
+            'intensity_verification', 'suite2p', 'behavior', 'video', 'dataset'.
         """
 
 def generate_project_manifest(
@@ -174,11 +172,9 @@ def resolve_p53_marker(
         from altering the data while it is integrated into a dataset. The p53.bin marker solves this issue by ensuring
         that only one type of runtimes (processing or dataset integration) is allowed to work with the session.
 
-        For the p53.bin marker to be created, the session must currently not undergo any processing and must be
-        successfully processed with the minimal set of pipelines for its session type. Removing the p53.bin marker does
-        not have any dependencies and will be executed even if the session is currently undergoing dataset integration.
-        Due to this limitation, it is only possible to call this function with the 'remove' flag manually (via the
-        dedicated CLI).
+        For the p53.bin marker to be created, the session must currently not undergo any processing. Removing the
+        p53.bin marker does not have any dependencies and will be executed even if the session is currently undergoing
+        dataset integration. This is due to data access hierarchy limitations of the Sun lab BioHPC server.
 
     Args:
         session_path: The path to the session directory for which the p53.bin marker needs to be resolved. Note, the

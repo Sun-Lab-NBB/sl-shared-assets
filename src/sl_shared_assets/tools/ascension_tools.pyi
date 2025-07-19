@@ -2,7 +2,7 @@ from pathlib import Path
 
 from ..data_classes import (
     SessionData as SessionData,
-    ProjectConfiguration as ProjectConfiguration,
+    SessionTypes as SessionTypes,
     get_system_configuration_data as get_system_configuration_data,
 )
 from .transfer_tools import transfer_directory as transfer_directory

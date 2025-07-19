@@ -7,10 +7,10 @@ from pathlib import Path
 import datetime
 
 import numpy as np
-from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
+from ataraxis_base_utilities import LogLevel, console
 from ataraxis_time.time_helpers import extract_timestamp_from_bytes
 
-from ..data_classes import SessionData, ProjectConfiguration, get_system_configuration_data
+from ..data_classes import SessionData, SessionTypes, get_system_configuration_data
 from .transfer_tools import transfer_directory
 from .packaging_tools import calculate_directory_checksum
 
@@ -194,26 +194,12 @@ def ascend_tyche_data(root_directory: Path) -> None:
         root_directory: The directory that stores one or more Tyche animal folders. This can be conceptualized as the
             root directory for the Tyche project.
     """
-    # Generates a (shared) project configuration file.
-    project_configuration = ProjectConfiguration()
-
     # The acquisition system config resolves most paths and filesystem configuration arguments
     acquisition_system = get_system_configuration_data()
-    output_root_directory = acquisition_system.paths.root_directory
     server_root_directory = acquisition_system.paths.server_storage_directory
 
     # Statically defines project name and local root paths
     project_name = "Tyche"
-    project_configuration.project_name = project_name
-
-    # Uses nonsensical google sheet IDs. Tyche project did not use Google Sheet processing like our modern projects do.
-    project_configuration.water_log_sheet_id = "1xFh9Q2zT7pL3mVkJdR8bN6yXoE4wS5aG0cHu2Kf7D3v"
-    project_configuration.surgery_sheet_id = "1xFh9Q2zT7pL3mVkJdR8bN6yXoE4wS5aG0cHu2Kf7D3v"
-
-    # Dumps project configuration into the 'configuration' subfolder of the Tyche project.
-    configuration_path = output_root_directory.joinpath("Tyche", "configuration", "project_configuration.yaml")
-    ensure_directory_exists(configuration_path)
-    project_configuration.save(path=configuration_path)
 
     # Assumes that root directory stores all animal folders to be processed
     for animal_folder in root_directory.iterdir():
@@ -230,16 +216,18 @@ def ascend_tyche_data(root_directory: Path) -> None:
                 # This procedure generates timestamp-based session names, analogous to how our modern pipeline does it.
                 session_name = _generate_session_name(acquisition_path=acquisition_folder)
 
-                # Uses derived session name and the statically created project configuration file to create the
-                # session data hierarchy using the output root. This generates a 'standard' Sun lab directory structure
-                # for the Tyche data.
+                # Uses derived session name and the derived project name to create the session data hierarchy using the
+                # output root. This generates a 'standard' Sun lab directory structure for the Tyche data.
                 session_data = SessionData.create(
-                    project_name=project_configuration.project_name,
+                    project_name=project_name,
                     session_name=session_name,
                     animal_id=animal_name,
-                    session_type="mesoscope experiment",
+                    session_type=SessionTypes.MESOSCOPE_EXPERIMENT,
                     experiment_name=None,
                 )
+
+                # Since this runtime reprocesses already acquired data, marks the session as fully initialized.
+                session_data.runtime_initialized()
 
                 # Moves the data from the old hierarchy to the new hierarchy. If the process runs as expected, and
                 # fully empties the source acquisition folder, destroys the folder. Otherwise, notifies the user that
