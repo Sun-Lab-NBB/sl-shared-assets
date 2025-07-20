@@ -73,8 +73,8 @@ class Job:
     Attributes:
         remote_script_path: Stores the path to the script file relative to the root of the remote server that runs the
             command.
-        job_id: Stores the unique job identifier assigned by the SLURM manager to this job, when it is accepted for
-            execution. This field initialized to None and is overwritten by the Server class that submits the job.
+        job_id: Stores the unique job identifier assigned by the SLURM manager to this job when it is accepted for
+            execution. This field is initialized to None and is overwritten by the Server class that submits the job.
         job_name: Stores the descriptive name of the SLURM job.
         _command: Stores the managed SLURM command object.
     """
@@ -138,8 +138,8 @@ class JupyterJob(Job):
         conda_environment: The name of the conda environment to activate on the server before running the job logic. The
             environment should contain the necessary Python packages and CLIs to support running the job's logic. For
             Jupyter jobs, this necessarily includes the Jupyter notebook and jupyterlab packages.
-        port: The connection port number for Jupyter server. Do not change the default value unless you know what you
-            are doing, as the server has most common communication ports closed for security reasons.
+        port: The connection port number for the Jupyter server. Do not change the default value unless you know what
+            you are doing, as the server has most common communication ports closed for security reasons.
         notebook_directory: The directory to use as Jupyter's root. During runtime, Jupyter will only have access to
             items stored in or under this directory. For most runtimes, this should be set to the user's root data or
             working directory.
@@ -184,7 +184,7 @@ class JupyterJob(Job):
         jupyter_args: str = "",
     ) -> None: ...
     def _build_jupyter_command(self, jupyter_args: str) -> None:
-        """Builds the command to launch Jupyter notebook server on the remote Sun lab server."""
+        """Builds the command to launch the Jupyter notebook server on the remote Sun lab server."""
     def parse_connection_info(self, info_file: Path) -> None:
         """Parses the connection information file created by the Jupyter job on the server.
 

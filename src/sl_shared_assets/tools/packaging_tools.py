@@ -10,7 +10,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 import xxhash
 
-# Defines a 'blacklist' set of files. Primarily, this lit contains the service files that may change after the session
+# Defines a 'blacklist' set of files. Primarily, this list contains the service files that may change after the session
 # data has been acquired. Therefore, it does not make sense to include them in the checksum, as they do not reflect the
 # data that should remain permanently unchanged. Note, make sure all service files are added to this set!
 _excluded_files = {

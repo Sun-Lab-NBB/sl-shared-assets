@@ -29,7 +29,7 @@ class SessionTypes(StrEnum):
 
     Notes:
         This enumeration does not differentiate between different acquisition systems. Different acquisition systems
-        support different session types, and may not be suited for acquiring some of the session types listed in this
+        support different session types and may not be suited for acquiring some of the session types listed in this
         enumeration.
     """
 
@@ -405,7 +405,7 @@ class SessionData(YamlConfig):
         raw_data.resolve_paths(root_directory_path=session_path.joinpath("raw_data"))
         raw_data.make_directories()  # Generates the local 'raw_data' directory tree
 
-        # Resolves, but does not make processed_data directories. All runtimes that require access to 'processed_data'
+        # Resolves but does not make processed_data directories. All runtimes that require access to 'processed_data'
         # are configured to generate those directories if necessary, so there is no need to make them here.
         processed_data = ProcessedData()
         processed_data.resolve_paths(root_directory_path=session_path.joinpath("processed_data"))
@@ -425,18 +425,18 @@ class SessionData(YamlConfig):
             sl_experiment_version=sl_experiment_version,
         )
 
-        # Saves the configured instance data to the session's folder, so that it can be reused during processing or
+        # Saves the configured instance data to the session's folder so that it can be reused during processing or
         # preprocessing.
         instance._save()
 
         # Also saves the SystemConfiguration and ExperimentConfiguration instances to the same folder using the paths
         # resolved for the RawData instance above.
 
-        # Dumps the acquisition system's configuration data to session's folder
+        # Dumps the acquisition system's configuration data to the session's folder
         acquisition_system.save(path=instance.raw_data.system_configuration_path)
 
         if experiment_name is not None:
-            # Copies the experiment_configuration.yaml file to session's folder
+            # Copies the experiment_configuration.yaml file to the session's folder
             experiment_configuration_path = acquisition_system.paths.root_directory.joinpath(
                 project_name, "configuration", f"{experiment_name}.yaml"
             )
@@ -473,8 +473,8 @@ class SessionData(YamlConfig):
                 provide the path to the root project directory (directory that stores all Sun lab projects) on that
                 drive. The method will automatically resolve the project/animal/session/processed_data hierarchy using
                 this root path. If raw and processed data are kept on the same drive, keep this set to None.
-            make_processed_data_directory: Determines whether this method should create processed_data directory if it
-                does not exist.
+            make_processed_data_directory: Determines whether this method should create the processed_data directory if
+                it does not exist.
 
         Returns:
             An initialized SessionData instance for the session whose data is stored at the provided path.
@@ -484,7 +484,7 @@ class SessionData(YamlConfig):
 
         """
         # To properly initialize the SessionData instance, the provided path should contain the raw_data directory
-        # with session_data.yaml file.
+        # with the session_data.yaml file.
         session_data_path = session_path.joinpath("raw_data", "session_data.yaml")
         if not session_data_path.exists():
             message = (
@@ -495,7 +495,7 @@ class SessionData(YamlConfig):
             )
             console.error(message=message, error=FileNotFoundError)
 
-        # Loads class data from .yaml file
+        # Loads class data from the .yaml file
         instance: SessionData = cls.from_yaml(file_path=session_data_path)  # type: ignore
 
         # The method assumes that the 'donor' .yaml file is always stored inside the raw_data directory of the session
@@ -538,7 +538,7 @@ class SessionData(YamlConfig):
     def _save(self) -> None:
         """Saves the instance data to the 'raw_data' directory of the managed session as a 'session_data.yaml' file.
 
-        This is used to save the data stored in the instance to disk, so that it can be reused during further stages of
+        This is used to save the data stored in the instance to disk so that it can be reused during further stages of
         data processing. The method is intended to only be used by the SessionData instance itself during its
         create() method runtime.
         """
@@ -547,9 +547,9 @@ class SessionData(YamlConfig):
         # processing
         origin = copy.deepcopy(self)
 
-        # Resets all path fields to null. These fields are not loaded from disk when the instance is loaded, so setting
-        # them to null has no negative consequences. Conversely, keeping these fields with Path objects prevents the
-        # SessionData instance from being loaded from disk.
+        # Resets all path fields to null. These fields are not loaded from the disk when the instance is loaded, so
+        # setting them to null has no negative consequences. Conversely, keeping these fields with Path objects
+        # prevents the SessionData instance from being loaded from the disk.
         origin.raw_data = None  # type: ignore
         origin.processed_data = None  # type: ignore
 
@@ -606,7 +606,7 @@ class ProcessingTracker(YamlConfig):
     def _load_state(self) -> None:
         """Reads the current processing state from the wrapped .YAML file."""
         if self.file_path.exists():
-            # Loads the data for the state values, but does not replace the file path or lock attributes.
+            # Loads the data for the state values but does not replace the file path or lock attributes.
             instance: ProcessingTracker = self.from_yaml(self.file_path)  # type: ignore
             self._is_complete = instance._is_complete
             self._encountered_error = instance._encountered_error
@@ -631,13 +631,13 @@ class ProcessingTracker(YamlConfig):
         with an error.
 
         Raises:
-            TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
+            TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
         """
         try:
             # Acquires the lock
             lock = FileLock(self._lock_path)
             with lock.acquire(timeout=10.0):
-                # Loads tracker state from .yaml file
+                # Loads tracker state from the .yaml file
                 self._load_state()
 
                 # If the runtime is already running, aborts with an error
@@ -676,14 +676,14 @@ class ProcessingTracker(YamlConfig):
         from the process that calls this method.
 
         Raises:
-            TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
+            TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
         """
 
         try:
             # Acquires the lock
             lock = FileLock(self._lock_path)
             with lock.acquire(timeout=10.0):
-                # Loads tracker state from .yaml file
+                # Loads tracker state from the .yaml file
                 self._load_state()
 
                 # If the runtime is not running, aborts with an error
@@ -720,14 +720,14 @@ class ProcessingTracker(YamlConfig):
         at the end of the runtime.
 
         Raises:
-            TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
+            TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
         """
 
         try:
             # Acquires the lock
             lock = FileLock(self._lock_path)
             with lock.acquire(timeout=10.0):
-                # Loads tracker state from .yaml file
+                # Loads tracker state from the .yaml file
                 self._load_state()
 
                 # If the runtime is not running, aborts with an error
@@ -764,7 +764,7 @@ class ProcessingTracker(YamlConfig):
             # Acquires the lock
             lock = FileLock(self._lock_path)
             with lock.acquire(timeout=10.0):
-                # Loads tracker state from .yaml file
+                # Loads tracker state from the .yaml file
                 self._load_state()
                 return self._is_complete
 
@@ -786,7 +786,7 @@ class ProcessingTracker(YamlConfig):
             # Acquires the lock
             lock = FileLock(self._lock_path)
             with lock.acquire(timeout=10.0):
-                # Loads tracker state from .yaml file
+                # Loads tracker state from the .yaml file
                 self._load_state()
                 return self._encountered_error
 
@@ -808,7 +808,7 @@ class ProcessingTracker(YamlConfig):
             # Acquires the lock
             lock = FileLock(self._lock_path)
             with lock.acquire(timeout=10.0):
-                # Loads tracker state from .yaml file
+                # Loads tracker state from the .yaml file
                 self._load_state()
                 return self._is_running
 

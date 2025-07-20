@@ -14,10 +14,10 @@ class AcquisitionSystems(StrEnum):
 class ExperimentState:
     """Encapsulates the information used to set and maintain the desired experiment and system state.
 
-    Broadly, each experiment runtime can be conceptualized as a two state-system. The first is the experiment task,
+    Broadly, each experiment runtime can be conceptualized as a two-state-system. The first is the experiment task,
     which reflects the behavior goal, the rules for achieving the goal, and the reward for achieving the goal. The
     second is the data acquisition system state, which is a snapshot of all hardware module states that make up the
-    system that acquires the data and controls the task environment. Overall, experiment state is about
+    system that acquires the data and controls the task environment. Overall, the experiment state is about
     'what the animal is doing', while the system state is about 'what the hardware is doing'.
 
     Note:
@@ -53,16 +53,16 @@ class ExperimentTrial:
 class MesoscopeExperimentConfiguration(YamlConfig):
     """Stores the configuration of a single experiment runtime that uses the Mesoscope_VR data acquisition system.
 
-    Primarily, this includes the sequence of experiment and system states that defines the flow of the experiment
+    Primarily, this includes the sequence of experiment and system states that define the flow of the experiment
     runtime and the configuration of various trials supported by the experiment runtime. During runtime, the main
     runtime control function traverses the sequence of states stored in this class instance start-to-end in the exact
-    order specified by the user. Together with custom Unity projects that define the task logic (how the system
-    responds to animal interactions with the VR system) this class allows flexibly implementing a wide range of
+    order specified by the user. Together with custom Unity projects, which define the task logic (how the system
+    responds to animal interactions with the VR system), this class allows flexibly implementing a wide range of
     experiments using the Mesoscope-VR system.
 
     Each project should define one or more experiment configurations and save them as .yaml files inside the project
     'configuration' folder. The name for each configuration file is defined by the user and is used to identify and load
-    the experiment configuration when 'sl-experiment' CLI command exposed by the sl-experiment library is executed.
+    the experiment configuration when the 'sl-experiment' CLI command exposed by the sl-experiment library is executed.
 
     Notes:
         This class is designed exclusively for the Mesoscope-VR system. Any other system needs to define a separate
@@ -198,7 +198,7 @@ def set_system_configuration_file(path: Path) -> None:
     the managed machine (PC).
 
     This function is used to initially configure or override the existing configuration of any data acquisition system
-    used in the lab. The path to the configuration file is stored inside the user's data directory, so that all
+    used in the lab. The path to the configuration file is stored inside the user's data directory so that all
     Sun lab libraries can automatically access that information during every runtime. Since the storage directory is
     typically hidden and varies between OSes and machines, this function provides a convenient way for setting that
     path without manually editing the storage cache.

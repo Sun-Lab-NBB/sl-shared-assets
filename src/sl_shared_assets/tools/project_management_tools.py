@@ -531,7 +531,7 @@ def resolve_p53_marker(
     )
 
     # If the p53.bin marker exists and the runtime is configured to remove it, removes the marker file. If the runtime
-    # is configured to create the marker, aborts the runtime (as the marker already exists).
+    # is configured to create the marker, the method aborts the runtime (as the marker already exists).
     if session_data.processed_data.p53_path.exists():
         if remove:
             session_data.processed_data.p53_path.unlink()
@@ -547,8 +547,8 @@ def resolve_p53_marker(
     # Queries the type of the processed session
     session_type = session_data.session_type
 
-    # Window checking sessions are not designed to be integrated into datasets, so they cannot be marked with p53.bin
-    # file. Similarly, any incomplete session is automatically excluded from dataset formation.
+    # Window checking sessions are not designed to be integrated into datasets, so they cannot be marked with the
+    # p53.bin file. Similarly, any incomplete session is automatically excluded from dataset formation.
     if session_type == SessionTypes.WINDOW_CHECKING or not session_data.raw_data.telomere_path.exists():
         return
 
@@ -567,7 +567,7 @@ def resolve_p53_marker(
         suite2p_tracker = ProcessingTracker(file_path=session_data.processed_data.suite2p_processing_tracker_path)
         video_tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
 
-        # Similar to above, ensures that the session is not being processed with one of the supported pipelines.
+        # Similar to the above, ensures that the session is not being processed with one of the supported pipelines.
         if behavior_tracker.is_running or suite2p_tracker.is_running or video_tracker.is_running:
             return
 

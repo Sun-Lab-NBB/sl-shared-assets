@@ -1,6 +1,6 @@
 """This module provides the core Job class, used as the starting point for all SLURM-managed job executed on lab compute
 server(s). Specifically, the Job class acts as a wrapper around the SLURM configuration and specific logic of each
-job. During runtime, Server class interacts with input job objects to manage their transfer and execution on the
+job. During runtime, the Server class interacts with input job objects to manage their transfer and execution on the
 remote servers.
 
 Since version 3.0.0, this module also provides the specialized JupyterJob class used to launch remote Jupyter
@@ -97,8 +97,8 @@ class Job:
     Attributes:
         remote_script_path: Stores the path to the script file relative to the root of the remote server that runs the
             command.
-        job_id: Stores the unique job identifier assigned by the SLURM manager to this job, when it is accepted for
-            execution. This field initialized to None and is overwritten by the Server class that submits the job.
+        job_id: Stores the unique job identifier assigned by the SLURM manager to this job when it is accepted for
+            execution. This field is initialized to None and is overwritten by the Server class that submits the job.
         job_name: Stores the descriptive name of the SLURM job.
         _command: Stores the managed SLURM command object.
     """
@@ -174,7 +174,7 @@ class Job:
         # initialization would not work as expected.
         fixed_script_content = script_content.replace("\\$", "$")
 
-        # Returns the script content to caller as a string
+        # Returns the script content to the caller as a string
         return fixed_script_content
 
 
@@ -202,8 +202,8 @@ class JupyterJob(Job):
         conda_environment: The name of the conda environment to activate on the server before running the job logic. The
             environment should contain the necessary Python packages and CLIs to support running the job's logic. For
             Jupyter jobs, this necessarily includes the Jupyter notebook and jupyterlab packages.
-        port: The connection port number for Jupyter server. Do not change the default value unless you know what you
-            are doing, as the server has most common communication ports closed for security reasons.
+        port: The connection port number for the Jupyter server. Do not change the default value unless you know what
+            you are doing, as the server has most common communication ports closed for security reasons.
         notebook_directory: The directory to use as Jupyter's root. During runtime, Jupyter will only have access to
             items stored in or under this directory. For most runtimes, this should be set to the user's root data or
             working directory.
@@ -270,7 +270,7 @@ class JupyterJob(Job):
         self._build_jupyter_command(jupyter_args)
 
     def _build_jupyter_command(self, jupyter_args: str) -> None:
-        """Builds the command to launch Jupyter notebook server on the remote Sun lab server."""
+        """Builds the command to launch the Jupyter notebook server on the remote Sun lab server."""
 
         # Gets the hostname of the compute node and caches it in the connection data file. Also caches the port name.
         self.add_command('echo "COMPUTE_NODE: $(hostname)" > {}'.format(self.connection_info_file))
@@ -297,7 +297,7 @@ class JupyterJob(Job):
         if jupyter_args:
             jupyter_cmd.append(jupyter_args)
 
-        # Adds resolved jupyter command to the list of job commands.
+        # Adds the resolved jupyter command to the list of job commands.
         jupyter_cmd_str = " ".join(jupyter_cmd)
         self.add_command(jupyter_cmd_str)
 
@@ -324,7 +324,7 @@ class JupyterJob(Job):
             message = f"Could not parse connection information file for the Jupyter server job with id {self.job_id}."
             console.error(message, ValueError)
 
-        # Stores extracted data inside connection_info attribute as a JupyterConnectionInfo instance.
+        # Stores extracted data inside the connection_info attribute as a JupyterConnectionInfo instance.
         self.connection_info = _JupyterConnectionInfo(
             compute_node=compute_node_match.group(1).strip(),  # type: ignore
             port=int(port_match.group(1)),  # type: ignore
@@ -352,7 +352,7 @@ class JupyterJob(Job):
             )
             return  # No connection information available, so does not proceed with printing.
 
-        # Prints generic connection details to terminal
+        # Prints generic connection details to the terminal
         console.echo(f"Jupyter is running on: {self.connection_info.compute_node}")
         console.echo(f"Port: {self.connection_info.port}")
         console.echo(f"Token: {self.connection_info.token}")

@@ -49,11 +49,11 @@ def verify_session_integrity(
     """Checks the integrity of the target session's raw data (contents of the raw_data directory).
 
     This command assumes that the data has been checksummed during acquisition and contains an ax_checksum.txt file
-    that stores the data checksum generated before transferring the data to long-term storage destination. This function
-    always verified the integrity of the 'raw_data' directory. It does not work with 'processed_data' or any other
-    directories. If the session data was corrupted, the command removes the 'telomere.bin' file, marking the session as
-    'incomplete' and automatically excluding it from all further automated processing runtimes. if the session data
-    is intact, generates a 'verified.bin' marker file inside the session's raw_data folder.
+    that stores the data checksum generated before transferring the data to the long-term storage destination. This
+    function always verified the integrity of the 'raw_data' directory. It does not work with 'processed_data' or any
+    other directories. If the session data was corrupted, the command removes the 'telomere.bin' file, marking the
+    session as 'incomplete' and automatically excluding it from all further automated processing runtimes. If the
+    session data is intact, it generates a 'verified.bin' marker file inside the session's raw_data folder.
 
     The command is also used by Sun lab data acquisition systems to generate the processed data hierarchy for each
     processed session. This use case is fully automated and should not be triggered manually by the user.
@@ -366,7 +366,7 @@ def start_jupyter_server(
     server = Server(credentials_path)
     job: JupyterJob | None = None
     try:
-        # If the caller did not provide an explicit notebook directory, defaults to user's working directory
+        # If the caller did not provide an explicit notebook directory, defaults to the user's working directory
         if directory is None:
             directory = (server.user_working_root,)
 
@@ -394,7 +394,7 @@ def start_jupyter_server(
         if job is not None:
             server.abort_job(job)
 
-        # Closes server connection if it is still open
+        # Closes the server connection if it is still open
         server.close()
 
 

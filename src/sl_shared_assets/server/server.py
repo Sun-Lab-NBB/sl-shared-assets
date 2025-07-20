@@ -27,7 +27,7 @@ def generate_server_credentials(
     output_directory: Path,
     username: str,
     password: str,
-    host: str = "cbsuwsun.biohpc.cornell.edu",
+    host: str = "cbsuwsun.biopic.cornell.edu",
     storage_root: str = "/local/workdir",
     working_root: str = "/local/storage",
     shared_directory_name: str = "sun_data",
@@ -255,7 +255,7 @@ class Server:
             conda_environment: The name of the conda environment to activate on the server before running the job logic.
                 The environment should contain the necessary Python packages and CLIs to support running the job's
                 logic. For Jupyter jobs, this necessarily includes the Jupyter notebook and jupyterlab packages.
-            port: The connection port number for Jupyter server. If set to 0 (default), a random port number between
+            port: The connection port number for the Jupyter server. If set to 0 (default), a random port number between
                 8888 and 9999 will be assigned to this connection to reduce the possibility of colliding with other
                 user sessions.
             notebook_directory: The directory to use as Jupyter's root. During runtime, Jupyter will only have GUI
@@ -274,8 +274,8 @@ class Server:
             Do NOT re-submit the job to the server, as this is done as part of this method's runtime.
 
         Raises:
-            TimeoutError: If the target Jupyter server doesn't start within 120 minutes from this method being called.
-            RuntimeError: If job submission fails for any reason.
+            TimeoutError: If the target Jupyter server doesn't start within 120 minutes of this method being called.
+            RuntimeError: If the job submission fails for any reason.
         """
 
         # Statically configures the working directory to be stored under:
@@ -309,7 +309,7 @@ class Server:
     def submit_job(self, job: Job | JupyterJob) -> Job | JupyterJob:
         """Submits the input job to the managed BioHPC server via SLURM job manager.
 
-        This method submits various jobs for execution via SLURM-managed BioHPC cluster. As part of its runtime, the
+        This method submits various jobs for execution via the SLURM-managed BioHPC cluster. As part of its runtime, the
         method translates the Job object into the shell script, moves the script to the target working directory on
         the server, and instructs the server to execute the shell script (via SLURM).
 
@@ -400,7 +400,7 @@ class Server:
 
                 timer.delay_noblock(delay=5, allow_sleep=True)  # Waits for 5 seconds before checking again
             else:
-                # Only raises timeout error if the while loop is not broken in 120 seconds
+                # Only raises the timeout error if the while loop is not broken in 120 seconds
                 message = (
                     f"Remote jupyter server job {job.job_name} with id {job.job_id} did not start within 120 seconds "
                     f"from being submitted. Since all jupyter jobs are intended to be interactive and the server is "
@@ -418,7 +418,7 @@ class Server:
         """Returns True if the job managed by the input Job instance has been completed or terminated its runtime due
         to an error.
 
-        If the job is still running or is waiting inside the execution queue, returns False.
+        If the job is still running or is waiting inside the execution queue, the method returns False.
 
         Args:
             job: The Job object whose status needs to be checked.
@@ -446,7 +446,7 @@ class Server:
     def abort_job(self, job: Job | JupyterJob) -> None:
         """Aborts the target job if it is currently running on the server.
 
-        Use this method to immediately abort running or queued jobs, without waiting for the timeout guard. If the job
+        Use this method to immediately abort running or queued jobs without waiting for the timeout guard. If the job
         is queued, this method will remove it from the SLURM queue. If the job is already terminated, this method will
         do nothing.
 
@@ -507,12 +507,12 @@ class Server:
                 remote_item_path = remote_directory_path.joinpath(item.filename)
                 local_item_path = local_directory_path.joinpath(item.filename)
 
-                # Checks if item is a directory
+                # Checks if the item is a directory
                 if stat.S_ISDIR(item.st_mode):  # type: ignore
                     # Recursively pulls the subdirectory
                     self.pull_directory(local_item_path, remote_item_path)
                 else:
-                    # Pulls the individual file using existing method
+                    # Pulls the individual file using the existing method
                     sftp.get(localpath=str(local_item_path), remotepath=str(remote_item_path))
 
         finally:
@@ -535,7 +535,7 @@ class Server:
         sftp = self._client.open_sftp()
 
         try:
-            # Creates the remote directory using existing method
+            # Creates the remote directory using the existing method
             self.create_directory(remote_directory_path, parents=True)
 
             # Iterates through all items in the local directory
@@ -546,7 +546,7 @@ class Server:
                     # Recursively pushes subdirectory
                     self.push_directory(local_item_path, remote_item_path)
                 else:
-                    # Pushes the individual file using existing method
+                    # Pushes the individual file using the existing method
                     sftp.put(localpath=str(local_item_path), remotepath=str(remote_item_path))
 
         finally:
@@ -609,7 +609,7 @@ class Server:
                         current_path = part
 
                     try:
-                        # Checks if directory exists by trying to stat it
+                        # Checks if the directory exists by trying to 'stat' it
                         sftp.stat(current_path)
                     except FileNotFoundError:
                         # If the directory does not exist, creates it
@@ -617,7 +617,7 @@ class Server:
             else:
                 # Otherwise, only creates the final directory
                 try:
-                    # Checks if directory already exists
+                    # Checks if the directory already exists
                     sftp.stat(remote_path_str)
                 except FileNotFoundError:
                     # Creates the directory if it does not exist
@@ -632,7 +632,7 @@ class Server:
 
         sftp = self._client.open_sftp()
         try:
-            # Checks if the target file or directory exists by trying to stat it
+            # Checks if the target file or directory exists by trying to 'stat' it
             sftp.stat(str(remote_path))
 
             # If the request does not err, returns True (file or directory exists)

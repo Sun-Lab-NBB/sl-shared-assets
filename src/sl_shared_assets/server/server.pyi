@@ -15,7 +15,7 @@ def generate_server_credentials(
     output_directory: Path,
     username: str,
     password: str,
-    host: str = "cbsuwsun.biohpc.cornell.edu",
+    host: str = "cbsuwsun.biopic.cornell.edu",
     storage_root: str = "/local/workdir",
     working_root: str = "/local/storage",
     shared_directory_name: str = "sun_data",
@@ -140,7 +140,7 @@ class Server:
             conda_environment: The name of the conda environment to activate on the server before running the job logic.
                 The environment should contain the necessary Python packages and CLIs to support running the job's
                 logic. For Jupyter jobs, this necessarily includes the Jupyter notebook and jupyterlab packages.
-            port: The connection port number for Jupyter server. If set to 0 (default), a random port number between
+            port: The connection port number for the Jupyter server. If set to 0 (default), a random port number between
                 8888 and 9999 will be assigned to this connection to reduce the possibility of colliding with other
                 user sessions.
             notebook_directory: The directory to use as Jupyter's root. During runtime, Jupyter will only have GUI
@@ -159,13 +159,13 @@ class Server:
             Do NOT re-submit the job to the server, as this is done as part of this method's runtime.
 
         Raises:
-            TimeoutError: If the target Jupyter server doesn't start within 120 minutes from this method being called.
-            RuntimeError: If job submission fails for any reason.
+            TimeoutError: If the target Jupyter server doesn't start within 120 minutes of this method being called.
+            RuntimeError: If the job submission fails for any reason.
         """
     def submit_job(self, job: Job | JupyterJob) -> Job | JupyterJob:
         """Submits the input job to the managed BioHPC server via SLURM job manager.
 
-        This method submits various jobs for execution via SLURM-managed BioHPC cluster. As part of its runtime, the
+        This method submits various jobs for execution via the SLURM-managed BioHPC cluster. As part of its runtime, the
         method translates the Job object into the shell script, moves the script to the target working directory on
         the server, and instructs the server to execute the shell script (via SLURM).
 
@@ -183,7 +183,7 @@ class Server:
         """Returns True if the job managed by the input Job instance has been completed or terminated its runtime due
         to an error.
 
-        If the job is still running or is waiting inside the execution queue, returns False.
+        If the job is still running or is waiting inside the execution queue, the method returns False.
 
         Args:
             job: The Job object whose status needs to be checked.
@@ -195,7 +195,7 @@ class Server:
     def abort_job(self, job: Job | JupyterJob) -> None:
         """Aborts the target job if it is currently running on the server.
 
-        Use this method to immediately abort running or queued jobs, without waiting for the timeout guard. If the job
+        Use this method to immediately abort running or queued jobs without waiting for the timeout guard. If the job
         is queued, this method will remove it from the SLURM queue. If the job is already terminated, this method will
         do nothing.
 

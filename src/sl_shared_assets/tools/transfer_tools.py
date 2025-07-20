@@ -45,7 +45,7 @@ def transfer_directory(source: Path, destination: Path, num_threads: int = 1, ve
         done before copying the files.
 
         The method executes a multithreading copy operation. It does not clean up the source files. That job is handed
-        to the specific preprocessing function from the sl_experiment or sl-forgery libraries that calls this function.
+        to the specific preprocessing function from the sl_experiment or sl-forgery libraries that call this function.
 
         If the method is configured to verify transferred file integrity, it reruns the xxHash3-128 checksum calculation
         and compares the returned checksum to the one stored in the source directory. The method assumes that all input

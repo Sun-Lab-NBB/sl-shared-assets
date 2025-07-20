@@ -20,7 +20,7 @@ class SessionTypes(StrEnum):
 
     Notes:
         This enumeration does not differentiate between different acquisition systems. Different acquisition systems
-        support different session types, and may not be suited for acquiring some of the session types listed in this
+        support different session types and may not be suited for acquiring some of the session types listed in this
         enumeration.
     """
 
@@ -206,8 +206,8 @@ class SessionData(YamlConfig):
                 provide the path to the root project directory (directory that stores all Sun lab projects) on that
                 drive. The method will automatically resolve the project/animal/session/processed_data hierarchy using
                 this root path. If raw and processed data are kept on the same drive, keep this set to None.
-            make_processed_data_directory: Determines whether this method should create processed_data directory if it
-                does not exist.
+            make_processed_data_directory: Determines whether this method should create the processed_data directory if
+                it does not exist.
 
         Returns:
             An initialized SessionData instance for the session whose data is stored at the provided path.
@@ -226,7 +226,7 @@ class SessionData(YamlConfig):
     def _save(self) -> None:
         """Saves the instance data to the 'raw_data' directory of the managed session as a 'session_data.yaml' file.
 
-        This is used to save the data stored in the instance to disk, so that it can be reused during further stages of
+        This is used to save the data stored in the instance to disk so that it can be reused during further stages of
         data processing. The method is intended to only be used by the SessionData instance itself during its
         create() method runtime.
         """
@@ -264,7 +264,7 @@ class ProcessingTracker(YamlConfig):
         with an error.
 
         Raises:
-            TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
+            TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
         """
     def error(self) -> None:
         """Configures the tracker file to indicate that the tracked processing runtime encountered an error and failed
@@ -276,7 +276,7 @@ class ProcessingTracker(YamlConfig):
         from the process that calls this method.
 
         Raises:
-            TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
+            TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
         """
     def stop(self) -> None:
         """Configures the tracker file to indicate that the tracked processing runtime has been completed successfully.
@@ -286,7 +286,7 @@ class ProcessingTracker(YamlConfig):
         at the end of the runtime.
 
         Raises:
-            TimeoutError: If the file lock for the target .YAML file cannot be acquired within the timeout period.
+            TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
         """
     @property
     def is_complete(self) -> bool:

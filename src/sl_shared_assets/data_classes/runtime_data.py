@@ -35,7 +35,7 @@ class MesoscopeHardwareState(YamlConfig):
         any field in this dataclass to None also functions as a flag for whether to parse the log associated with the
         module that provides this field's information.
 
-        This class is automatically configured by _MesoscopeVRSystem class from sl-experiment library to facilitate
+        This class is automatically configured by _MesoscopeVRSystem class from the sl-experiment library to facilitate
         proper log parsing.
     """
 
@@ -200,7 +200,7 @@ class WindowCheckingDescriptor(YamlConfig):
 
     Notes:
         Window Checking sessions are different from all other sessions. Unlike other sessions, their purpose is not to
-        generate data, but rather to assess the suitability of the particular animal to be included in training and
+        generate data but rather to assess the suitability of the particular animal to be included in training and
         experiment cohorts. These sessions are automatically excluded from any automated data processing and analysis.
     """
 

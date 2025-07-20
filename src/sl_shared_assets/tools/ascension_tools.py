@@ -47,7 +47,7 @@ def _generate_session_name(acquisition_path: Path) -> str:
         console.error(message=message, error=FileNotFoundError)
         raise FileNotFoundError(message)  # Fall-back to appease mypy
 
-    # Gets last modified time (available on all platforms) and converts it to a UTC timestamp object.
+    # Gets the last modified time (available on all platforms) and converts it to a UTC timestamp object.
     mod_time = source.stat().st_mtime
     mod_datetime = datetime.datetime.fromtimestamp(mod_time)
 
@@ -57,7 +57,7 @@ def _generate_session_name(acquisition_path: Path) -> str:
     timestamp_bytes = np.array([(timestamp_microseconds >> (8 * i)) & 0xFF for i in range(8)], dtype=np.uint8)
     stamp = extract_timestamp_from_bytes(timestamp_bytes=timestamp_bytes)
 
-    # Returns the generated session name to caller.
+    # Returns the generated session name to the caller.
     return stamp
 
 
@@ -89,8 +89,8 @@ def _reorganize_data(session_data: SessionData, source_root: Path) -> bool:
     mesoscope_frames_path = source_root.joinpath("mesoscope_frames")
     ax_checksum_path = source_root.joinpath("ax_checksum.txt")
 
-    # These two file types are present for some, but not all folders. They are not as important as the group of files
-    # above though, as, currently, the data stored in these files is not used during processing.
+    # These two file types are present for some, but not all folders. They are not as important as the files mentioned
+    # above, though, as, currently, the data stored in these files is not used during processing.
     frame_metadata_path = source_root.joinpath("frame_metadata.npz")
     metadata_path = source_root.joinpath("metadata.json")
 
@@ -201,10 +201,10 @@ def ascend_tyche_data(root_directory: Path) -> None:
     # Statically defines project name and local root paths
     project_name = "Tyche"
 
-    # Assumes that root directory stores all animal folders to be processed
+    # Assumes that the root directory stores all animal folders to be processed
     for animal_folder in root_directory.iterdir():
-        # Each animal folder is named to include project name and a static animal ID, e.g.: Tyche-A7. This extracts each
-        # animal ID.
+        # Each animal folder is named to include a project name and a static animal ID, e.g.: Tyche-A7. This extracts
+        # each animal ID.
         animal_name = animal_folder.stem.split(sep="-")[1]
 
         # Under each animal root folder, there are day folders that use YYYY-MM-DD timestamps
@@ -230,7 +230,7 @@ def ascend_tyche_data(root_directory: Path) -> None:
                 session_data.runtime_initialized()
 
                 # Moves the data from the old hierarchy to the new hierarchy. If the process runs as expected, and
-                # fully empties the source acquisition folder, destroys the folder. Otherwise, notifies the user that
+                # fully empties the source acquisition folder, it destroys the folder. Otherwise, notifies the user that
                 # the runtime did not fully process the session data and requests intervention.
                 success = _reorganize_data(session_data, acquisition_folder)
                 if not success:
