@@ -585,6 +585,10 @@ class ProcessingTracker(YamlConfig):
     _lock_path: str = field(init=False)
     """Stores the path to the .lock file for the target tracker .yaml file. This file is used to ensure that only one 
     process can simultaneously read from or write to the wrapped .yaml file."""
+    _started_runtime: bool = False
+    """This internal service field tracks when the class instance is used to start a runtime. It is set automatically by
+    the ProcessingTracker instance and is used to prevent runtime errors from deadlocking the specific processing 
+    pipeline tracked by the class instance."""
 
     def __post_init__(self) -> None:
         # Generates the lock file for the target .yaml file path.
@@ -594,13 +598,12 @@ class ProcessingTracker(YamlConfig):
             self._lock_path = ""
 
     def __del__(self) -> None:
-        """If the instance is garbage-collected without calling the stop() method, assumes this is due to a runtime
-        error.
+        """If the instance as used to start a runtime, ensures that the instance properly marks the runtime as completed
+        or erred before being garbage-collected.
 
-        It is essential to always resolve the runtime as either 'stopped' or 'erred' to avoid deadlocking the session
-        data.
+        This is a security mechanism to prevent deadlocking the processed session and pipeline for future runtimes.
         """
-        if self._is_running:
+        if self._started_runtime and self._is_running:
             self.error()
 
     def _load_state(self) -> None:
@@ -622,6 +625,7 @@ class ProcessingTracker(YamlConfig):
         original = copy.deepcopy(self)
         original.file_path = None  # type: ignore
         original._lock_path = None  # type: ignore
+        original._started_runtime = False  # This field is only used by the instance stored in memory.
         original.to_yaml(file_path=self.file_path)
 
     def start(self) -> None:
@@ -655,6 +659,10 @@ class ProcessingTracker(YamlConfig):
                 self._is_complete = False
                 self._encountered_error = False
                 self._save_state()
+
+                # Sets the start tracker flag to True, which ensures that the class tries to mark the runtime as
+                # completed or erred before it being garbage-collected.
+                self._started_runtime = True
 
         # If lock acquisition fails for any reason, aborts with an error
         except Timeout:
@@ -702,6 +710,9 @@ class ProcessingTracker(YamlConfig):
                 self._encountered_error = True
                 self._save_state()
 
+                # Disables the security flag
+                self._started_runtime = False
+
         # If lock acquisition fails for any reason, aborts with an error
         except Timeout:
             message = (
@@ -745,6 +756,9 @@ class ProcessingTracker(YamlConfig):
                 self._is_complete = True
                 self._encountered_error = False
                 self._save_state()
+
+                # Disables the security flag
+                self._started_runtime = False
 
         # If lock acquisition fails for any reason, aborts with an error
         except Timeout:

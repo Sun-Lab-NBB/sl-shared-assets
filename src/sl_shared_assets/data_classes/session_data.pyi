@@ -245,13 +245,13 @@ class ProcessingTracker(YamlConfig):
     _encountered_error: bool = ...
     _is_running: bool = ...
     _lock_path: str = field(init=False)
+    _started_runtime: bool = ...
     def __post_init__(self) -> None: ...
     def __del__(self) -> None:
-        """If the instance is garbage-collected without calling the stop() method, assumes this is due to a runtime
-        error.
+        """If the instance as used to start a runtime, ensures that the instance properly marks the runtime as completed
+        or erred before beign garbage-collected.
 
-        It is essential to always resolve the runtime as either 'stopped' or 'erred' to avoid deadlocking the session
-        data.
+        This is a security mechanism to prevent deadlocking the processed session and pipeline for future runtimes.
         """
     def _load_state(self) -> None:
         """Reads the current processing state from the wrapped .YAML file."""
