@@ -1,4 +1,5 @@
 from .tools import (
+    ProjectManifest as ProjectManifest,
     resolve_p53_marker as resolve_p53_marker,
     transfer_directory as transfer_directory,
     calculate_directory_checksum as calculate_directory_checksum,
@@ -75,6 +76,7 @@ __all__ = [
     "SessionTypes",
     "AcquisitionSystems",
     "WindowCheckingDescriptor",
+    "ProjectManifest",
     "resolve_p53_marker",
     "transfer_directory",
     "calculate_directory_checksum",

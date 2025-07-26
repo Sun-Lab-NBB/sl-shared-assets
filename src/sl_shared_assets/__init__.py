@@ -8,6 +8,7 @@ Authors: Ivan Kondratyev (Inkaros), Kushaan Gupta, Natalie Yeung
 from ataraxis_base_utilities import console
 
 from .tools import (
+    ProjectManifest,
     resolve_p53_marker,
     transfer_directory,
     calculate_directory_checksum,
@@ -86,6 +87,7 @@ __all__ = [
     "AcquisitionSystems",
     "WindowCheckingDescriptor",
     # Tools package
+    "ProjectManifest",
     "resolve_p53_marker",
     "transfer_directory",
     "calculate_directory_checksum",
