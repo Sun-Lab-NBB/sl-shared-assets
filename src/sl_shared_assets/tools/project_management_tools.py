@@ -7,6 +7,7 @@ from datetime import datetime
 
 import pytz
 import polars as pl
+from filelock import FileLock
 from ataraxis_base_utilities import console
 
 from ..data_classes import (
@@ -288,139 +289,146 @@ def generate_project_manifest(
         "dataset": [],  # Determines whether the session's data is ready to be integrated into a dataset.
     }
 
-    # Loops over each session of every animal in the project and extracts session ID information and information
-    # about which processing steps have been successfully applied to the session.
-    for directory in session_directories:
-        # Skips processing directories without files (sessions with empty raw-data directories)
-        if len([file for file in directory.joinpath("raw_data").glob("*")]) == 0:
-            continue
+    # Resolves the path to the manifest .feather file to be created and the .lock file for the generated manifest
+    manifest_path = output_directory.joinpath(f"{raw_project_directory.stem}_manifest.feather")
+    manifest_lock = manifest_path.with_suffix(manifest_path.suffix + ".lock")
 
-        # Instantiates the SessionData instance to resolve the paths to all session's data files and locations.
-        session_data = SessionData.load(
-            session_path=directory,
-            processed_data_root=processed_project_directory,
-            make_processed_data_directory=False,
-        )
+    # Acquires the lock
+    lock = FileLock(str(manifest_lock))
+    with lock.acquire(timeout=20.0):
+        # Loops over each session of every animal in the project and extracts session ID information and information
+        # about which processing steps have been successfully applied to the session.
+        for directory in session_directories:
+            # Skips processing directories without files (sessions with empty raw-data directories)
+            if len([file for file in directory.joinpath("raw_data").glob("*")]) == 0:
+                continue
 
-        # Fills the manifest dictionary with data for the processed session:
-
-        # Extracts ID and data path information from the SessionData instance
-        manifest["animal"].append(session_data.animal_id)
-        manifest["session"].append(session_data.session_name)
-        manifest["type"].append(session_data.session_type)
-
-        # Parses session name into the date-time object to simplify working with date-time data in the future
-        date_time_components = session_data.session_name.split("-")
-        date_time = datetime(
-            year=int(date_time_components[0]),
-            month=int(date_time_components[1]),
-            day=int(date_time_components[2]),
-            hour=int(date_time_components[3]),
-            minute=int(date_time_components[4]),
-            second=int(date_time_components[5]),
-            microsecond=int(date_time_components[6]),
-            tzinfo=pytz.UTC,
-        )
-
-        # Converts from UTC to EST / EDT for user convenience
-        eastern = pytz.timezone("America/New_York")
-        date_time = date_time.astimezone(eastern)
-        manifest["date"].append(date_time)
-
-        # Depending on the session type, instantiates the appropriate descriptor instance and uses it to read the
-        # experimenter notes
-        if session_data.session_type == SessionTypes.LICK_TRAINING:
-            descriptor: LickTrainingDescriptor = LickTrainingDescriptor.from_yaml(  # type: ignore
-                file_path=session_data.raw_data.session_descriptor_path
+            # Instantiates the SessionData instance to resolve the paths to all session's data files and locations.
+            session_data = SessionData.load(
+                session_path=directory,
+                processed_data_root=processed_project_directory,
+                make_processed_data_directory=False,
             )
-            manifest["notes"].append(descriptor.experimenter_notes)
-        elif session_data.session_type == SessionTypes.RUN_TRAINING:
-            descriptor: RunTrainingDescriptor = RunTrainingDescriptor.from_yaml(  # type: ignore
-                file_path=session_data.raw_data.session_descriptor_path
+
+            # Fills the manifest dictionary with data for the processed session:
+
+            # Extracts ID and data path information from the SessionData instance
+            manifest["animal"].append(session_data.animal_id)
+            manifest["session"].append(session_data.session_name)
+            manifest["type"].append(session_data.session_type)
+
+            # Parses session name into the date-time object to simplify working with date-time data in the future
+            date_time_components = session_data.session_name.split("-")
+            date_time = datetime(
+                year=int(date_time_components[0]),
+                month=int(date_time_components[1]),
+                day=int(date_time_components[2]),
+                hour=int(date_time_components[3]),
+                minute=int(date_time_components[4]),
+                second=int(date_time_components[5]),
+                microsecond=int(date_time_components[6]),
+                tzinfo=pytz.UTC,
             )
-            manifest["notes"].append(descriptor.experimenter_notes)
-        elif session_data.session_type == SessionTypes.MESOSCOPE_EXPERIMENT:
-            descriptor: MesoscopeExperimentDescriptor = MesoscopeExperimentDescriptor.from_yaml(  # type: ignore
-                file_path=session_data.raw_data.session_descriptor_path
-            )
-            manifest["notes"].append(descriptor.experimenter_notes)
-        elif session_data.session_type == SessionTypes.WINDOW_CHECKING:
-            # sl-experiment version 3.0.0 added session descriptors to Window Checking runtimes. Since the file does not
-            # exist in prior versions, this section is written to statically handle the discrepancy.
-            try:
-                descriptor: WindowCheckingDescriptor = WindowCheckingDescriptor.from_yaml(  # type: ignore
+
+            # Converts from UTC to EST / EDT for user convenience
+            eastern = pytz.timezone("America/New_York")
+            date_time = date_time.astimezone(eastern)
+            manifest["date"].append(date_time)
+
+            # Depending on the session type, instantiates the appropriate descriptor instance and uses it to read the
+            # experimenter notes
+            if session_data.session_type == SessionTypes.LICK_TRAINING:
+                descriptor: LickTrainingDescriptor = LickTrainingDescriptor.from_yaml(  # type: ignore
                     file_path=session_data.raw_data.session_descriptor_path
                 )
                 manifest["notes"].append(descriptor.experimenter_notes)
-            except Exception:
-                manifest["notes"].append("N/A")
+            elif session_data.session_type == SessionTypes.RUN_TRAINING:
+                descriptor: RunTrainingDescriptor = RunTrainingDescriptor.from_yaml(  # type: ignore
+                    file_path=session_data.raw_data.session_descriptor_path
+                )
+                manifest["notes"].append(descriptor.experimenter_notes)
+            elif session_data.session_type == SessionTypes.MESOSCOPE_EXPERIMENT:
+                descriptor: MesoscopeExperimentDescriptor = MesoscopeExperimentDescriptor.from_yaml(  # type: ignore
+                    file_path=session_data.raw_data.session_descriptor_path
+                )
+                manifest["notes"].append(descriptor.experimenter_notes)
+            elif session_data.session_type == SessionTypes.WINDOW_CHECKING:
+                # sl-experiment version 3.0.0 added session descriptors to Window Checking runtimes. Since the file
+                # does not exist in prior versions, this section is written to statically handle the discrepancy.
+                try:
+                    descriptor: WindowCheckingDescriptor = WindowCheckingDescriptor.from_yaml(  # type: ignore
+                        file_path=session_data.raw_data.session_descriptor_path
+                    )
+                    manifest["notes"].append(descriptor.experimenter_notes)
+                except Exception:
+                    manifest["notes"].append("N/A")
 
-        # If the session raw_data folder contains the telomere.bin file, marks the session as complete.
-        manifest["complete"].append(session_data.raw_data.telomere_path.exists())
+            # If the session raw_data folder contains the telomere.bin file, marks the session as complete.
+            manifest["complete"].append(session_data.raw_data.telomere_path.exists())
 
-        # Data verification status
-        tracker = ProcessingTracker(file_path=session_data.raw_data.integrity_verification_tracker_path)
-        manifest["integrity"].append(tracker.is_complete)
+            # Data verification status
+            tracker = ProcessingTracker(file_path=session_data.raw_data.integrity_verification_tracker_path)
+            manifest["integrity"].append(tracker.is_complete)
 
-        # If the session is incomplete or unverified, marks all processing steps as FALSE, as automatic processing is
-        # disabled for incomplete sessions. If the session is unverified, the case is even more severe, as its data may
-        # be corrupted.
-        if not manifest["complete"][-1] or not manifest["integrity"][-1]:
-            manifest["suite2p"].append(False)
-            manifest["dataset"].append(False)
-            manifest["behavior"].append(False)
-            manifest["video"].append(False)
-            continue  # Cycles to the next session
+            # If the session is incomplete or unverified, marks all processing steps as FALSE, as automatic processing
+            # is disabled for incomplete sessions. If the session is unverified, the case is even more severe, as its
+            # data may be corrupted.
+            if not manifest["complete"][-1] or not manifest["integrity"][-1]:
+                manifest["suite2p"].append(False)
+                manifest["dataset"].append(False)
+                manifest["behavior"].append(False)
+                manifest["video"].append(False)
+                continue  # Cycles to the next session
 
-        # Suite2p (single-day) processing status.
-        tracker = ProcessingTracker(file_path=session_data.processed_data.suite2p_processing_tracker_path)
-        manifest["suite2p"].append(tracker.is_complete)
+            # Suite2p (single-day) processing status.
+            tracker = ProcessingTracker(file_path=session_data.processed_data.suite2p_processing_tracker_path)
+            manifest["suite2p"].append(tracker.is_complete)
 
-        # Behavior data processing status.
-        tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
-        manifest["behavior"].append(tracker.is_complete)
+            # Behavior data processing status.
+            tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
+            manifest["behavior"].append(tracker.is_complete)
 
-        # DeepLabCut (video) processing status.
-        tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
-        manifest["video"].append(tracker.is_complete)
+            # DeepLabCut (video) processing status.
+            tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
+            manifest["video"].append(tracker.is_complete)
 
-        # Tracks whether the session's data is currently in the processing or dataset integration mode.
-        manifest["dataset"].append(session_data.processed_data.p53_path.exists())
+            # Tracks whether the session's data is currently in the processing or dataset integration mode.
+            manifest["dataset"].append(session_data.processed_data.p53_path.exists())
 
-    # If all animal IDs are integer-convertible, stores them as numbers to promote proper sorting. Otherwise, stores
-    # them as strings. The latter options are primarily kept for compatibility with Tyche data
-    animal_type: type[pl.UInt64] | type[pl.String]
-    if all([str(animal).isdigit() for animal in manifest["animal"]]):
-        # Converts all strings to integers
-        manifest["animal"] = [int(animal) for animal in manifest["animal"]]  # type: ignore
-        animal_type = pl.UInt64  # Uint64 for future proofing
-    else:
-        animal_type = pl.String
+        # If all animal IDs are integer-convertible, stores them as numbers to promote proper sorting. Otherwise, stores
+        # them as strings. The latter options are primarily kept for compatibility with Tyche data
+        animal_type: type[pl.UInt64] | type[pl.String]
+        if all([str(animal).isdigit() for animal in manifest["animal"]]):
+            # Converts all strings to integers
+            manifest["animal"] = [int(animal) for animal in manifest["animal"]]  # type: ignore
+            animal_type = pl.UInt64  # Uint64 for future proofing
+        else:
+            animal_type = pl.String
 
-    # Converts the manifest dictionary to a Polars Dataframe.
-    schema = {
-        "animal": animal_type,
-        "date": pl.Datetime,
-        "session": pl.String,
-        "type": pl.String,
-        "notes": pl.String,
-        "complete": pl.UInt8,
-        "integrity": pl.UInt8,
-        "suite2p": pl.UInt8,
-        "dataset": pl.UInt8,
-        "behavior": pl.UInt8,
-        "video": pl.UInt8,
-    }
-    df = pl.DataFrame(manifest, schema=schema, strict=False)
+        # Converts the manifest dictionary to a Polars Dataframe.
+        schema = {
+            "animal": animal_type,
+            "date": pl.Datetime,
+            "session": pl.String,
+            "type": pl.String,
+            "notes": pl.String,
+            "complete": pl.UInt8,
+            "integrity": pl.UInt8,
+            "suite2p": pl.UInt8,
+            "dataset": pl.UInt8,
+            "behavior": pl.UInt8,
+            "video": pl.UInt8,
+        }
+        df = pl.DataFrame(manifest, schema=schema, strict=False)
 
-    # Sorts the DataFrame by animal and then session. Since we assign animal IDs sequentially and 'name' sessions based
-    # on acquisition timestamps, the sort order is chronological.
-    sorted_df = df.sort(["animal", "session"])
+        # Sorts the DataFrame by animal and then session. Since we assign animal IDs sequentially and 'name' sessions
+        # based on acquisition timestamps, the sort order is chronological.
+        sorted_df = df.sort(["animal", "session"])
 
-    # Saves the generated manifest to the project-specific manifest .feather file for further processing.
-    sorted_df.write_ipc(
-        file=output_directory.joinpath(f"{raw_project_directory.stem}_manifest.feather"), compression="lz4"
-    )
+        # Saves the generated manifest to the project-specific manifest .feather file for further processing.
+        sorted_df.write_ipc(
+            file=output_directory.joinpath(f"{raw_project_directory.stem}_manifest.feather"), compression="lz4"
+        )
 
 
 def verify_session_checksum(
@@ -508,16 +516,10 @@ def verify_session_checksum(
             # the raw project directory.
             raw_directory = session_path.parents[1]
 
-            # Depending on the processed_data_root configuration, determines the path for the project's processed
-            # data directory.
-            processed_directory: Path | None = None
-            if processed_data_root is not None:
-                processed_directory = processed_data_root.joinpath(session_data.project_name)
-
             # Generates the manifest file inside the root raw data project directory
             generate_project_manifest(
                 raw_project_directory=session_path.parents[1],
-                processed_project_directory=processed_directory,
+                processed_project_directory=processed_data_root,
                 output_directory=raw_directory,
             )
 
@@ -618,15 +620,9 @@ def resolve_p53_marker(
         # the raw project directory.
         raw_directory = session_path.parents[1]
 
-        # Depending on the processed_data_root configuration, determines the path for the project's processed
-        # data directory.
-        processed_directory: Path | None = None
-        if processed_data_root is not None:
-            processed_directory = processed_data_root.joinpath(session_data.project_name)
-
         # Generates the manifest file inside the root raw data project directory
         generate_project_manifest(
             raw_project_directory=session_path.parents[1],
-            processed_project_directory=processed_directory,
+            processed_project_directory=processed_data_root,
             output_directory=raw_directory,
         )
