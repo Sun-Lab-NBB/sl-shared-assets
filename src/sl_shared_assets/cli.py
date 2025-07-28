@@ -128,7 +128,7 @@ def generate_project_manifest_file(
     generate_project_manifest(
         raw_project_directory=Path(project_path),
         output_directory=Path(output_directory),
-        processed_project_directory=Path(project_processed_path) if project_processed_path else None,
+        processed_data_root=Path(project_processed_path) if project_processed_path else None,
     )
     # noinspection PyTypeChecker
     console.echo(message=f"Project {Path(project_path).stem} data manifest file: generated.", level=LogLevel.SUCCESS)

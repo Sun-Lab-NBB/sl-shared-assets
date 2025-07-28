@@ -107,7 +107,7 @@ class ProjectManifest:
         """
 
 def generate_project_manifest(
-    raw_project_directory: Path, output_directory: Path, processed_project_directory: Path | None = None
+    raw_project_directory: Path, output_directory: Path, processed_data_root: Path | None = None
 ) -> None:
     """Builds and saves the project manifest .feather file under the specified output directory.
 
@@ -125,9 +125,9 @@ def generate_project_manifest(
     Args:
         raw_project_directory: The path to the root project directory used to store raw session data.
         output_directory: The path to the directory where to save the generated manifest file.
-        processed_project_directory: The path to the root project directory used to store processed session data if it
-            is different from the 'raw_project_directory'. Typically, this would be the case on remote compute server(s)
-            and not on local machines.
+        processed_data_root: The path to the root directory (volume) used to store processed data for all Sun lab
+            projects if it is different from the parent of the 'raw_project_directory'. Typically, this would be the
+            case on remote compute server(s) and not on local machines.
     """
 
 def verify_session_checksum(
