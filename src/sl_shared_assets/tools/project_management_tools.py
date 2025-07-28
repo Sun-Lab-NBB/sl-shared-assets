@@ -424,7 +424,10 @@ def generate_project_manifest(
 
 
 def verify_session_checksum(
-    session_path: Path, create_processed_data_directory: bool = True, processed_data_root: None | Path = None
+    session_path: Path,
+    create_processed_data_directory: bool = True,
+    processed_data_root: None | Path = None,
+    update_manifest: bool = False,
 ) -> None:
     """Verifies the integrity of the session's raw data by generating the checksum of the raw_data directory and
     comparing it against the checksum stored in the ax_checksum.txt file.
@@ -440,6 +443,9 @@ def verify_session_checksum(
         This function is also used to create the processed data hierarchy on the BioHPC server, when it is called as
         part of the data preprocessing runtime performed by a data acquisition system.
 
+        Since version 3.1.0, this functon also supports (re) generating the processed session's project manifest file,
+        which is used to support further Sun lab data processing pipelines.
+
     Args:
         session_path: The path to the session directory to be verified. Note, the input session directory must contain
             the 'raw_data' subdirectory.
@@ -447,6 +453,9 @@ def verify_session_checksum(
         processed_data_root: The root directory where to store the processed data hierarchy. This path has to point to
             the root directory where to store the processed data from all projects, and it will be automatically
             modified to include the project name, the animal name, and the session ID.
+        update_manifest: Determines whether to update (regenerate) the project manifest file for the processed session's
+            project. This should always be enabled when working with remote compute server(s) to ensure that the
+            project manifest file contains the most actual snapshot of the project's state.
     """
 
     # Loads session data layout. If configured to do so, also creates the processed data hierarchy
@@ -492,12 +501,33 @@ def verify_session_checksum(
         if tracker.is_running:
             tracker.error()
 
+        # If the runtime is configured to generate the project manifest file, attempts to generate and overwrite the
+        # existing manifest file for the target project.
+        if update_manifest:
+            # All sessions are stored under root/project/animal/session. Therefore, the grandparent of the session is
+            # the raw project directory.
+            raw_directory = session_path.parents[1]
+
+            # Depending on the processed_data_root configuration, determines the path for the project's processed
+            # data directory.
+            processed_directory: Path | None = None
+            if processed_data_root is not None:
+                processed_directory = processed_data_root.joinpath(session_data.project_name)
+
+            # Generates the manifest file inside the root raw data project directory
+            generate_project_manifest(
+                raw_project_directory=session_path.parents[1],
+                processed_project_directory=processed_directory,
+                output_directory=raw_directory,
+            )
+
 
 def resolve_p53_marker(
     session_path: Path,
     create_processed_data_directory: bool = True,
     processed_data_root: None | Path = None,
     remove: bool = False,
+    update_manifest: bool = False,
 ) -> None:
     """Depending on configuration, either creates or removes the p53.bin marker file for the target session.
 
@@ -511,7 +541,10 @@ def resolve_p53_marker(
 
         For the p53.bin marker to be created, the session must currently not undergo any processing. Removing the
         p53.bin marker does not have any dependencies and will be executed even if the session is currently undergoing
-        dataset integration. This is due to data access hierarchy limitations of the Sun lab BioHPC server.
+        dataset integration. This is due to data access hierarchy limitations of the Sun lab compute server.
+
+        Since version 3.1.0, this functon also supports (re)generating the processed session's project manifest file,
+        which is used to support further Sun lab data processing pipelines.
 
     Args:
         session_path: The path to the session directory for which the p53.bin marker needs to be resolved. Note, the
@@ -521,6 +554,9 @@ def resolve_p53_marker(
             the root directory where to store the processed data from all projects, and it will be automatically
             modified to include the project name, the animal name, and the session ID.
         remove: Determines whether this function is called to create or remove the p53.bin marker.
+        update_manifest: Determines whether to update (regenerate) the project manifest file for the processed session's
+            project. This should always be enabled when working with remote compute server(s) to ensure that the
+            project manifest file contains the most actual snapshot of the project's state.
     """
 
     # Loads session data layout. If configured to do so, also creates the processed data hierarchy
@@ -574,3 +610,23 @@ def resolve_p53_marker(
     # If the runtime reached this point, the session is eligible for dataset integration. Creates the p53.bin marker
     # file, preventing the session from being processed again as long as the marker exists.
     session_data.processed_data.p53_path.touch()
+
+    # If the runtime is configured to generate the project manifest file, attempts to generate and overwrite the
+    # existing manifest file for the target project.
+    if update_manifest:
+        # All sessions are stored under root/project/animal/session. Therefore, the grandparent of the session is
+        # the raw project directory.
+        raw_directory = session_path.parents[1]
+
+        # Depending on the processed_data_root configuration, determines the path for the project's processed
+        # data directory.
+        processed_directory: Path | None = None
+        if processed_data_root is not None:
+            processed_directory = processed_data_root.joinpath(session_data.project_name)
+
+        # Generates the manifest file inside the root raw data project directory
+        generate_project_manifest(
+            raw_project_directory=session_path.parents[1],
+            processed_project_directory=processed_directory,
+            output_directory=raw_directory,
+        )

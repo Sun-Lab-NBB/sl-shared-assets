@@ -43,8 +43,18 @@ from .data_classes import SessionData, ProcessingTracker
         "used if 'create_processed_directories' flag is True."
     ),
 )
+@click.option(
+    "-um",
+    "--update_manifest",
+    is_flag=True,
+    help=(
+        "Determines whether to (re)generate the manifest file for the processed session's project. This flag "
+        "should always be enabled when this CLI is executed on the remote compute server(s) to ensure that the "
+        "manifest file always reflects the most actual state of each project."
+    ),
+)
 def verify_session_integrity(
-    session_path: Path, create_processed_directories: bool, processed_data_root: Path | None
+    session_path: Path, create_processed_directories: bool, processed_data_root: Path | None, update_manifest: bool
 ) -> None:
     """Checks the integrity of the target session's raw data (contents of the raw_data directory).
 
@@ -63,7 +73,10 @@ def verify_session_integrity(
 
     # Runs the verification process
     verify_session_checksum(
-        session, create_processed_data_directory=create_processed_directories, processed_data_root=processed_data_root
+        session,
+        create_processed_data_directory=create_processed_directories,
+        processed_data_root=processed_data_root,
+        update_manifest=update_manifest,
     )
 
     # Checks the outcome of the verification process
@@ -437,8 +450,22 @@ def start_jupyter_server(
         "being integrated into any datasets."
     ),
 )
+@click.option(
+    "-um",
+    "--update_manifest",
+    is_flag=True,
+    help=(
+        "Determines whether to (re)generate the manifest file for the processed session's project. This flag "
+        "should always be enabled when this CLI is executed on the remote compute server(s) to ensure that the "
+        "manifest file always reflects the most actual state of each project."
+    ),
+)
 def resolve_dataset_marker(
-    session_path: Path, create_processed_directories: bool, project_processed_path: Path | None, remove: bool
+    session_path: Path,
+    create_processed_directories: bool,
+    project_processed_path: Path | None,
+    remove: bool,
+    update_manifest: bool,
 ) -> None:
     """Depending on configuration, either creates or removes the p53.bin marker from the target session.
 
@@ -452,4 +479,5 @@ def resolve_dataset_marker(
         create_processed_data_directory=create_processed_directories,
         processed_data_root=project_processed_path,
         remove=remove,
+        update_manifest=update_manifest,
     )
