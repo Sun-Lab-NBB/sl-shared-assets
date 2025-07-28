@@ -4,9 +4,15 @@ integrity of the data. The tools from this package are used by most other data p
 from .transfer_tools import transfer_directory
 from .ascension_tools import ascend_tyche_data
 from .packaging_tools import calculate_directory_checksum
-from .project_management_tools import resolve_p53_marker, verify_session_checksum, generate_project_manifest
+from .project_management_tools import (
+    ProjectManifest,
+    resolve_p53_marker,
+    verify_session_checksum,
+    generate_project_manifest,
+)
 
 __all__ = [
+    "ProjectManifest",
     "transfer_directory",
     "calculate_directory_checksum",
     "ascend_tyche_data",

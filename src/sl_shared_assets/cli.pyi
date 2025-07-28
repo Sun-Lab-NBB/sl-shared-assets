@@ -17,7 +17,7 @@ from .data_classes import (
 )
 
 def verify_session_integrity(
-    session_path: Path, create_processed_directories: bool, processed_data_root: Path | None
+    session_path: Path, create_processed_directories: bool, processed_data_root: Path | None, update_manifest: bool
 ) -> None:
     """Checks the integrity of the target session's raw data (contents of the raw_data directory).
 
@@ -86,7 +86,11 @@ def start_jupyter_server(
     """
 
 def resolve_dataset_marker(
-    session_path: Path, create_processed_directories: bool, project_processed_path: Path | None, remove: bool
+    session_path: Path,
+    create_processed_directories: bool,
+    project_processed_path: Path | None,
+    remove: bool,
+    update_manifest: bool,
 ) -> None:
     """Depending on configuration, either creates or removes the p53.bin marker from the target session.
 

@@ -249,7 +249,7 @@ class ProcessingTracker(YamlConfig):
     def __post_init__(self) -> None: ...
     def __del__(self) -> None:
         """If the instance as used to start a runtime, ensures that the instance properly marks the runtime as completed
-        or erred before beign garbage-collected.
+        or erred before being garbage-collected.
 
         This is a security mechanism to prevent deadlocking the processed session and pipeline for future runtimes.
         """
