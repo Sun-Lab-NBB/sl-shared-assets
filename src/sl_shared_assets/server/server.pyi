@@ -1,6 +1,7 @@
 from pathlib import Path
 from dataclasses import field, dataclass
 
+import paramiko
 from _typeshed import Incomplete
 from simple_slurm import Slurm as Slurm
 from paramiko.client import SSHClient as SSHClient
@@ -230,12 +231,23 @@ class Server:
             local_directory_path: The path to the local directory to be uploaded.
             remote_directory_path: The path on the remote server where the directory will be copied.
         """
-    def remove(self, remote_path: Path, is_dir: bool) -> None:
+    def remove(self, remote_path: Path, is_dir: bool, recursive: bool = False) -> None:
         """Removes the specified file or directory from the remote server.
 
         Args:
             remote_path: The path to the file or directory on the remote server to be removed.
             is_dir: Determines whether the input path represents a directory or a file.
+            recursive: If True and is_dir is True, recursively deletes all contents of the directory
+                before removing it. If False, only removes empty directories (standard rmdir behavior).
+        """
+    def _recursive_remove(self, sftp: paramiko.SFTPClient, remote_path: Path) -> None:
+        """Recursively removes a directory and all its contents.
+
+        This worker method is used by the user-facing remove() method to recursively remove non-empty directories.
+
+        Args:
+            sftp: The SFTP client instance to use for remove operations.
+            remote_path: The path to the remote directory to recursively remove.
         """
     def create_directory(self, remote_path: Path, parents: bool = True) -> None:
         """Creates the specified directory tree on the managed remote server via SFTP.

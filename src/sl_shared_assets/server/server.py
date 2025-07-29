@@ -552,21 +552,58 @@ class Server:
         finally:
             sftp.close()
 
-    def remove(self, remote_path: Path, is_dir: bool) -> None:
+    def remove(self, remote_path: Path, is_dir: bool, recursive: bool = False) -> None:
         """Removes the specified file or directory from the remote server.
 
         Args:
             remote_path: The path to the file or directory on the remote server to be removed.
             is_dir: Determines whether the input path represents a directory or a file.
+            recursive: If True and is_dir is True, recursively deletes all contents of the directory
+                before removing it. If False, only removes empty directories (standard rmdir behavior).
         """
         sftp = self._client.open_sftp()
         try:
             if is_dir:
-                sftp.rmdir(path=str(remote_path))
+                if recursive:
+                    # Recursively deletes all contents first and then removes the top-level (now empty) directory
+                    self._recursive_remove(sftp, remote_path)
+                else:
+                    # Only removes empty directories
+                    sftp.rmdir(path=str(remote_path))
             else:
                 sftp.unlink(path=str(remote_path))
         finally:
             sftp.close()
+
+    def _recursive_remove(self, sftp: paramiko.SFTPClient, remote_path: Path) -> None:
+        """Recursively removes a directory and all its contents.
+
+        This worker method is used by the user-facing remove() method to recursively remove non-empty directories.
+
+        Args:
+            sftp: The SFTP client instance to use for remove operations.
+            remote_path: The path to the remote directory to recursively remove.
+        """
+        try:
+            # Lists all items in the directory
+            items = sftp.listdir_attr(str(remote_path))
+
+            for item in items:
+                item_path = remote_path / item.filename
+
+                # Checks if the item is a directory
+                if stat.S_ISDIR(item.st_mode):  # type: ignore
+                    # Recursively removes subdirectories
+                    self._recursive_remove(sftp, item_path)
+                else:
+                    # Recursively removes files
+                    sftp.unlink(str(item_path))
+
+            # After all contents are removed, removes the empty directory
+            sftp.rmdir(str(remote_path))
+
+        except Exception as e:
+            console.echo(f"Unable to remove the specified directory {remote_path}: {str(e)}", level=LogLevel.WARNING)
 
     def create_directory(self, remote_path: Path, parents: bool = True) -> None:
         """Creates the specified directory tree on the managed remote server via SFTP.

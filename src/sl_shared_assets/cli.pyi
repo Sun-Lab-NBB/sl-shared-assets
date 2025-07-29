@@ -33,7 +33,7 @@ def verify_session_integrity(
     """
 
 def generate_project_manifest_file(
-    project_path: Path, output_directory: Path, project_processed_path: Path | None
+    project_path: Path, output_directory: Path, processed_data_root: Path | None
 ) -> None:
     """Generates the manifest .feather file that provides information about the data-processing state of all available
     project sessions.
@@ -88,7 +88,7 @@ def start_jupyter_server(
 def resolve_dataset_marker(
     session_path: Path,
     create_processed_directories: bool,
-    project_processed_path: Path | None,
+    processed_data_root: Path | None,
     remove: bool,
     update_manifest: bool,
 ) -> None:

@@ -26,7 +26,7 @@ from .data_classes import SessionData, ProcessingTracker
     default=False,
     help=(
         "Determines whether to create the processed data hierarchy. This flag should be disabled for most runtimes. "
-        "Primarily, it is used by lab acquisition system code to generate processed data directories on the remote "
+        "Primarily, it is used by acquisition systems to generate processed data directories on the remote "
         "compute servers as part of the data preprocessing pipeline."
     ),
 )
@@ -105,18 +105,21 @@ def verify_session_integrity(
     help="The absolute path to the directory where to store the generated project manifest file.",
 )
 @click.option(
-    "-ppp",
-    "--project_processed_path",
+    "-pdr",
+    "--processed_data_root",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=False,
     help=(
-        "The absolute path to the project directory where processed session data is stored, if different from the "
-        "directory used to store raw session data. Typically, this extra argument is only used when processing data "
-        "stored on remote compute server(s)."
+        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
+        "this command. This argument is used when calling the CLI on the BioHPC server, which uses different data "
+        "volumes for raw and processed data. Note, the input path must point to the root directory, as it will be "
+        "automatically modified to include the project name. Note, if the system cannot properly resolve the path to "
+        "the processed data, the generated manifest will indicate that no data processing has been performed for the "
+        "project."
     ),
 )
 def generate_project_manifest_file(
-    project_path: Path, output_directory: Path, project_processed_path: Path | None
+    project_path: Path, output_directory: Path, processed_data_root: Path | None
 ) -> None:
     """Generates the manifest .feather file that provides information about the data-processing state of all available
     project sessions.
@@ -128,7 +131,7 @@ def generate_project_manifest_file(
     generate_project_manifest(
         raw_project_directory=Path(project_path),
         output_directory=Path(output_directory),
-        processed_data_root=Path(project_processed_path) if project_processed_path else None,
+        processed_data_root=Path(processed_data_root) if processed_data_root else None,
     )
     # noinspection PyTypeChecker
     console.echo(message=f"Project {Path(project_path).stem} data manifest file: generated.", level=LogLevel.SUCCESS)
@@ -428,14 +431,15 @@ def start_jupyter_server(
     help="Determines whether to create the processed data hierarchy. This flag should be disabled for most runtimes.",
 )
 @click.option(
-    "-ppp",
-    "--project_processed_path",
+    "-pdr",
+    "--processed_data_root",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=False,
     help=(
-        "The absolute path to the project directory where processed session data is stored, if different from the "
-        "directory used to store raw session data. Typically, this extra argument is only used when processing data "
-        "stored on remote compute server(s)."
+        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
+        "this command. This argument is used when calling the CLI on the BioHPC server, which uses different data "
+        "volumes for raw and processed data. Note, the input path must point to the root directory, as it will be "
+        "automatically modified to include the project name."
     ),
 )
 @click.option(
@@ -463,7 +467,7 @@ def start_jupyter_server(
 def resolve_dataset_marker(
     session_path: Path,
     create_processed_directories: bool,
-    project_processed_path: Path | None,
+    processed_data_root: Path | None,
     remove: bool,
     update_manifest: bool,
 ) -> None:
@@ -477,7 +481,7 @@ def resolve_dataset_marker(
     resolve_p53_marker(
         session_path=session_path,
         create_processed_data_directory=create_processed_directories,
-        processed_data_root=project_processed_path,
+        processed_data_root=processed_data_root,
         remove=remove,
         update_manifest=update_manifest,
     )

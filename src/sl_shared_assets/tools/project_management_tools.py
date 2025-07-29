@@ -8,7 +8,7 @@ from datetime import datetime
 import pytz
 import polars as pl
 from filelock import FileLock
-from ataraxis_base_utilities import console
+from ataraxis_base_utilities import LogLevel, console
 
 from ..data_classes import (
     SessionData,
@@ -362,6 +362,8 @@ def generate_project_manifest(
                     manifest["notes"].append(descriptor.experimenter_notes)
                 except Exception:
                     manifest["notes"].append("N/A")
+            else:
+                manifest["notes"].append("N/A")
 
             # If the session raw_data folder contains the telomere.bin file, marks the session as complete.
             manifest["complete"].append(session_data.raw_data.telomere_path.exists())
@@ -573,12 +575,27 @@ def resolve_p53_marker(
     if session_data.processed_data.p53_path.exists():
         if remove:
             session_data.processed_data.p53_path.unlink()
+            message = (
+                f"Dataset marker for the session {session_data.session_name} acquired for the animal "
+                f"{session_data.animal_id} and {session_data.project_name} project: Removed."
+            )
+            console.echo(message=message, level=LogLevel.SUCCESS)
             return  # Ends remove runtime
 
+        message = (
+            f"Dataset marker for the session {session_data.session_name} acquired for the animal "
+            f"{session_data.animal_id} and {session_data.project_name} project: Already exists. No actions taken."
+        )
+        console.echo(message=message, level=LogLevel.SUCCESS)
         return  # Ends create runtime
 
     # If the marker does not exist and the function is called in 'remove' mode, aborts the runtime
     elif remove:
+        message = (
+            f"Dataset marker for the session {session_data.session_name} acquired for the animal "
+            f"{session_data.animal_id} and {session_data.project_name} project: Does not exist. No actions taken."
+        )
+        console.echo(message=message, level=LogLevel.SUCCESS)
         return  # Ends remove runtime
 
     # The rest of the runtime deals with determining whether it is safe to create the marker file.
@@ -588,6 +605,13 @@ def resolve_p53_marker(
     # Window checking sessions are not designed to be integrated into datasets, so they cannot be marked with the
     # p53.bin file. Similarly, any incomplete session is automatically excluded from dataset formation.
     if session_type == SessionTypes.WINDOW_CHECKING or not session_data.raw_data.telomere_path.exists():
+        message = (
+            f"Unable to generate the dataset marker for the session {session_data.session_name} acquired for the "
+            f"animal {session_data.animal_id} and {session_data.project_name} project, as the session is incomplete or "
+            f"is of Window Checking type. These sessions must be manually evaluated and marked for dataset inclusion "
+            f"by the experimenter. "
+        )
+        console.echo(message=message, level=LogLevel.ERROR)
         return
 
     # Training sessions collect similar data and share processing pipeline requirements
@@ -597,6 +621,13 @@ def resolve_p53_marker(
         video_tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
         if behavior_tracker.is_running or video_tracker.is_running:
             # Note, training runtimes do not require suite2p processing.
+            message = (
+                f"Unable to generate the dataset marker for the session {session_data.session_name} acquired for the "
+                f"animal {session_data.animal_id} and {session_data.project_name} project, as it is currently being "
+                f"processed by one of the data processing pipelines. Wait until the session is fully processed by all "
+                f"pipelines and repeat the command that encountered this error."
+            )
+            console.echo(message=message, level=LogLevel.ERROR)
             return
 
     # Mesoscope experiment sessions require additional processing with suite2p
@@ -607,11 +638,23 @@ def resolve_p53_marker(
 
         # Similar to the above, ensures that the session is not being processed with one of the supported pipelines.
         if behavior_tracker.is_running or suite2p_tracker.is_running or video_tracker.is_running:
+            message = (
+                f"Unable to generate the dataset marker for the session {session_data.session_name} acquired for the "
+                f"animal {session_data.animal_id} and {session_data.project_name} project, as it is currently being "
+                f"processed by one of the data processing pipelines. Wait until the session is fully processed by all "
+                f"pipelines and repeat the command that encountered this error."
+            )
+            console.echo(message=message, level=LogLevel.ERROR)
             return
 
     # If the runtime reached this point, the session is eligible for dataset integration. Creates the p53.bin marker
     # file, preventing the session from being processed again as long as the marker exists.
     session_data.processed_data.p53_path.touch()
+    message = (
+        f"Dataset marker for the session {session_data.session_name} acquired for the animal "
+        f"{session_data.animal_id} and {session_data.project_name} project: Created."
+    )
+    console.echo(message=message, level=LogLevel.SUCCESS)
 
     # If the runtime is configured to generate the project manifest file, attempts to generate and overwrite the
     # existing manifest file for the target project.

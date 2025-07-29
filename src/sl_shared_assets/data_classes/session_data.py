@@ -264,8 +264,8 @@ class SessionData(YamlConfig):
     Notes:
         This class is specifically designed for working with the data from a single session, performed by a single
         animal under the specific experiment. The class is used to manage both raw and processed data. It follows the
-        data through acquisition, preprocessing and processing stages of the Sun lab data workflow. This class serves as
-        an entry point for all interactions with the managed session's data.
+        data through acquisition, preprocessing, and processing stages of the Sun lab data workflow. This class serves
+        as an entry point for all interactions with the managed session's data.
     """
 
     project_name: str
