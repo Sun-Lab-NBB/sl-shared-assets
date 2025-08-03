@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 # Project metdata section. Provides the genral ID information about the project.
 [project]
 name = "sl-shared-assets"
-version = "3.1.3"
+version = "4.0.0"
 description = "Provides data acquisition and processing assets shared between Sun (NeuroAI) lab libraries."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -50,9 +50,9 @@ dependencies = [
     "xxhash==3.5.0",
     "paramiko==3.5.1",
     "simple-slurm==0.3.6",
-    "click==8.2.1",
+    "click==8.2.2",
     "natsort==8.4.0",
-    "polars==1.31.0",
+    "polars==1.32.0",
     "pyarrow==21.0.0",
     "filelock==3.18.0",
     "pytz==2025.2",
@@ -74,10 +74,8 @@ condarun = [
     "appdirs==1.4.4",
     "tqdm==4.67.1",
     "paramiko==3.5.1",
-    "click==8.2.1",
     "natsort==8.4.0",
-    "polars==1.31.0",
-    "pyarrow==20.0.0",
+    "pyarrow==21.0.0",
     "filelock==3.18.0",
     "pytz==2025.2",
 ]

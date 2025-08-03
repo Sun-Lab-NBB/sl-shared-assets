@@ -11,6 +11,7 @@ from .tools import (
     ProjectManifest,
     resolve_p53_marker,
     transfer_directory,
+    generate_project_manifest,
     calculate_directory_checksum,
 )
 from .server import Job, Server, JupyterJob, ServerCredentials
@@ -30,6 +31,7 @@ from .data_classes import (
     ExperimentState,
     ExperimentTrial,
     MesoscopeCameras,
+    TrackerFileNames,
     ProcessingTracker,
     AcquisitionSystems,
     MesoscopePositions,
@@ -42,6 +44,8 @@ from .data_classes import (
     MesoscopeSystemConfiguration,
     MesoscopeExperimentDescriptor,
     MesoscopeExperimentConfiguration,
+    generate_manager_id,
+    get_processing_tracker,
     get_system_configuration_data,
     set_system_configuration_file,
 )
@@ -86,9 +90,13 @@ __all__ = [
     "SessionTypes",
     "AcquisitionSystems",
     "WindowCheckingDescriptor",
+    "get_processing_tracker",
+    "generate_manager_id",
+    "TrackerFileNames",
     # Tools package
     "ProjectManifest",
     "resolve_p53_marker",
     "transfer_directory",
     "calculate_directory_checksum",
+    "generate_project_manifest",
 ]

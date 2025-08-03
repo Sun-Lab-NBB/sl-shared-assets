@@ -7,11 +7,13 @@ libraries use these classes to work with all lab-generated data."""
 
 import copy
 from enum import StrEnum
+from random import randint
 import shutil as sh
 from pathlib import Path
 from dataclasses import field, dataclass
 
-from filelock import Timeout, FileLock
+from xxhash import xxh3_64
+from filelock import FileLock
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
@@ -44,6 +46,26 @@ class SessionTypes(StrEnum):
     """A special Mesoscope-VR session designed to evaluate the suitability of the given animal to be included into the
     experiment dataset. Specifically, the session involves using the Mesoscope to check the quality of the cell 
     activity data."""
+
+
+class TrackerFileNames(StrEnum):
+    """Defines a set of processing tacker .yaml files supported by various Sun lab data preprocessing, processing, and
+    dataset formation pipelines.
+
+    This enumeration standardizes the names for all processing tracker files used in the lab. It is designed to be used
+    via the get_processing_tracker() function to generate ProcessingTracker instances.
+    """
+
+    BEHAVIOR = "behavior_processing_tracker.yaml"
+    """This file is used to track the state of the behavior log processing pipeline."""
+    SUITE2P = "suite2p_processing_tracker.yaml"
+    """This file is used to track the state of the single-day suite2p processing pipeline."""
+    DATASET = "dataset_formation_tracker.yaml"
+    """This file is used to track the state of the dataset formation pipeline."""
+    VIDEO = "video_concatenation_processing_tracker.yaml"
+    """This file is used to track the state of the video (DeepLabCut) processing pipeline."""
+    INTEGRITY = "integrity_verification_tracker.yaml"
+    """This file is used to track the state of the data integrity verification pipeline."""
 
 
 @dataclass()
@@ -133,10 +155,6 @@ class RawData:
     runtime initialization. Since runtime initialization is a complex process that may encounter a runtime error, the 
     marker is used to discover sessions that failed to initialize. Since uninitialized sessions by definition do not 
     contain any valuable data, they are marked for immediate deletion from all managed destinations."""
-    integrity_verification_tracker_path: Path = Path()
-    """Stores the path to the integrity_verification.yaml tracker file. This file stores the current state of the data 
-    integrity verification pipeline. It prevents more than one instance of the pipeline from working with the data 
-    at a given time and communicates the outcome (success or failure) of the most recent pipeline runtime."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -167,7 +185,6 @@ class RawData:
         self.telomere_path = self.raw_data_path.joinpath("telomere.bin")
         self.ubiquitin_path = self.raw_data_path.joinpath("ubiquitin.bin")
         self.nk_path = self.raw_data_path.joinpath("nk.bin")
-        self.integrity_verification_tracker_path = self.raw_data_path.joinpath("integrity_verification_tracker.yaml")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories.
@@ -203,15 +220,6 @@ class ProcessedData:
     behavior_data_path: Path = Path()
     """Stores the path to the directory that contains the non-video and non-brain-activity data extracted from 
     .npz log files by the sl-behavior log processing pipeline."""
-    suite2p_processing_tracker_path: Path = Path()
-    """Stores the path to the suite2p_processing_tracker.yaml tracker file. This file stores the current state of 
-    processing the session with the sl-suite2p single-day pipeline."""
-    behavior_processing_tracker_path: Path = Path()
-    """Stores the path to the behavior_processing_tracker.yaml file. This file stores the current state of processing 
-    the session with the sl-behavior log-parsing pipeline."""
-    video_processing_tracker_path: Path = Path()
-    """Stores the path to the video_processing_tracker.yaml file. This file stores the current state of processing 
-    the session with the DeepLabCut-based video processing pipeline."""
     p53_path: Path = Path()
     """Stores the path to the p53.bin file. This file serves as a lock-in marker that determines whether the session is 
     in the processing or dataset state. Specifically, if the file does not exist, the session data cannot be integrated 
@@ -234,9 +242,6 @@ class ProcessedData:
         self.camera_data_path = self.processed_data_path.joinpath("camera_data")
         self.mesoscope_data_path = self.processed_data_path.joinpath("mesoscope_data")
         self.behavior_data_path = self.processed_data_path.joinpath("behavior_data")
-        self.suite2p_processing_tracker_path = self.processed_data_path.joinpath("suite2p_processing_tracker.yaml")
-        self.behavior_processing_tracker_path = self.processed_data_path.joinpath("behavior_processing_tracker.yaml")
-        self.video_processing_tracker_path = self.processed_data_path.joinpath("video_processing_tracker.yaml")
         self.p53_path = self.processed_data_path.joinpath("p53.bin")
 
     def make_directories(self) -> None:
@@ -278,10 +283,10 @@ class SessionData(YamlConfig):
     """Stores the type of the session. Has to be set to one of the supported session types, defined in the SessionTypes
     enumeration exposed by the sl-shared-assets library.
     """
-    acquisition_system: str | AcquisitionSystems
+    acquisition_system: str | AcquisitionSystems = AcquisitionSystems.MESOSCOPE_VR
     """Stores the name of the data acquisition system that acquired the data. Has to be set to one of the supported 
     acquisition systems, defined in the AcquisitionSystems enumeration exposed by the sl-shared-assets library."""
-    experiment_name: str | None
+    experiment_name: str | None = None
     """Stores the name of the experiment performed during the session. If the session_type field indicates that the 
     session is an experiment, this field communicates the specific experiment configuration used by the session. During 
     runtime, this name is used to load the specific experiment configuration data stored in a .yaml file with the same 
@@ -427,7 +432,7 @@ class SessionData(YamlConfig):
 
         # Saves the configured instance data to the session's folder so that it can be reused during processing or
         # preprocessing.
-        instance._save()
+        instance.save()
 
         # Also saves the SystemConfiguration and ExperimentConfiguration instances to the same folder using the paths
         # resolved for the RawData instance above.
@@ -535,7 +540,7 @@ class SessionData(YamlConfig):
         """
         self.raw_data.nk_path.unlink(missing_ok=True)
 
-    def _save(self) -> None:
+    def save(self) -> None:
         """Saves the instance data to the 'raw_data' directory of the managed session as a 'session_data.yaml' file.
 
         This is used to save the data stored in the instance to disk so that it can be reused during further stages of
@@ -567,55 +572,59 @@ class ProcessingTracker(YamlConfig):
     state between multiple processes in a thread-safe manner.
 
     Primarily, this tracker class is used by all remote data processing pipelines in the lab to prevent race conditions
-    and make it impossible to run multiple processing runtimes at the same time.
+    and make it impossible to run multiple processing runtimes at the same time. It is also used to evaluate the status
+    (success / failure) of jobs running on remote compute servers.
+
+    Note:
+        In library version 4.0.0 the processing trackers have been refactored to work similar to 'lock' files. That is,
+        when a runtime is started, the tracker is switched into the 'running' (locked) state until it is unlocked,
+        aborted, or encounters an error. When the tracker is locked, only the same manager process as the one that
+        locked the tracker is allowed to work with session data. This feature allows executing complex processing
+        pipelines that use multiple concurrent and / or sequential processing jobs on the remote server.
+
+        This instance frequently refers to a 'manager process' in method documentation. A 'manager process' is the
+        highest-level process that manages the runtime. When the runtime is executed on remote compute servers, the
+        manager process is typically the process running on the non-server machine (user PC) that executes the remote
+        processing job on the compute server (via SSH or similar protocol). The worker process(es) that run the
+        processing job(s) on the remote compute servers are NOT considered manager processes.
     """
 
     file_path: Path
-    """Stores the path to the .yaml file used to save the tracker data between runtimes. The class instance functions as
-    a wrapper around the data stored inside the specified .yaml file."""
-    _is_complete: bool = False
-    """Tracks whether the processing runtime managed by this tracker has been successfully carried out for the session 
-    that calls the tracker."""
+    """Stores the path to the .yaml file used to cache the tracker data on disk. The class instance functions as a 
+    wrapper around the data stored inside the specified .yaml file."""
+    _complete: bool = False
+    """Tracks whether the processing runtime managed by this tracker has finished successfully."""
     _encountered_error: bool = False
-    """Tracks whether the processing runtime managed by this tracker has encountered an error while running for the 
-    session that calls the tracker."""
-    _is_running: bool = False
-    """Tracks whether the processing runtime managed by this tracker is currently running for the session that calls 
-    the tracker."""
-    _lock_path: str = field(init=False)
-    """Stores the path to the .lock file for the target tracker .yaml file. This file is used to ensure that only one 
-    process can simultaneously read from or write to the wrapped .yaml file."""
-    _started_runtime: bool = False
-    """This internal service field tracks when the class instance is used to start a runtime. It is set automatically by
-    the ProcessingTracker instance and is used to prevent runtime errors from deadlocking the specific processing 
-    pipeline tracked by the class instance."""
+    """Tracks whether the processing runtime managed by this tracker has encountered an error and has finished 
+    unsuccessfully."""
+    _running: bool = False
+    """Tracks whether the processing runtime managed by this tracker is currently running."""
+    _manager_id: int = -1
+    """Stores the xxHash3-64 hash value that represents the unique identifier of the manager process that started the 
+    runtime. The manager process is typically running on a remote control machine (computer) and is used to 
+    support processing runtimes that are distributed over multiple separate batch jobs on the compute server. This 
+    ID should be generated using the 'generate_manager_id()' function exposed by this library."""
+    _lock: FileLock = field(init=False)
+    """Stores the FileLock object used to ensure that only a single process can simultaneously access the data stored 
+    inside the tracker file."""
 
     def __post_init__(self) -> None:
-        # Generates the lock file for the target .yaml file path.
-        if self.file_path is not None:
-            self._lock_path = str(self.file_path.with_suffix(self.file_path.suffix + ".lock"))
-        else:
-            self._lock_path = ""
-
-    def __del__(self) -> None:
-        """If the instance as used to start a runtime, ensures that the instance properly marks the runtime as completed
-        or erred before being garbage-collected.
-
-        This is a security mechanism to prevent deadlocking the processed session and pipeline for future runtimes.
-        """
-        if self._started_runtime and self._is_running:
-            self.error()
+        # Generates the .lock file path for the target tracker .yaml file.
+        lock_path = str(self.file_path.with_suffix(self.file_path.suffix + ".lock"))
+        self._lock = FileLock(lock_path)
 
     def _load_state(self) -> None:
         """Reads the current processing state from the wrapped .YAML file."""
         if self.file_path.exists():
             # Loads the data for the state values but does not replace the file path or lock attributes.
             instance: ProcessingTracker = self.from_yaml(self.file_path)  # type: ignore
-            self._is_complete = instance._is_complete
-            self._encountered_error = instance._encountered_error
-            self._is_running = instance._is_running
+            self._complete = copy.copy(instance._complete)
+            self._encountered_error = copy.copy(instance._encountered_error)
+            self._running = copy.copy(instance._running)
+            self._manager_id = copy.copy(instance._manager_id)
         else:
-            # Otherwise, if the tracker file does not exist, generates a new .yaml file using default instance values.
+            # Otherwise, if the tracker file does not exist, generates a new .yaml file using default instance values
+            # and saves it to disk using the specified tracker file path.
             self._save_state()
 
     def _save_state(self) -> None:
@@ -624,214 +633,238 @@ class ProcessingTracker(YamlConfig):
         # back.
         original = copy.deepcopy(self)
         original.file_path = None  # type: ignore
-        original._lock_path = None  # type: ignore
-        original._started_runtime = False  # This field is only used by the instance stored in memory.
+        original._lock = None  # type: ignore
         original.to_yaml(file_path=self.file_path)
 
-    def start(self) -> None:
-        """Configures the tracker file to indicate that the tracked processing runtime is currently running.
+    def start(self, manager_id: int) -> None:
+        """Configures the tracker file to indicate that a manager process is currently executing the tracked processing
+        runtime.
 
-        All further attempts to start the same processing runtime for the same session's data will automatically abort
-        with an error.
+        Calling this method effectively 'locks' the tracked session and processing runtime combination to only be
+        accessible from the manager process that calls this method. Calling this method for an already running runtime
+        managed by the same process does not have any effect, so it is safe to call this method at the beginning of
+        each processing job that makes up the runtime.
+
+        Args:
+            manager_id: The unique xxHash-64 hash identifier of the manager process which attempts to start the runtime
+                tracked by this tracker file.
 
         Raises:
             TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
         """
-        try:
-            # Acquires the lock
-            lock = FileLock(self._lock_path)
-            with lock.acquire(timeout=10.0):
-                # Loads tracker state from the .yaml file
-                self._load_state()
+        # Acquires the lock
+        with self._lock.acquire(timeout=10.0):
+            # Loads tracker state from the .yaml file
+            self._load_state()
 
-                # If the runtime is already running, aborts with an error
-                if self._is_running:
-                    message = (
-                        f"Unable to start the processing runtime. The {self.file_path.name} tracker file indicates "
-                        f"that the runtime is currently running from a different process. Only a single runtime "
-                        f"instance is allowed to run at the same time."
-                    )
-                    console.error(message=message, error=RuntimeError)
-                    raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
+            # If the runtime is already running from a different process, aborts with an error.
+            if self._running and manager_id != self._manager_id:
+                message = (
+                    f"Unable to start the processing runtime from the manager process with id {manager_id}. The "
+                    f"{self.file_path.name} tracker file indicates that the manager process with id {self._manager_id} "
+                    f"is currently executing the tracked runtime. Only a single manager process is allowed to execute "
+                    f"the runtime at the same time."
+                )
+                console.error(message=message, error=RuntimeError)
+                raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
 
-                # Otherwise, marks the runtime as running and saves the state back to the .yaml file.
-                self._is_running = True
-                self._is_complete = False
-                self._encountered_error = False
-                self._save_state()
+            # Otherwise, if the runtime is already running for the current manager process, returns without modifying
+            # the tracker data.
+            elif self._running and manager_id == self._manager_id:
+                return
 
-                # Sets the start tracker flag to True, which ensures that the class tries to mark the runtime as
-                # completed or erred before it being garbage-collected.
-                self._started_runtime = True
+            # Otherwise, locks the runtime for the current manager process and updates the cached tracker data
+            self._running = True
+            self._manager_id = manager_id
+            self._complete = False
+            self._encountered_error = False
+            self._save_state()
 
-        # If lock acquisition fails for any reason, aborts with an error
-        except Timeout:
-            message = (
-                f"Unable to interface with the ProcessingTracker instance data cached inside the target .yaml file "
-                f"{self.file_path.stem}. Specifically, unable to acquire the file lock before the timeout duration of "
-                f"10 minutes has passed."
-            )
-            console.error(message=message, error=Timeout)
-            raise Timeout(message)  # Fallback to appease mypy, should not be reachable
-
-    def error(self) -> None:
+    def error(self, manager_id: int) -> None:
         """Configures the tracker file to indicate that the tracked processing runtime encountered an error and failed
         to complete.
 
-        This method will only work for an active runtime. When called for an active runtime, it expects the runtime to
-        be aborted with an error after the method returns. It configures the target tracker to allow other processes
-        to restart the runtime at any point after this method returns, so it is UNSAFE to do any further processing
-        from the process that calls this method.
+        This method fulfills two main purposes. First, it 'unlocks' the runtime, allowing other manager processes to
+        interface with the tracked runtime. Second, it updates the tracker file to reflect that the runtime was
+        interrupted due to an error, which is used by the manager processes to detect and handle processing failures.
+
+        Args:
+            manager_id: The unique xxHash-64 hash identifier of the manager process which attempts to report that the
+                runtime tracked by this tracker file has encountered an error.
 
         Raises:
             TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
         """
 
-        try:
-            # Acquires the lock
-            lock = FileLock(self._lock_path)
-            with lock.acquire(timeout=10.0):
-                # Loads tracker state from the .yaml file
-                self._load_state()
+        # Acquires the lock
+        with self._lock.acquire(timeout=10.0):
+            # Loads tracker state from the .yaml file
+            self._load_state()
 
-                # If the runtime is not running, aborts with an error
-                if not self._is_running:
-                    message = (
-                        f"Unable to report that the processing runtime encountered an error. The {self.file_path.name} "
-                        f"tracker file indicates that the runtime is currently NOT running. A runtime has to be "
-                        f"actively running to set the tracker to an error state."
-                    )
-                    console.error(message=message, error=RuntimeError)
-                    raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
+            # If the runtime is not running, returns without doing anything
+            if not self._running:
+                return
 
-                # Otherwise, indicates that the runtime aborted with an error
-                self._is_running = False
-                self._is_complete = False
-                self._encountered_error = True
-                self._save_state()
+            # Ensures that only the active manager process can report runtime errors using the tracker file
+            if manager_id != self._manager_id:
+                message = (
+                    f"Unable to report that the processing runtime has encountered an error from the manager process "
+                    f"with id {manager_id}. The {self.file_path.name} tracker file indicates that the runtime is "
+                    f"managed by the process with id {self._manager_id}, preventing other processes from interfacing "
+                    f"with the runtime."
+                )
+                console.error(message=message, error=RuntimeError)
+                raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
 
-                # Disables the security flag
-                self._started_runtime = False
+            # Indicates that the runtime aborted with an error
+            self._running = False
+            self._manager_id = -1
+            self._complete = False
+            self._encountered_error = True
+            self._save_state()
 
-        # If lock acquisition fails for any reason, aborts with an error
-        except Timeout:
-            message = (
-                f"Unable to interface with the ProcessingTracker instance data cached inside the target .yaml file "
-                f"{self.file_path.stem}. Specifically, unable to acquire the file lock before the timeout duration of "
-                f"10 minutes has passed."
-            )
-            console.error(message=message, error=Timeout)
-            raise Timeout(message)  # Fallback to appease mypy, should not be reachable
-
-    def stop(self) -> None:
+    def stop(self, manager_id: int) -> None:
         """Configures the tracker file to indicate that the tracked processing runtime has been completed successfully.
 
-        After this method returns, it is UNSAFE to do any further processing from the process that calls this method.
-        Any process that calls the 'start' method of this class is expected to also call this method or 'error' method
-        at the end of the runtime.
+        This method 'unlocks' the runtime, allowing other manager processes to interface with the tracked runtime. It
+        also configures the tracker file to indicate that the runtime has been completed successfully, which is used
+        by the manager processes to detect and handle processing completion.
+
+        Args:
+            manager_id: The unique xxHash-64 hash identifier of the manager process which attempts to report that the
+                runtime tracked by this tracker file has been completed successfully.
 
         Raises:
             TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
         """
 
-        try:
-            # Acquires the lock
-            lock = FileLock(self._lock_path)
-            with lock.acquire(timeout=10.0):
-                # Loads tracker state from the .yaml file
-                self._load_state()
+        with self._lock.acquire(timeout=10.0):
+            # Loads tracker state from the .yaml file
+            self._load_state()
 
-                # If the runtime is not running, aborts with an error
-                if not self._is_running:
-                    message = (
-                        f"Unable to stop (complete) the processing runtime. The {self.file_path.name} tracker file "
-                        f"indicates that the runtime is currently NOT running. A runtime has to be actively running to "
-                        f"mark it as complete and stop the runtime."
-                    )
-                    console.error(message=message, error=RuntimeError)
-                    raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
+            # If the runtime is not running, does not do anything
+            if not self._running:
+                return
 
-                # Otherwise, marks the runtime as complete (stopped)
-                self._is_running = False
-                self._is_complete = True
-                self._encountered_error = False
-                self._save_state()
+            # Ensures that only the active manager process can report runtime completion using the tracker file
+            if manager_id != self._manager_id:
+                message = (
+                    f"Unable to report that the processing runtime has completed successfully from the manager process "
+                    f"with id {manager_id}. The {self.file_path.name} tracker file indicates that the runtime is "
+                    f"managed by the process with id {self._manager_id}, preventing other processes from interfacing "
+                    f"with the runtime."
+                )
+                console.error(message=message, error=RuntimeError)
+                raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
 
-                # Disables the security flag
-                self._started_runtime = False
+            # Otherwise, marks the runtime as complete (stopped)
+            self._running = False
+            self._manager_id = -1
+            self._complete = True
+            self._encountered_error = False
+            self._save_state()
 
-        # If lock acquisition fails for any reason, aborts with an error
-        except Timeout:
-            message = (
-                f"Unable to interface with the ProcessingTracker instance data cached inside the target .yaml file "
-                f"{self.file_path.stem}. Specifically, unable to acquire the file lock before the timeout duration of "
-                f"10 minutes has passed."
-            )
-            console.error(message=message, error=Timeout)
-            raise Timeout(message)  # Fallback to appease mypy, should not be reachable
+    def abort(self) -> None:
+        """Resets the runtime tracker file to the default state.
+
+        This method can be used to reset the runtime tracker file, regardless of the current runtime state. Unlike other
+        instance methods, this method can be called from any manager process, even if the runtime is already locked by
+        another process. This method is only intended to be used in the case of emergency to 'unlock' a deadlocked
+        runtime.
+        """
+        with self._lock.acquire(timeout=10.0):
+            # Loads tracker state from the .yaml file
+            self._load_state()
+
+            # Resets the tracker file to the default state. Note, does not indicate that the runtime is complete nor
+            # that it has encountered an error.
+            self._running = False
+            self._manager_id = -1
+            self._complete = False
+            self._encountered_error = False
+            self._save_state()
 
     @property
     def is_complete(self) -> bool:
         """Returns True if the tracker wrapped by the instance indicates that the processing runtime has been completed
-        successfully at least once and that there is no ongoing processing that uses the target session."""
-        try:
-            # Acquires the lock
-            lock = FileLock(self._lock_path)
-            with lock.acquire(timeout=10.0):
-                # Loads tracker state from the .yaml file
-                self._load_state()
-                return self._is_complete
-
-            # If lock acquisition fails for any reason, aborts with an error
-        except Timeout:
-            message = (
-                f"Unable to interface with the ProcessingTracker instance data cached inside the target .yaml file "
-                f"{self.file_path.stem}. Specifically, unable to acquire the file lock before the timeout duration of "
-                f"10 minutes has passed."
-            )
-            console.error(message=message, error=Timeout)
-            raise Timeout(message)  # Fallback to appease mypy, should not be reachable
+        successfully and that the runtime is not currently ongoing."""
+        with self._lock.acquire(timeout=10.0):
+            # Loads tracker state from the .yaml file
+            self._load_state()
+            return self._complete
 
     @property
     def encountered_error(self) -> bool:
-        """Returns True if the tracker wrapped by the instance indicates that the processing runtime for the target
-        session has aborted due to encountering an error."""
-        try:
-            # Acquires the lock
-            lock = FileLock(self._lock_path)
-            with lock.acquire(timeout=10.0):
-                # Loads tracker state from the .yaml file
-                self._load_state()
-                return self._encountered_error
-
-            # If lock acquisition fails for any reason, aborts with an error
-        except Timeout:
-            message = (
-                f"Unable to interface with the ProcessingTracker instance data cached inside the target .yaml file "
-                f"{self.file_path.stem}. Specifically, unable to acquire the file lock before the timeout duration of "
-                f"10 minutes has passed."
-            )
-            console.error(message=message, error=Timeout)
-            raise Timeout(message)  # Fallback to appease mypy, should not be reachable
+        """Returns True if the tracker wrapped by the instance indicates that the processing runtime has aborted due
+        to encountering an error."""
+        with self._lock.acquire(timeout=10.0):
+            # Loads tracker state from the .yaml file
+            self._load_state()
+            return self._encountered_error
 
     @property
     def is_running(self) -> bool:
         """Returns True if the tracker wrapped by the instance indicates that the processing runtime is currently
-        running for the target session."""
-        try:
-            # Acquires the lock
-            lock = FileLock(self._lock_path)
-            with lock.acquire(timeout=10.0):
-                # Loads tracker state from the .yaml file
-                self._load_state()
-                return self._is_running
+        ongoing."""
+        with self._lock.acquire(timeout=10.0):
+            # Loads tracker state from the .yaml file
+            self._load_state()
+            return self._running
 
-            # If lock acquisition fails for any reason, aborts with an error
-        except Timeout:
-            message = (
-                f"Unable to interface with the ProcessingTracker instance data cached inside the target .yaml file "
-                f"{self.file_path.stem}. Specifically, unable to acquire the file lock before the timeout duration of "
-                f"10 minutes has passed."
-            )
-            console.error(message=message, error=Timeout)
-            raise Timeout(message)  # Fallback to appease mypy, should not be reachable
+
+def get_processing_tracker(root: Path, file_name: TrackerFileNames | str) -> ProcessingTracker:
+    """Initializes and returns the ProcessingTracker instance that manages the data stored inside the target processing
+    tracker file.
+
+    This function uses the input root path and tracker file name to first resolve the absolute path to the .yaml data
+    cache of the target processing tracker file and then wrap the file into a ProcessingTracker instance. All Sun lab
+    libraries that use ProcessingTracker instances use this function to access the necessary trackers.
+
+    Notes:
+        If the target file does not exist, this function will create the file as part of the ProcessingTracker
+        initialization.
+
+        This function also generates the corresponding .lock file to ensure that the data inside the processing tracker
+        is accessed by a single process at a time.
+
+    Args:
+        file_name: The name of the target processing tracker file. Has to be one of the names from the TrackerFileNames
+            enumeration.
+        root: The absolute path to the directory where the target file is stored or should be created.
+
+    Returns:
+        The initialized ProcessingTracker instance that manages the data stored in the target file.
+    """
+
+    # Prevents using the function for unsupported tracker file names.
+    supported_files = tuple(TrackerFileNames)
+    if file_name not in supported_files:
+        message = (
+            f"Unable to construct the path to the tracker file {file_name}. The input name is not one of the supported"
+            f"names. Use one of the supported options provided by the TrackerFileNames enumeration."
+        )
+        console.error(message=message, error=ValueError)
+
+    # Constructs and returns the absolute path to the requested tracker file.
+    tracker_path = root.joinpath(file_name)
+    return ProcessingTracker(file_path=tracker_path)
+
+
+def generate_manager_id() -> int:
+    """Generates and returns a unique integer identifier that can be used to identify the manager process that calls
+    this function.
+
+    The identifier is generated based on the current timestamp, accurate to microseconds, and a random number between 1
+    and 9999999999999. This ensures that the identifier is unique for each function call. The generated identifier
+    string is converted to a unique integer value using the xxHash-64 algorithm before it is returned to the caller.
+
+    Notes:
+        This function should be used to generate manager process identifiers for working with ProcessingTracker
+        instances from sl-shared-assets version 4.0.0 and above.
+    """
+    timestamp = get_timestamp()
+    random_number = randint(1, 9999999999999)
+    manager_id = f"{timestamp}_{random_number}"
+    id_hash = xxh3_64()
+    id_hash.update(input=manager_id)
+    return id_hash.intdigest()
