@@ -219,9 +219,8 @@ def resolve_p53_marker(
         from altering the data while it is integrated into a dataset. The p53.bin marker solves this issue by ensuring
         that only one type of runtimes (processing or dataset integration) is allowed to work with the session.
 
-        For the p53.bin marker to be created, the session must currently not undergo any processing. Removing the
-        p53.bin marker does not have any dependencies and will be executed even if the session is currently undergoing
-        dataset integration. This is due to data access hierarchy limitations of the Sun lab compute server.
+        For the p53.bin marker to be created, the session must not be undergoing processing. For the p53 marker
+        to be removed, the session must not be undergoing dataset integration.
 
         Since version 3.1.0, this functon also supports (re)generating the processed session's project manifest file,
         which is used to support further Sun lab data processing pipelines.
