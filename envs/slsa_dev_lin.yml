@@ -28,17 +28,16 @@ dependencies:
   - babel=2.17.0=pyhd8ed1ab_0
   - backports=1.0=pyhd8ed1ab_5
   - backports.tarfile=1.2.0=pyhd8ed1ab_1
-  - bcrypt=4.3.0=py313h4b2b08d_1
   - brotli-python=1.1.0=py313h46c70d0_3
   - bzip2=1.0.8=h4bc722e_7
   - c-ares=1.34.5=hb9d3cd8_0
-  - ca-certificates=2025.7.14=hbd8a1cb_0
+  - ca-certificates=2025.8.3=hbd8a1cb_0
   - cachetools=6.1.0=pyhd8ed1ab_0
-  - certifi=2025.7.14=pyhd8ed1ab_0
+  - certifi=2025.8.3=pyhd8ed1ab_0
   - cffi=1.17.1=py313hfab6e84_0
   - chardet=5.2.0=pyhd8ed1ab_3
   - charset-normalizer=3.4.2=pyhd8ed1ab_0
-  - click=8.2.1=pyh707e725_0
+  - click=8.2.2=pyh707e725_0
   - cmarkgfm=2024.11.20=py313h536fd9c_0
   - colorama=0.4.6=pyhd8ed1ab_1
   - cpython=3.13.5=py313hd8ed1ab_102
@@ -54,7 +53,6 @@ dependencies:
   - hatchling=1.27.0=pypyhd8ed1ab_0
   - hpack=4.1.0=pyhd8ed1ab_0
   - hyperframe=6.1.0=pyhd8ed1ab_0
-  - icu=75.1=he02047a_0
   - id=1.5.0=pyh29332c3_0
   - idna=3.10=pyhd8ed1ab_1
   - imagesize=1.4.1=pyhd8ed1ab_0
@@ -71,11 +69,11 @@ dependencies:
   - krb5=1.21.3=h659f571_0
   - ld_impl_linux-64=2.44=h1423503_1
   - libabseil=20250512.1=cxx17_hba17884_0
-  - libarrow=21.0.0=hd5bb725_0_cpu
-  - libarrow-acero=21.0.0=h635bf11_0_cpu
-  - libarrow-compute=21.0.0=he319acf_0_cpu
-  - libarrow-dataset=21.0.0=h635bf11_0_cpu
-  - libarrow-substrait=21.0.0=h3f74fd7_0_cpu
+  - libarrow=21.0.0=hb116c0f_1_cpu
+  - libarrow-acero=21.0.0=h635bf11_1_cpu
+  - libarrow-compute=21.0.0=he319acf_1_cpu
+  - libarrow-dataset=21.0.0=h635bf11_1_cpu
+  - libarrow-substrait=21.0.0=h3f74fd7_1_cpu
   - libblas=3.9.0=32_h59b9bed_openblas
   - libbrotlicommon=1.1.0=hb9d3cd8_3
   - libbrotlidec=1.1.0=hb9d3cd8_3
@@ -92,7 +90,7 @@ dependencies:
   - libgcc-ng=15.1.0=h69a702a_4
   - libgfortran=15.1.0=h69a702a_4
   - libgfortran5=15.1.0=hcea5267_4
-  - libglib=2.84.2=h3618099_0
+  - libglib=2.84.3=hf39c6af_0
   - libgomp=15.1.0=h767d61c_4
   - libgoogle-cloud=2.39.0=hdb79228_0
   - libgoogle-cloud-storage=2.39.0=hdbdcf42_0
@@ -105,10 +103,9 @@ dependencies:
   - libopenblas=0.3.30=pthreads_h94d23a6_1
   - libopentelemetry-cpp=1.21.0=hb9b0907_1
   - libopentelemetry-cpp-headers=1.21.0=ha770c72_1
-  - libparquet=21.0.0=h790f06f_0_cpu
+  - libparquet=21.0.0=h790f06f_1_cpu
   - libprotobuf=6.31.1=h9ef548d_1
   - libre2-11=2025.07.22=h7b12aa8_0
-  - libsodium=1.0.20=h4ab18f5_0
   - libsqlite=3.50.4=h0c1763c_0
   - libssh2=1.11.1=hcf80075_0
   - libstdcxx=15.1.0=h8f9b012_4
@@ -116,7 +113,7 @@ dependencies:
   - libthrift=0.22.0=h454ac66_1
   - libutf8proc=2.10.0=h202a827_0
   - libuuid=2.38.1=h0b41bf4_0
-  - libxml2=2.13.8=h4bc477f_0
+  - libxml2=2.13.8=h2cb61b6_1
   - libzlib=1.3.1=hb9d3cd8_2
   - lz4-c=1.10.0=h5888daf_1
   - markdown-it-py=3.0.0=pyhd8ed1ab_1
@@ -131,9 +128,8 @@ dependencies:
   - nlohmann_json=3.12.0=h3f2d84a_0
   - numpy=2.2.6=py313h17eae1a_0
   - openssl=3.5.1=h7b32b05_0
-  - orc=2.1.3=h61e0c1e_0
+  - orc=2.2.0=h1bc01a4_0
   - packaging=25.0=pyh29332c3_1
-  - paramiko=3.5.1=pyhd8ed1ab_0
   - pathspec=0.12.1=pyhd8ed1ab_1
   - pcre2=10.45=hc749103_0
   - pip=25.2=pyh145f28c_0
@@ -145,7 +141,6 @@ dependencies:
   - pyarrow-core=21.0.0=py313he109ebe_0_cpu
   - pycparser=2.22=pyh29332c3_1
   - pygments=2.19.2=pyhd8ed1ab_0
-  - pynacl=1.5.0=py313h536fd9c_4
   - pyproject-api=1.9.1=pyhe01879c_0
   - pysocks=1.7.1=pyha55dd90_7
   - python=3.13.5=hec9711d_102_cp313
@@ -163,18 +158,14 @@ dependencies:
   - ruff=0.12.7=hf9daec2_0
   - s2n=1.5.23=h8e187f5_0
   - secretstorage=3.3.3=py313h78bf25f_3
-  - six=1.17.0=pyhe01879c_1
   - snappy=1.2.2=h03e3b7b_0
   - snowballstemmer=3.0.1=pyhd8ed1ab_0
   - sphinx=8.2.3=pyhd8ed1ab_0
   - sphinx-autodoc-typehints=3.2.0=pyhd8ed1ab_0
   - sphinx-click=6.0.0=pyhd8ed1ab_1
-  - sphinx-rtd-theme=3.0.1=hd8ed1ab_0
-  - sphinx_rtd_theme=3.0.1=pyha770c72_0
   - sphinxcontrib-applehelp=2.0.0=pyhd8ed1ab_1
   - sphinxcontrib-devhelp=2.0.0=pyhd8ed1ab_1
   - sphinxcontrib-htmlhelp=2.1.0=pyhd8ed1ab_1
-  - sphinxcontrib-jquery=4.1=pyhd8ed1ab_1
   - sphinxcontrib-jsmath=1.0.1=pyhd8ed1ab_1
   - sphinxcontrib-qthelp=2.0.0=pyhd8ed1ab_1
   - sphinxcontrib-serializinghtml=1.1.10=pyhd8ed1ab_1
@@ -193,29 +184,34 @@ dependencies:
   - tzdata=2025b=h78e105d_0
   - urllib3=2.5.0=pyhd8ed1ab_0
   - uv=0.8.4=heb9285d_0
-  - virtualenv=20.32.0=pyhd8ed1ab_0
+  - virtualenv=20.33.0=pyhd8ed1ab_0
   - zipp=3.23.0=pyhd8ed1ab_0
   - zlib=1.3.1=hb9d3cd8_2
   - zstandard=0.23.0=py313h536fd9c_2
   - zstd=1.5.7=hb8e6e7a_2
   - pip:
+    - PyNaCl==1.5.0
     - PyYAML==6.0.2
     - ataraxis-automation==5.0.0
     - ataraxis-base-utilities==3.1.0
     - ataraxis-data-structures==3.1.1
     - ataraxis-time==3.0.0
-    - build==1.2.2.post1
-    - click==8.2.2
+    - bcrypt==4.3.0
+    - build==1.3.0
     - dacite==1.9.2
+    - invoke==2.2.0
     - loguru==0.7.3
+    - paramiko==4.0.0
     - polars==1.32.0
     - pyarrow==21.0.0
     - pyproject_hooks==1.2.0
     - simple_slurm==0.3.6
-    - sl-shared-assets==3.2.0
+    - sl-shared-assets==4.0.0
     - sphinx-rtd-dark-mode==1.3.0
-    - tox-uv==1.26.1
+    - sphinx-rtd-theme==3.0.2
+    - sphinxcontrib-jquery==4.1
+    - tox-uv==1.26.2
     - types-pytz==2025.2.0.20250516
-    - uv==0.7.19
+    - uv==0.8.4
     - xxhash==3.5.0
 
