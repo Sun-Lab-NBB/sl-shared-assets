@@ -7,7 +7,7 @@ from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 
 from .tools import ascend_tyche_data, resolve_p53_marker, verify_session_checksum, generate_project_manifest
 from .server import Server, JupyterJob, generate_server_credentials
-from .data_classes import SessionData, ProcessingTracker
+from .data_classes import SessionData, TrackerFileNames, get_processing_tracker
 
 
 @click.command()
@@ -17,6 +17,18 @@ from .data_classes import SessionData, ProcessingTracker
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
     help="The absolute path to the session directory whose raw data needs to be verified for potential corruption.",
+)
+@click.option(
+    "-id",
+    "--manager_id",
+    required=True,
+    default=0,
+    show_default=True,
+    help=(
+        "The xxHash-64 hash value that represents the unique identifier for the process that manages this runtime. "
+        "This is primarily used when calling this CLI on remote compute servers to ensure that only a single process "
+        "can execute the CLI at a time."
+    ),
 )
 @click.option(
     "-c",
@@ -54,7 +66,11 @@ from .data_classes import SessionData, ProcessingTracker
     ),
 )
 def verify_session_integrity(
-    session_path: Path, create_processed_directories: bool, processed_data_root: Path | None, update_manifest: bool
+    session_path: Path,
+    manager_id: int,
+    create_processed_directories: bool,
+    processed_data_root: Path | None,
+    update_manifest: bool,
 ) -> None:
     """Checks the integrity of the target session's raw data (contents of the raw_data directory).
 
@@ -73,14 +89,15 @@ def verify_session_integrity(
 
     # Runs the verification process
     verify_session_checksum(
-        session,
+        session_path=session,
+        manager_id=manager_id,
         create_processed_data_directory=create_processed_directories,
         processed_data_root=processed_data_root,
         update_manifest=update_manifest,
     )
 
     # Checks the outcome of the verification process
-    tracker = ProcessingTracker(file_path=session_data.raw_data.integrity_verification_tracker_path)
+    tracker = get_processing_tracker(root=session_data.raw_data.raw_data_path, file_name=TrackerFileNames.INTEGRITY)
     if tracker.is_complete:
         # noinspection PyTypeChecker
         console.echo(message=f"Session {session.stem} raw data integrity: Verified.", level=LogLevel.SUCCESS)
@@ -448,11 +465,7 @@ def start_jupyter_server(
     is_flag=True,
     show_default=True,
     default=False,
-    help=(
-        "Determines whether the command should create or remove the dataset integration marker. Do not enable this "
-        "flag unless you know what you are doing. It is only safe to enable this flag if the session is not currently "
-        "being integrated into any datasets."
-    ),
+    help="Determines whether the command should create or remove the dataset integration marker.",
 )
 @click.option(
     "-um",

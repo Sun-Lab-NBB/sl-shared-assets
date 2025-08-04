@@ -560,7 +560,7 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
     app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
     path_file = app_dir.joinpath("configuration_path.txt")
 
-    # If the cache file or the Sun lab data directory do not exist, aborts with an error
+    # If the cache file or the Sun lab data directory does not exist, aborts with an error
     if not path_file.exists():
         message = (
             "Unable to resolve the path to the local system configuration file, as local machine does not have the "

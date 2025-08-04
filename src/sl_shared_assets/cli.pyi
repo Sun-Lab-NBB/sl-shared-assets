@@ -13,11 +13,16 @@ from .server import (
 )
 from .data_classes import (
     SessionData as SessionData,
-    ProcessingTracker as ProcessingTracker,
+    TrackerFileNames as TrackerFileNames,
+    get_processing_tracker as get_processing_tracker,
 )
 
 def verify_session_integrity(
-    session_path: Path, create_processed_directories: bool, processed_data_root: Path | None, update_manifest: bool
+    session_path: Path,
+    manager_id: int,
+    create_processed_directories: bool,
+    processed_data_root: Path | None,
+    update_manifest: bool,
 ) -> None:
     """Checks the integrity of the target session's raw data (contents of the raw_data directory).
 

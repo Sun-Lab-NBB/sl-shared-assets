@@ -56,7 +56,7 @@ class ProcedureData:
 
 @dataclass
 class ImplantData:
-    """Stores the information about a single implantation performed during the surgical intervention.
+    """Stores the information about a single implantation procedure performed during the surgical intervention.
 
     Multiple ImplantData instances are used at the same time if the surgery involved multiple implants.
     """

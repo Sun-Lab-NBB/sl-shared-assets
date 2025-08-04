@@ -87,9 +87,6 @@ class LickTrainingDescriptor(YamlConfig):
     """The ID of the experimenter running the session."""
     mouse_weight_g: float
     """The weight of the animal, in grams, at the beginning of the session."""
-    dispensed_water_volume_ml: float
-    """Stores the total water volume, in milliliters, dispensed during runtime. This excludes the water volume 
-    dispensed during the paused (idle) state."""
     minimum_reward_delay_s: int
     """Stores the minimum delay, in seconds, that can separate the delivery of two consecutive water rewards."""
     maximum_reward_delay_s: int
@@ -102,6 +99,9 @@ class LickTrainingDescriptor(YamlConfig):
     """Stores the maximum number of consecutive rewards that can be delivered without the animal consuming them. If 
     the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal 
     consumes the rewards."""
+    dispensed_water_volume_ml: float = 0.0
+    """Stores the total water volume, in milliliters, dispensed during runtime. This excludes the water volume 
+    dispensed during the paused (idle) state."""
     pause_dispensed_water_volume_ml: float = 0.0
     """Stores the total water volume, in milliliters, dispensed during the paused (idle) state."""
     experimenter_notes: str = "Replace this with your notes."
@@ -110,6 +110,9 @@ class LickTrainingDescriptor(YamlConfig):
     experimenter_given_water_volume_ml: float = 0.0
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the session.
     """
+    preferred_session_water_volume_ml: float = 0.0
+    """The volume of water, in milliliters, the animal should be receiving during the session runtime if its 
+    performance matches experimenter-specified threshold."""
     incomplete: bool = False
     """If this field is set to True, the session is marked as 'incomplete' and automatically excluded from all further 
     Sun lab automated processing and analysis."""
@@ -123,8 +126,6 @@ class RunTrainingDescriptor(YamlConfig):
     """The ID of the experimenter running the session."""
     mouse_weight_g: float
     """The weight of the animal, in grams, at the beginning of the session."""
-    dispensed_water_volume_ml: float
-    """Stores the total water volume, in milliliters, dispensed during runtime."""
     final_run_speed_threshold_cm_s: float
     """Stores the final running speed threshold, in centimeters per second, that was active at the end of training."""
     final_run_duration_threshold_s: float
@@ -154,6 +155,9 @@ class RunTrainingDescriptor(YamlConfig):
     """Stores the maximum time, in seconds, the animal can dip below the running speed threshold to still receive the 
     reward. This allows animals that 'run' by taking a series of large steps, briefly dipping below speed threshold at 
     the end of each step, to still get water rewards."""
+    dispensed_water_volume_ml: float = 0.0
+    """Stores the total water volume, in milliliters, dispensed during runtime. This excludes the water volume 
+    dispensed during the paused (idle) state."""
     pause_dispensed_water_volume_ml: float = 0.0
     """Stores the total water volume, in milliliters, dispensed during the paused (idle) state."""
     experimenter_notes: str = "Replace this with your notes."
@@ -162,6 +166,9 @@ class RunTrainingDescriptor(YamlConfig):
     experimenter_given_water_volume_ml: float = 0.0
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the session.
     """
+    preferred_session_water_volume_ml: float = 0.0
+    """The volume of water, in milliliters, the animal should be receiving during the session runtime if its 
+    performance matches experimenter-specified threshold."""
     incomplete: bool = False
     """If this field is set to True, the session is marked as 'incomplete' and automatically excluded from all further 
     Sun lab automated processing and analysis."""
@@ -175,20 +182,24 @@ class MesoscopeExperimentDescriptor(YamlConfig):
     """The ID of the experimenter running the session."""
     mouse_weight_g: float
     """The weight of the animal, in grams, at the beginning of the session."""
-    dispensed_water_volume_ml: float
-    """Stores the total water volume, in milliliters, dispensed during runtime."""
     maximum_unconsumed_rewards: int = 1
     """Stores the maximum number of consecutive rewards that can be delivered without the animal consuming them. If 
     the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal 
     consumes the rewards."""
+    dispensed_water_volume_ml: float = 0.0
+    """Stores the total water volume, in milliliters, dispensed during runtime. This excludes the water volume 
+    dispensed during the paused (idle) state."""
+    pause_dispensed_water_volume_ml: float = 0.0
+    """Stores the total water volume, in milliliters, dispensed during the paused (idle) state."""
     experimenter_notes: str = "Replace this with your notes."
     """This field is not set during runtime. It is expected that each experimenter will replace this field with their 
     notes made during runtime."""
-    pause_dispensed_water_volume_ml: float = 0.0
-    """Stores the total water volume, in milliliters, dispensed during the paused (idle) state."""
     experimenter_given_water_volume_ml: float = 0.0
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the session.
     """
+    preferred_session_water_volume_ml: float = 0.0
+    """The volume of water, in milliliters, the animal should be receiving during the session runtime if its 
+    performance matches experimenter-specified threshold."""
     incomplete: bool = False
     """If this field is set to True, the session is marked as 'incomplete' and automatically excluded from all further 
     Sun lab automated processing and analysis."""

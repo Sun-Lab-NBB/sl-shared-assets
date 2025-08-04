@@ -2,6 +2,7 @@ from .tools import (
     ProjectManifest as ProjectManifest,
     resolve_p53_marker as resolve_p53_marker,
     transfer_directory as transfer_directory,
+    generate_project_manifest as generate_project_manifest,
     calculate_directory_checksum as calculate_directory_checksum,
 )
 from .server import (
@@ -26,6 +27,7 @@ from .data_classes import (
     ExperimentState as ExperimentState,
     ExperimentTrial as ExperimentTrial,
     MesoscopeCameras as MesoscopeCameras,
+    TrackerFileNames as TrackerFileNames,
     ProcessingTracker as ProcessingTracker,
     AcquisitionSystems as AcquisitionSystems,
     MesoscopePositions as MesoscopePositions,
@@ -38,6 +40,8 @@ from .data_classes import (
     MesoscopeSystemConfiguration as MesoscopeSystemConfiguration,
     MesoscopeExperimentDescriptor as MesoscopeExperimentDescriptor,
     MesoscopeExperimentConfiguration as MesoscopeExperimentConfiguration,
+    generate_manager_id as generate_manager_id,
+    get_processing_tracker as get_processing_tracker,
     get_system_configuration_data as get_system_configuration_data,
     set_system_configuration_file as set_system_configuration_file,
 )
@@ -76,8 +80,12 @@ __all__ = [
     "SessionTypes",
     "AcquisitionSystems",
     "WindowCheckingDescriptor",
+    "get_processing_tracker",
+    "generate_manager_id",
+    "TrackerFileNames",
     "ProjectManifest",
     "resolve_p53_marker",
     "transfer_directory",
     "calculate_directory_checksum",
+    "generate_project_manifest",
 ]

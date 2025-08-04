@@ -10,6 +10,8 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 import xxhash
 
+from ..data_classes import TrackerFileNames
+
 # Defines a 'blacklist' set of files. Primarily, this list contains the service files that may change after the session
 # data has been acquired. Therefore, it does not make sense to include them in the checksum, as they do not reflect the
 # data that should remain permanently unchanged. Note, make sure all service files are added to this set!
@@ -19,15 +21,12 @@ _excluded_files = {
     "telomere.bin",
     "p53.bin",
     "nk.bin",
-    "suite2p_processing_tracker.yaml",
-    "dataset_formation_tracker.yaml",
-    "video_processing_tracker.yaml",
-    "integrity_verification_tracker.yaml",
-    "suite2p_processing_tracker.yaml.lock",
-    "behavior_processing_tracker.yaml.lock",
-    "video_processing_tracker.yaml.lock",
-    "integrity_verification_tracker.yaml.lock",
 }
+
+# Extends the exclusion set to include all tracker .yaml files and their concurrent access .lock files.
+for name in tuple(TrackerFileNames):
+    _excluded_files.add(name)
+    _excluded_files.add(f"{name}.lock")
 
 
 def _calculate_file_checksum(base_directory: Path, file_path: Path) -> tuple[str, bytes]:

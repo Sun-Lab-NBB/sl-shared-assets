@@ -393,8 +393,8 @@ class Server:
                     # The file doesn't exist yet or job initialization failed
                     if self.job_complete(job):
                         message = (
-                            f"Remote jupyter server job {job.job_name} with id {job.job_id} encountered a startup and "
-                            f"was terminated prematurely."
+                            f"Remote jupyter server job {job.job_name} with id {job.job_id} encountered a startup "
+                            f"error and was terminated prematurely."
                         )
                         console.error(message, RuntimeError)
 

@@ -13,11 +13,12 @@ from ataraxis_base_utilities import LogLevel, console
 from ..data_classes import (
     SessionData,
     SessionTypes,
-    ProcessingTracker,
+    TrackerFileNames,
     RunTrainingDescriptor,
     LickTrainingDescriptor,
     WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor,
+    get_processing_tracker,
 )
 from .packaging_tools import calculate_directory_checksum
 
@@ -149,28 +150,20 @@ class ProjectManifest:
         """
         return tuple(self._data.select("animal").unique().sort("animal").to_series().to_list())
 
-    @property
-    def sessions(self) -> tuple[str, ...]:
-        """Returns all session IDs stored inside the manifest file.
-
-        This provides a tuple of all sessions, independent of the participating animal, that were recorded as part
-        of the target project.
-        """
-        return tuple(self._data.select("session").sort("session").to_series().to_list())
-
-    def get_sessions_for_animal(
+    def _get_filtered_sessions(
         self,
-        animal: str | int,
+        animal: str | int | None = None,
         exclude_incomplete: bool = True,
         dataset_ready_only: bool = False,
         not_dataset_ready_only: bool = False,
     ) -> tuple[str, ...]:
-        """Returns all session IDs for the target animal.
+        """This worker method is used to get a list of sessions with optional filtering.
 
-        This provides a tuple of all sessions performed by the target animal as part of the target project.
+        User-facing methods call this worker under-the-hood to fetch the filtered tuple of sessions.
 
         Args:
-            animal: The ID of the animal for which to get the session data.
+            animal: An optional animal ID to filter the sessions. If set to None, the method returns sessions for all
+                animals.
             exclude_incomplete: Determines whether to exclude sessions not marked as 'complete' from the output
                 list.
             dataset_ready_only: Determines whether to exclude sessions not marked as 'dataset' integration ready from
@@ -179,22 +172,27 @@ class ProjectManifest:
                 as 'dataset' integration ready from the output list. Note, when both this and 'dataset_ready_only' are
                 enabled, the 'dataset_ready_only' option takes precedence.
 
+        Returns:
+            The tuple of session IDs matching the filter criteria.
+
         Raises:
             ValueError: If the specified animal is not found in the manifest file.
         """
+        data = self._data
 
-        # Ensures that the 'animal' argument has the same type as the data inside the DataFrame.
-        if self._animal_string:
-            animal = str(animal)
-        else:
-            animal = int(animal)
+        # Filter by animal if specified
+        if animal is not None:
+            # Ensures that the 'animal' argument has the same type as the data inside the DataFrame.
+            if self._animal_string:
+                animal = str(animal)
+            else:
+                animal = int(animal)
 
-        if animal not in self.animals:
-            message = f"Animal ID '{animal}' not found in manifest. Available animals: {self.animals}"
-            console.error(message=message, error=ValueError)
+            if animal not in self.animals:
+                message = f"Animal ID '{animal}' not found in the project manifest. Available animals: {self.animals}."
+                console.error(message=message, error=ValueError)
 
-        # Filters by animal ID
-        data = self._data.filter(pl.col("animal") == animal)
+            data = data.filter(pl.col("animal") == animal)
 
         # Optionally filters out incomplete sessions
         if exclude_incomplete:
@@ -209,6 +207,51 @@ class ProjectManifest:
         # Formats and returns session IDs to the caller
         sessions = data.select("session").sort("session").to_series().to_list()
         return tuple(sessions)
+
+    @property
+    def sessions(self) -> tuple[str, ...]:
+        """Returns all session IDs stored inside the manifest file.
+
+        This property provides a tuple of all sessions, independent of the participating animal, that were recorded as
+        part of the target project. Use the get_sessions() method to get the list of session tuples with filtering.
+        """
+        return self._get_filtered_sessions(animal=None, exclude_incomplete=False)
+
+    def get_sessions(
+        self,
+        animal: str | int | None = None,
+        exclude_incomplete: bool = True,
+        dataset_ready_only: bool = False,
+        not_dataset_ready_only: bool = False,
+    ) -> tuple[str, ...]:
+        """Returns requested session IDs based on selected filtering criteria.
+
+        This method provides a tuple of sessions based on the specified filters. If no animal is specified, returns
+        sessions for all animals in the project.
+
+        Args:
+            animal: An optional animal ID to filter the sessions. If set to None, the method returns sessions for all
+                animals.
+            exclude_incomplete: Determines whether to exclude sessions not marked as 'complete' from the output
+                list.
+            dataset_ready_only: Determines whether to exclude sessions not marked as 'dataset' integration ready from
+                the output list. Enabling this option only shows sessions that can be integrated into a dataset.
+            not_dataset_ready_only: The opposite of 'dataset_ready_only'. Determines whether to exclude sessions marked
+                as 'dataset' integration ready from the output list. Note, when both this and 'dataset_ready_only' are
+                enabled, the 'dataset_ready_only' option takes precedence.
+
+        Returns:
+            The tuple of session IDs matching the filter criteria.
+
+        Raises:
+            ValueError: If the specified animal is not found in the manifest file.
+        """
+        return self._get_filtered_sessions(
+            animal=animal,
+            exclude_incomplete=exclude_incomplete,
+            dataset_ready_only=dataset_ready_only,
+            not_dataset_ready_only=not_dataset_ready_only,
+        )
 
     def get_session_info(self, session: str) -> pl.DataFrame:
         """Returns a Polars DataFrame that stores detailed information for the specified session.
@@ -237,7 +280,7 @@ def generate_project_manifest(
     This function evaluates the input project directory and builds the 'manifest' file for the project. The file
     includes the descriptive information about every session stored inside the input project folder and the state of
     the session's data processing (which processing pipelines have been applied to each session). The file will be
-    created under the 'output_path' directory and use the following name pattern: {ProjectName}}_manifest.feather.
+    created under the 'output_path' directory and use the following name pattern: ProjectName_manifest.feather.
 
     Notes:
         The manifest file is primarily used to capture and move project state information between machines, typically
@@ -369,7 +412,9 @@ def generate_project_manifest(
             manifest["complete"].append(session_data.raw_data.telomere_path.exists())
 
             # Data verification status
-            tracker = ProcessingTracker(file_path=session_data.raw_data.integrity_verification_tracker_path)
+            tracker = get_processing_tracker(
+                root=session_data.raw_data.raw_data_path, file_name=TrackerFileNames.INTEGRITY
+            )
             manifest["integrity"].append(tracker.is_complete)
 
             # If the session is incomplete or unverified, marks all processing steps as FALSE, as automatic processing
@@ -383,15 +428,21 @@ def generate_project_manifest(
                 continue  # Cycles to the next session
 
             # Suite2p (single-day) processing status.
-            tracker = ProcessingTracker(file_path=session_data.processed_data.suite2p_processing_tracker_path)
+            tracker = get_processing_tracker(
+                file_name=TrackerFileNames.SUITE2P, root=session_data.processed_data.processed_data_path
+            )
             manifest["suite2p"].append(tracker.is_complete)
 
             # Behavior data processing status.
-            tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
+            tracker = get_processing_tracker(
+                file_name=TrackerFileNames.BEHAVIOR, root=session_data.processed_data.processed_data_path
+            )
             manifest["behavior"].append(tracker.is_complete)
 
             # DeepLabCut (video) processing status.
-            tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
+            tracker = get_processing_tracker(
+                file_name=TrackerFileNames.VIDEO, root=session_data.processed_data.processed_data_path
+            )
             manifest["video"].append(tracker.is_complete)
 
             # Tracks whether the session's data is currently in the processing or dataset integration mode.
@@ -435,6 +486,7 @@ def generate_project_manifest(
 
 def verify_session_checksum(
     session_path: Path,
+    manager_id: int,
     create_processed_data_directory: bool = True,
     processed_data_root: None | Path = None,
     update_manifest: bool = False,
@@ -459,6 +511,8 @@ def verify_session_checksum(
     Args:
         session_path: The path to the session directory to be verified. Note, the input session directory must contain
             the 'raw_data' subdirectory.
+        manager_id: The xxHash-64 hash-value that specifies the unique identifier of the manager process that
+            manages the integrity verification runtime.
         create_processed_data_directory: Determines whether to create the processed data hierarchy during runtime.
         processed_data_root: The root directory where to store the processed data hierarchy. This path has to point to
             the root directory where to store the processed data from all projects, and it will be automatically
@@ -476,14 +530,12 @@ def verify_session_checksum(
     )
 
     # Initializes the ProcessingTracker instance for the verification tracker file
-    tracker = ProcessingTracker(file_path=session_data.raw_data.integrity_verification_tracker_path)
+    tracker = get_processing_tracker(root=session_data.raw_data.raw_data_path, file_name=TrackerFileNames.INTEGRITY)
+    console.echo(f"{tracker.file_path}")
 
     # Updates the tracker data to communicate that the verification process has started. This automatically clears
     # the previous 'completed' status.
-    tracker.start()
-
-    # Try starts here to allow for proper error-driven 'start' terminations of the tracker cannot acquire the lock for
-    # a long time, or if another runtime is already underway.
+    tracker.start(manager_id=manager_id)
     try:
         # Re-calculates the checksum for the raw_data directory
         calculated_checksum = calculate_directory_checksum(
@@ -502,14 +554,14 @@ def verify_session_checksum(
 
         else:
             # Sets the tracker to indicate that the verification runtime completed successfully.
-            tracker.stop()
+            tracker.stop(manager_id=manager_id)
 
     finally:
         # If the code reaches this section while the tracker indicates that the processing is still running,
         # this means that the verification runtime encountered an error. Configures the tracker to indicate that this
         # runtime finished with an error to prevent deadlocking the runtime.
         if tracker.is_running:
-            tracker.error()
+            tracker.error(manager_id=manager_id)
 
         # If the runtime is configured to generate the project manifest file, attempts to generate and overwrite the
         # existing manifest file for the target project.
@@ -543,9 +595,8 @@ def resolve_p53_marker(
         from altering the data while it is integrated into a dataset. The p53.bin marker solves this issue by ensuring
         that only one type of runtimes (processing or dataset integration) is allowed to work with the session.
 
-        For the p53.bin marker to be created, the session must currently not undergo any processing. Removing the
-        p53.bin marker does not have any dependencies and will be executed even if the session is currently undergoing
-        dataset integration. This is due to data access hierarchy limitations of the Sun lab compute server.
+        For the p53.bin marker to be created, the session must not be undergoing processing. For the p53 marker
+        to be removed, the session must not be undergoing dataset integration.
 
         Since version 3.1.0, this functon also supports (re)generating the processed session's project manifest file,
         which is used to support further Sun lab data processing pipelines.
@@ -570,33 +621,68 @@ def resolve_p53_marker(
         make_processed_data_directory=create_processed_data_directory,
     )
 
-    # If the p53.bin marker exists and the runtime is configured to remove it, removes the marker file. If the runtime
-    # is configured to create the marker, the method aborts the runtime (as the marker already exists).
-    if session_data.processed_data.p53_path.exists():
-        if remove:
-            session_data.processed_data.p53_path.unlink()
-            message = (
-                f"Dataset marker for the session {session_data.session_name} acquired for the animal "
-                f"{session_data.animal_id} and {session_data.project_name} project: Removed."
-            )
-            console.echo(message=message, level=LogLevel.SUCCESS)
-            return  # Ends remove runtime
+    # If the p53.bin marker exists and the runtime is configured to remove it, attempts to remove the marker file.
+    if session_data.processed_data.p53_path.exists() and remove:
+        # This section deals with a unique nuance related to the Sun lab processing server organization. Specifically,
+        # the user accounts are not allowed to modify or create files in the data directories owned by the service
+        # accounts. In turn, this prevents user accounts from modifying the processed data directory to indicate when
+        # they are running a dataset integration pipeline on the processed data. To work around this problem, the
+        # dataset integration pipeline now creates a 'semaphore' marker for each session that is currently being
+        # integrated into a dataset. This semaphore marker is stored under the root user working directory, inside the
+        # subdirectory called 'semaphore'.
 
-        message = (
-            f"Dataset marker for the session {session_data.session_name} acquired for the animal "
-            f"{session_data.animal_id} and {session_data.project_name} project: Already exists. No actions taken."
-        )
-        console.echo(message=message, level=LogLevel.SUCCESS)
-        return  # Ends create runtime
+        # The parent of the shared sun-lab processed data directory is the root 'working' volume. All user directories
+        # are stored under this root working directory.
+        if processed_data_root is None:
+            # If the processed data root is not provided, sets it to the great-grandparent of the session directory.
+            # This works assuming that the data is stored under: root/project/animal/session.
+            processed_data_root = session_path.parents[2]
+        working_root = processed_data_root.parent
 
-    # If the marker does not exist and the function is called in 'remove' mode, aborts the runtime
-    elif remove:
+        # Loops over each user directory and checks whether a semaphore marker exists for the processed session.
+        for directory in working_root.iterdir():
+            if (
+                len([marker for marker in directory.joinpath("semaphore").glob(f"*{session_data.session_name}.bin")])
+                > 0
+            ):
+                # Aborts with an error if the semaphore marker prevents the p53 marker from being removed.
+                message = (
+                    f"Unable to remove the dataset marker for the session' {session_data.session_name}' acquired "
+                    f"for the animal '{session_data.animal_id}' under the '{session_data.project_name}' project. "
+                    f"The session data is currently being integrated into a dataset by the owner the "
+                    f"'{directory.stem}' user directory. Wait until the ongoing dataset integration is complete and "
+                    f"repeat the command that produced this error."
+                )
+                console.error(message=message, error=RuntimeError)
+
+        # If the session does not have a corresponding semaphore marker in any user directories, removes the p53 marker
+        # file.
+        session_data.processed_data.p53_path.unlink()
         message = (
-            f"Dataset marker for the session {session_data.session_name} acquired for the animal "
-            f"{session_data.animal_id} and {session_data.project_name} project: Does not exist. No actions taken."
+            f"Dataset marker for the session '{session_data.session_name}' acquired for the animal "
+            f"'{session_data.animal_id}' under the '{session_data.project_name}' project: Removed."
         )
         console.echo(message=message, level=LogLevel.SUCCESS)
         return  # Ends remove runtime
+
+    # If the marker does not exist and the function is called in 'remove' mode, aborts the runtime early
+    elif not session_data.processed_data.p53_path.exists() and remove:
+        message = (
+            f"Dataset marker for the session '{session_data.session_name}' acquired for the animal "
+            f"'{session_data.animal_id}' under the '{session_data.project_name}' project: Does not exist. No actions "
+            f"taken."
+        )
+        console.echo(message=message, level=LogLevel.SUCCESS)
+        return  # Ends remove runtime
+
+    elif session_data.processed_data.p53_path.exists():
+        message = (
+            f"Dataset marker for the session '{session_data.session_name}' acquired for the animal "
+            f"'{session_data.animal_id}' under the '{session_data.project_name}' project: Already exists. No actions "
+            f"taken."
+        )
+        console.echo(message=message, level=LogLevel.SUCCESS)
+        return  # Ends create runtime
 
     # The rest of the runtime deals with determining whether it is safe to create the marker file.
     # Queries the type of the processed session
@@ -606,53 +692,58 @@ def resolve_p53_marker(
     # p53.bin file. Similarly, any incomplete session is automatically excluded from dataset formation.
     if session_type == SessionTypes.WINDOW_CHECKING or not session_data.raw_data.telomere_path.exists():
         message = (
-            f"Unable to generate the dataset marker for the session {session_data.session_name} acquired for the "
-            f"animal {session_data.animal_id} and {session_data.project_name} project, as the session is incomplete or "
-            f"is of Window Checking type. These sessions must be manually evaluated and marked for dataset inclusion "
-            f"by the experimenter. "
+            f"Unable to generate the dataset marker for the session '{session_data.session_name}' acquired for the "
+            f"animal '{session_data.animal_id}' under the '{session_data.project_name}' project, as the session is "
+            f"incomplete or is of Window Checking type. These sessions must be manually evaluated and marked for "
+            f"dataset inclusion by the experimenter. "
         )
-        console.echo(message=message, level=LogLevel.ERROR)
-        return
+        console.error(message=message, error=RuntimeError)
 
     # Training sessions collect similar data and share processing pipeline requirements
+    error: bool = False
     if session_type == SessionTypes.LICK_TRAINING or session_type == SessionTypes.RUN_TRAINING:
         # Ensures that the session is not being processed with one of the supported pipelines.
-        behavior_tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
-        video_tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
+        behavior_tracker = get_processing_tracker(
+            file_name=TrackerFileNames.BEHAVIOR, root=session_data.processed_data.processed_data_path
+        )
+        video_tracker = get_processing_tracker(
+            file_name=TrackerFileNames.VIDEO, root=session_data.processed_data.processed_data_path
+        )
         if behavior_tracker.is_running or video_tracker.is_running:
             # Note, training runtimes do not require suite2p processing.
-            message = (
-                f"Unable to generate the dataset marker for the session {session_data.session_name} acquired for the "
-                f"animal {session_data.animal_id} and {session_data.project_name} project, as it is currently being "
-                f"processed by one of the data processing pipelines. Wait until the session is fully processed by all "
-                f"pipelines and repeat the command that encountered this error."
-            )
-            console.echo(message=message, level=LogLevel.ERROR)
-            return
+            error = True
 
     # Mesoscope experiment sessions require additional processing with suite2p
-    if session_type == SessionTypes.MESOSCOPE_EXPERIMENT:
-        behavior_tracker = ProcessingTracker(file_path=session_data.processed_data.behavior_processing_tracker_path)
-        suite2p_tracker = ProcessingTracker(file_path=session_data.processed_data.suite2p_processing_tracker_path)
-        video_tracker = ProcessingTracker(file_path=session_data.processed_data.video_processing_tracker_path)
+    elif session_type == SessionTypes.MESOSCOPE_EXPERIMENT:
+        behavior_tracker = get_processing_tracker(
+            file_name=TrackerFileNames.BEHAVIOR, root=session_data.processed_data.processed_data_path
+        )
+        suite2p_tracker = get_processing_tracker(
+            file_name=TrackerFileNames.SUITE2P, root=session_data.processed_data.processed_data_path
+        )
+        video_tracker = get_processing_tracker(
+            file_name=TrackerFileNames.VIDEO, root=session_data.processed_data.processed_data_path
+        )
+        console.echo(f"{behavior_tracker.is_running}")
+        if behavior_tracker.is_running or video_tracker.is_running or suite2p_tracker.is_running:
+            error = True
 
-        # Similar to the above, ensures that the session is not being processed with one of the supported pipelines.
-        if behavior_tracker.is_running or suite2p_tracker.is_running or video_tracker.is_running:
-            message = (
-                f"Unable to generate the dataset marker for the session {session_data.session_name} acquired for the "
-                f"animal {session_data.animal_id} and {session_data.project_name} project, as it is currently being "
-                f"processed by one of the data processing pipelines. Wait until the session is fully processed by all "
-                f"pipelines and repeat the command that encountered this error."
-            )
-            console.echo(message=message, level=LogLevel.ERROR)
-            return
+    # If the session is currently being processed by one or more pipelines, aborts with an error.
+    if error:
+        message = (
+            f"Unable to generate the dataset marker for the session '{session_data.session_name}' acquired for the "
+            f"animal '{session_data.animal_id}' under the '{session_data.project_name}' project, as it is "
+            f"currently being processed by one of the data processing pipelines. Wait until the session is fully "
+            f"processed by all pipelines and repeat the command that encountered this error."
+        )
+        console.error(message=message, error=RuntimeError)
 
     # If the runtime reached this point, the session is eligible for dataset integration. Creates the p53.bin marker
     # file, preventing the session from being processed again as long as the marker exists.
     session_data.processed_data.p53_path.touch()
     message = (
-        f"Dataset marker for the session {session_data.session_name} acquired for the animal "
-        f"{session_data.animal_id} and {session_data.project_name} project: Created."
+        f"Dataset marker for the session '{session_data.session_name}' acquired for the animal "
+        f"'{session_data.animal_id}' under the '{session_data.project_name}' project: Created."
     )
     console.echo(message=message, level=LogLevel.SUCCESS)
 

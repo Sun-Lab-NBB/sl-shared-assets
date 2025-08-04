@@ -5,11 +5,12 @@ import polars as pl
 from ..data_classes import (
     SessionData as SessionData,
     SessionTypes as SessionTypes,
-    ProcessingTracker as ProcessingTracker,
+    TrackerFileNames as TrackerFileNames,
     RunTrainingDescriptor as RunTrainingDescriptor,
     LickTrainingDescriptor as LickTrainingDescriptor,
     WindowCheckingDescriptor as WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor as MesoscopeExperimentDescriptor,
+    get_processing_tracker as get_processing_tracker,
 )
 from .packaging_tools import calculate_directory_checksum as calculate_directory_checksum
 
@@ -61,26 +62,20 @@ class ProjectManifest:
 
         This provides a tuple of all animal IDs participating in the target project.
         """
-    @property
-    def sessions(self) -> tuple[str, ...]:
-        """Returns all session IDs stored inside the manifest file.
-
-        This provides a tuple of all sessions, independent of the participating animal, that were recorded as part
-        of the target project.
-        """
-    def get_sessions_for_animal(
+    def _get_filtered_sessions(
         self,
-        animal: str | int,
+        animal: str | int | None = None,
         exclude_incomplete: bool = True,
         dataset_ready_only: bool = False,
         not_dataset_ready_only: bool = False,
     ) -> tuple[str, ...]:
-        """Returns all session IDs for the target animal.
+        """This worker method is used to get a list of sessions with optional filtering.
 
-        This provides a tuple of all sessions performed by the target animal as part of the target project.
+        User-facing methods call this worker under-the-hood to fetch the filtered tuple of sessions.
 
         Args:
-            animal: The ID of the animal for which to get the session data.
+            animal: An optional animal ID to filter the sessions. If set to None, the method returns sessions for all
+                animals.
             exclude_incomplete: Determines whether to exclude sessions not marked as 'complete' from the output
                 list.
             dataset_ready_only: Determines whether to exclude sessions not marked as 'dataset' integration ready from
@@ -88,6 +83,45 @@ class ProjectManifest:
             not_dataset_ready_only: The opposite of 'dataset_ready_only'. Determines whether to exclude sessions marked
                 as 'dataset' integration ready from the output list. Note, when both this and 'dataset_ready_only' are
                 enabled, the 'dataset_ready_only' option takes precedence.
+
+        Returns:
+            The tuple of session IDs matching the filter criteria.
+
+        Raises:
+            ValueError: If the specified animal is not found in the manifest file.
+        """
+    @property
+    def sessions(self) -> tuple[str, ...]:
+        """Returns all session IDs stored inside the manifest file.
+
+        This property provides a tuple of all sessions, independent of the participating animal, that were recorded as
+        part of the target project. Use the get_sessions() method to get the list of session tuples with filtering.
+        """
+    def get_sessions(
+        self,
+        animal: str | int | None = None,
+        exclude_incomplete: bool = True,
+        dataset_ready_only: bool = False,
+        not_dataset_ready_only: bool = False,
+    ) -> tuple[str, ...]:
+        """Returns requested session IDs based on selected filtering criteria.
+
+        This method provides a tuple of sessions based on the specified filters. If no animal is specified, returns
+        sessions for all animals in the project.
+
+        Args:
+            animal: An optional animal ID to filter the sessions. If set to None, the method returns sessions for all
+                animals.
+            exclude_incomplete: Determines whether to exclude sessions not marked as 'complete' from the output
+                list.
+            dataset_ready_only: Determines whether to exclude sessions not marked as 'dataset' integration ready from
+                the output list. Enabling this option only shows sessions that can be integrated into a dataset.
+            not_dataset_ready_only: The opposite of 'dataset_ready_only'. Determines whether to exclude sessions marked
+                as 'dataset' integration ready from the output list. Note, when both this and 'dataset_ready_only' are
+                enabled, the 'dataset_ready_only' option takes precedence.
+
+        Returns:
+            The tuple of session IDs matching the filter criteria.
 
         Raises:
             ValueError: If the specified animal is not found in the manifest file.
@@ -114,7 +148,7 @@ def generate_project_manifest(
     This function evaluates the input project directory and builds the 'manifest' file for the project. The file
     includes the descriptive information about every session stored inside the input project folder and the state of
     the session's data processing (which processing pipelines have been applied to each session). The file will be
-    created under the 'output_path' directory and use the following name pattern: {ProjectName}}_manifest.feather.
+    created under the 'output_path' directory and use the following name pattern: ProjectName_manifest.feather.
 
     Notes:
         The manifest file is primarily used to capture and move project state information between machines, typically
@@ -132,6 +166,7 @@ def generate_project_manifest(
 
 def verify_session_checksum(
     session_path: Path,
+    manager_id: int,
     create_processed_data_directory: bool = True,
     processed_data_root: None | Path = None,
     update_manifest: bool = False,
@@ -156,6 +191,8 @@ def verify_session_checksum(
     Args:
         session_path: The path to the session directory to be verified. Note, the input session directory must contain
             the 'raw_data' subdirectory.
+        manager_id: The xxHash-64 hash-value that specifies the unique identifier of the manager process that
+            manages the integrity verification runtime.
         create_processed_data_directory: Determines whether to create the processed data hierarchy during runtime.
         processed_data_root: The root directory where to store the processed data hierarchy. This path has to point to
             the root directory where to store the processed data from all projects, and it will be automatically
@@ -182,9 +219,8 @@ def resolve_p53_marker(
         from altering the data while it is integrated into a dataset. The p53.bin marker solves this issue by ensuring
         that only one type of runtimes (processing or dataset integration) is allowed to work with the session.
 
-        For the p53.bin marker to be created, the session must currently not undergo any processing. Removing the
-        p53.bin marker does not have any dependencies and will be executed even if the session is currently undergoing
-        dataset integration. This is due to data access hierarchy limitations of the Sun lab compute server.
+        For the p53.bin marker to be created, the session must not be undergoing processing. For the p53 marker
+        to be removed, the session must not be undergoing dataset integration.
 
         Since version 3.1.0, this functon also supports (re)generating the processed session's project manifest file,
         which is used to support further Sun lab data processing pipelines.

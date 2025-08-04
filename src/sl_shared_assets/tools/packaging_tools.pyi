@@ -2,6 +2,8 @@ from pathlib import Path
 
 from _typeshed import Incomplete
 
+from ..data_classes import TrackerFileNames as TrackerFileNames
+
 _excluded_files: Incomplete
 
 def _calculate_file_checksum(base_directory: Path, file_path: Path) -> tuple[str, bytes]:

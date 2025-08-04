@@ -12,7 +12,10 @@ from .session_data import (
     SessionData as SessionData,
     SessionTypes as SessionTypes,
     ProcessedData as ProcessedData,
+    TrackerFileNames as TrackerFileNames,
     ProcessingTracker as ProcessingTracker,
+    generate_manager_id as generate_manager_id,
+    get_processing_tracker as get_processing_tracker,
 )
 from .surgery_data import (
     DrugData as DrugData,
@@ -66,4 +69,7 @@ __all__ = [
     "AcquisitionSystems",
     "SessionTypes",
     "WindowCheckingDescriptor",
+    "get_processing_tracker",
+    "generate_manager_id",
+    "TrackerFileNames",
 ]

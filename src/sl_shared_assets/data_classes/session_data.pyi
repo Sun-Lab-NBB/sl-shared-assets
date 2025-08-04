@@ -29,6 +29,20 @@ class SessionTypes(StrEnum):
     MESOSCOPE_EXPERIMENT = "mesoscope experiment"
     WINDOW_CHECKING = "window checking"
 
+class TrackerFileNames(StrEnum):
+    """Defines a set of processing tacker .yaml files supported by various Sun lab data preprocessing, processing, and
+    dataset formation pipelines.
+
+    This enumeration standardizes the names for all processing tracker files used in the lab. It is designed to be used
+    via the get_processing_tracker() function to generate ProcessingTracker instances.
+    """
+
+    BEHAVIOR = "behavior_processing_tracker.yaml"
+    SUITE2P = "suite2p_processing_tracker.yaml"
+    DATASET = "dataset_formation_tracker.yaml"
+    VIDEO = "video_processing_tracker.yaml"
+    INTEGRITY = "integrity_verification_tracker.yaml"
+
 @dataclass()
 class RawData:
     """Stores the paths to the directories and files that make up the 'raw_data' session-specific directory.
@@ -60,7 +74,6 @@ class RawData:
     telomere_path: Path = ...
     ubiquitin_path: Path = ...
     nk_path: Path = ...
-    integrity_verification_tracker_path: Path = ...
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
 
@@ -91,9 +104,6 @@ class ProcessedData:
     camera_data_path: Path = ...
     mesoscope_data_path: Path = ...
     behavior_data_path: Path = ...
-    suite2p_processing_tracker_path: Path = ...
-    behavior_processing_tracker_path: Path = ...
-    video_processing_tracker_path: Path = ...
     p53_path: Path = ...
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -133,8 +143,8 @@ class SessionData(YamlConfig):
     animal_id: str
     session_name: str
     session_type: str | SessionTypes
-    acquisition_system: str | AcquisitionSystems
-    experiment_name: str | None
+    acquisition_system: str | AcquisitionSystems = ...
+    experiment_name: str | None = ...
     python_version: str = ...
     sl_experiment_version: str = ...
     raw_data: RawData = field(default_factory=Incomplete)
@@ -223,7 +233,7 @@ class SessionData(YamlConfig):
         that did not fully initialize during runtime. This service method is designed to be called by the sl-experiment
         library classes to remove the 'nk.bin' marker when it is safe to do so. It should not be called by end-users.
         """
-    def _save(self) -> None:
+    def save(self) -> None:
         """Saves the instance data to the 'raw_data' directory of the managed session as a 'session_data.yaml' file.
 
         This is used to save the data stored in the instance to disk so that it can be reused during further stages of
@@ -237,66 +247,133 @@ class ProcessingTracker(YamlConfig):
     state between multiple processes in a thread-safe manner.
 
     Primarily, this tracker class is used by all remote data processing pipelines in the lab to prevent race conditions
-    and make it impossible to run multiple processing runtimes at the same time.
+    and make it impossible to run multiple processing runtimes at the same time. It is also used to evaluate the status
+    (success / failure) of jobs running on remote compute servers.
+
+    Note:
+        In library version 4.0.0 the processing trackers have been refactored to work similar to 'lock' files. That is,
+        when a runtime is started, the tracker is switched into the 'running' (locked) state until it is unlocked,
+        aborted, or encounters an error. When the tracker is locked, only the same manager process as the one that
+        locked the tracker is allowed to work with session data. This feature allows executing complex processing
+        pipelines that use multiple concurrent and / or sequential processing jobs on the remote server.
+
+        This instance frequently refers to a 'manager process' in method documentation. A 'manager process' is the
+        highest-level process that manages the runtime. When the runtime is executed on remote compute servers, the
+        manager process is typically the process running on the non-server machine (user PC) that executes the remote
+        processing job on the compute server (via SSH or similar protocol). The worker process(es) that run the
+        processing job(s) on the remote compute servers are NOT considered manager processes.
     """
 
     file_path: Path
-    _is_complete: bool = ...
+    _complete: bool = ...
     _encountered_error: bool = ...
-    _is_running: bool = ...
+    _running: bool = ...
+    _manager_id: int = ...
     _lock_path: str = field(init=False)
-    _started_runtime: bool = ...
     def __post_init__(self) -> None: ...
-    def __del__(self) -> None:
-        """If the instance as used to start a runtime, ensures that the instance properly marks the runtime as completed
-        or erred before being garbage-collected.
-
-        This is a security mechanism to prevent deadlocking the processed session and pipeline for future runtimes.
-        """
     def _load_state(self) -> None:
         """Reads the current processing state from the wrapped .YAML file."""
     def _save_state(self) -> None:
         """Saves the current processing state stored inside instance attributes to the specified .YAML file."""
-    def start(self) -> None:
-        """Configures the tracker file to indicate that the tracked processing runtime is currently running.
+    def start(self, manager_id: int) -> None:
+        """Configures the tracker file to indicate that a manager process is currently executing the tracked processing
+        runtime.
 
-        All further attempts to start the same processing runtime for the same session's data will automatically abort
-        with an error.
+        Calling this method effectively 'locks' the tracked session and processing runtime combination to only be
+        accessible from the manager process that calls this method. Calling this method for an already running runtime
+        managed by the same process does not have any effect, so it is safe to call this method at the beginning of
+        each processing job that makes up the runtime.
+
+        Args:
+            manager_id: The unique xxHash-64 hash identifier of the manager process which attempts to start the runtime
+                tracked by this tracker file.
 
         Raises:
             TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
         """
-    def error(self) -> None:
+    def error(self, manager_id: int) -> None:
         """Configures the tracker file to indicate that the tracked processing runtime encountered an error and failed
         to complete.
 
-        This method will only work for an active runtime. When called for an active runtime, it expects the runtime to
-        be aborted with an error after the method returns. It configures the target tracker to allow other processes
-        to restart the runtime at any point after this method returns, so it is UNSAFE to do any further processing
-        from the process that calls this method.
+        This method fulfills two main purposes. First, it 'unlocks' the runtime, allowing other manager processes to
+        interface with the tracked runtime. Second, it updates the tracker file to reflect that the runtime was
+        interrupted due to an error, which is used by the manager processes to detect and handle processing failures.
+
+        Args:
+            manager_id: The unique xxHash-64 hash identifier of the manager process which attempts to report that the
+                runtime tracked by this tracker file has encountered an error.
 
         Raises:
             TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
         """
-    def stop(self) -> None:
+    def stop(self, manager_id: int) -> None:
         """Configures the tracker file to indicate that the tracked processing runtime has been completed successfully.
 
-        After this method returns, it is UNSAFE to do any further processing from the process that calls this method.
-        Any process that calls the 'start' method of this class is expected to also call this method or 'error' method
-        at the end of the runtime.
+        This method 'unlocks' the runtime, allowing other manager processes to interface with the tracked runtime. It
+        also configures the tracker file to indicate that the runtime has been completed successfully, which is used
+        by the manager processes to detect and handle processing completion.
+
+        Args:
+            manager_id: The unique xxHash-64 hash identifier of the manager process which attempts to report that the
+                runtime tracked by this tracker file has been completed successfully.
 
         Raises:
             TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
+        """
+    def abort(self) -> None:
+        """Resets the runtime tracker file to the default state.
+
+        This method can be used to reset the runtime tracker file, regardless of the current runtime state. Unlike other
+        instance methods, this method can be called from any manager process, even if the runtime is already locked by
+        another process. This method is only intended to be used in the case of emergency to 'unlock' a deadlocked
+        runtime.
         """
     @property
     def is_complete(self) -> bool:
         """Returns True if the tracker wrapped by the instance indicates that the processing runtime has been completed
-        successfully at least once and that there is no ongoing processing that uses the target session."""
+        successfully and that the runtime is not currently ongoing."""
     @property
     def encountered_error(self) -> bool:
-        """Returns True if the tracker wrapped by the instance indicates that the processing runtime for the target
-        session has aborted due to encountering an error."""
+        """Returns True if the tracker wrapped by the instance indicates that the processing runtime has aborted due
+        to encountering an error."""
     @property
     def is_running(self) -> bool:
         """Returns True if the tracker wrapped by the instance indicates that the processing runtime is currently
-        running for the target session."""
+        ongoing."""
+
+def get_processing_tracker(root: Path, file_name: TrackerFileNames | str) -> ProcessingTracker:
+    """Initializes and returns the ProcessingTracker instance that manages the data stored inside the target processing
+    tracker file.
+
+    This function uses the input root path and tracker file name to first resolve the absolute path to the .yaml data
+    cache of the target processing tracker file and then wrap the file into a ProcessingTracker instance. All Sun lab
+    libraries that use ProcessingTracker instances use this function to access the necessary trackers.
+
+    Notes:
+        If the target file does not exist, this function will create the file as part of the ProcessingTracker
+        initialization.
+
+        This function also generates the corresponding .lock file to ensure that the data inside the processing tracker
+        is accessed by a single process at a time.
+
+    Args:
+        file_name: The name of the target processing tracker file. Has to be one of the names from the TrackerFileNames
+            enumeration.
+        root: The absolute path to the directory where the target file is stored or should be created.
+
+    Returns:
+        The initialized ProcessingTracker instance that manages the data stored in the target file.
+    """
+
+def generate_manager_id() -> int:
+    """Generates and returns a unique integer identifier that can be used to identify the manager process that calls
+    this function.
+
+    The identifier is generated based on the current timestamp, accurate to microseconds, and a random number between 1
+    and 9999999999999. This ensures that the identifier is unique for each function call. The generated identifier
+    string is converted to a unique integer value using the xxHash-64 algorithm before it is returned to the caller.
+
+    Notes:
+        This function should be used to generate manager process identifiers for working with ProcessingTracker
+        instances from sl-shared-assets version 4.0.0 and above.
+    """
