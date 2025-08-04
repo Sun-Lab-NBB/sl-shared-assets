@@ -62,7 +62,7 @@ class TrackerFileNames(StrEnum):
     """This file is used to track the state of the single-day suite2p processing pipeline."""
     DATASET = "dataset_formation_tracker.yaml"
     """This file is used to track the state of the dataset formation pipeline."""
-    VIDEO = "video_concatenation_processing_tracker.yaml"
+    VIDEO = "video_processing_tracker.yaml"
     """This file is used to track the state of the video (DeepLabCut) processing pipeline."""
     INTEGRITY = "integrity_verification_tracker.yaml"
     """This file is used to track the state of the data integrity verification pipeline."""
@@ -604,14 +604,16 @@ class ProcessingTracker(YamlConfig):
     runtime. The manager process is typically running on a remote control machine (computer) and is used to 
     support processing runtimes that are distributed over multiple separate batch jobs on the compute server. This 
     ID should be generated using the 'generate_manager_id()' function exposed by this library."""
-    _lock: FileLock = field(init=False)
-    """Stores the FileLock object used to ensure that only a single process can simultaneously access the data stored 
-    inside the tracker file."""
+    _lock_path: str = field(init=False)
+    """Stores the path to the .lock file used to ensure that only a single process can simultaneously access the data 
+    stored inside the tracker file."""
 
     def __post_init__(self) -> None:
         # Generates the .lock file path for the target tracker .yaml file.
-        lock_path = str(self.file_path.with_suffix(self.file_path.suffix + ".lock"))
-        self._lock = FileLock(lock_path)
+        if self.file_path is not None:
+            self._lock_path = str(self.file_path.with_suffix(self.file_path.suffix + ".lock"))
+        else:
+            self._lock_path = ""
 
     def _load_state(self) -> None:
         """Reads the current processing state from the wrapped .YAML file."""
@@ -629,11 +631,11 @@ class ProcessingTracker(YamlConfig):
 
     def _save_state(self) -> None:
         """Saves the current processing state stored inside instance attributes to the specified .YAML file."""
-        # Resets the _lock and file_path to None before dumping the data to .YAML to avoid issues with loading it
+        # Resets the _lock_path and file_path to None before dumping the data to .YAML to avoid issues with loading it
         # back.
         original = copy.deepcopy(self)
         original.file_path = None  # type: ignore
-        original._lock = None  # type: ignore
+        original._lock_path = None  # type: ignore
         original.to_yaml(file_path=self.file_path)
 
     def start(self, manager_id: int) -> None:
@@ -653,7 +655,8 @@ class ProcessingTracker(YamlConfig):
             TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
         """
         # Acquires the lock
-        with self._lock.acquire(timeout=10.0):
+        lock = FileLock(self._lock_path)
+        with lock.acquire(timeout=10.0):
             # Loads tracker state from the .yaml file
             self._load_state()
 
@@ -695,9 +698,8 @@ class ProcessingTracker(YamlConfig):
         Raises:
             TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
         """
-
-        # Acquires the lock
-        with self._lock.acquire(timeout=10.0):
+        lock = FileLock(self._lock_path)
+        with lock.acquire(timeout=10.0):
             # Loads tracker state from the .yaml file
             self._load_state()
 
@@ -737,8 +739,8 @@ class ProcessingTracker(YamlConfig):
         Raises:
             TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
         """
-
-        with self._lock.acquire(timeout=10.0):
+        lock = FileLock(self._lock_path)
+        with lock.acquire(timeout=10.0):
             # Loads tracker state from the .yaml file
             self._load_state()
 
@@ -772,7 +774,8 @@ class ProcessingTracker(YamlConfig):
         another process. This method is only intended to be used in the case of emergency to 'unlock' a deadlocked
         runtime.
         """
-        with self._lock.acquire(timeout=10.0):
+        lock = FileLock(self._lock_path)
+        with lock.acquire(timeout=10.0):
             # Loads tracker state from the .yaml file
             self._load_state()
 
@@ -788,7 +791,8 @@ class ProcessingTracker(YamlConfig):
     def is_complete(self) -> bool:
         """Returns True if the tracker wrapped by the instance indicates that the processing runtime has been completed
         successfully and that the runtime is not currently ongoing."""
-        with self._lock.acquire(timeout=10.0):
+        lock = FileLock(self._lock_path)
+        with lock.acquire(timeout=10.0):
             # Loads tracker state from the .yaml file
             self._load_state()
             return self._complete
@@ -797,7 +801,8 @@ class ProcessingTracker(YamlConfig):
     def encountered_error(self) -> bool:
         """Returns True if the tracker wrapped by the instance indicates that the processing runtime has aborted due
         to encountering an error."""
-        with self._lock.acquire(timeout=10.0):
+        lock = FileLock(self._lock_path)
+        with lock.acquire(timeout=10.0):
             # Loads tracker state from the .yaml file
             self._load_state()
             return self._encountered_error
@@ -806,7 +811,8 @@ class ProcessingTracker(YamlConfig):
     def is_running(self) -> bool:
         """Returns True if the tracker wrapped by the instance indicates that the processing runtime is currently
         ongoing."""
-        with self._lock.acquire(timeout=10.0):
+        lock = FileLock(self._lock_path)
+        with lock.acquire(timeout=10.0):
             # Loads tracker state from the .yaml file
             self._load_state()
             return self._running
@@ -866,5 +872,5 @@ def generate_manager_id() -> int:
     random_number = randint(1, 9999999999999)
     manager_id = f"{timestamp}_{random_number}"
     id_hash = xxh3_64()
-    id_hash.update(input=manager_id)
+    id_hash.update(manager_id)
     return id_hash.intdigest()
