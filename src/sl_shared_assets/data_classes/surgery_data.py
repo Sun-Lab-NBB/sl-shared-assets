@@ -65,7 +65,7 @@ class ImplantData:
     """The descriptive name of the implant."""
     implant_target: str
     """The name of the brain region or cranium section targeted by the implant."""
-    implant_code: int
+    implant_code: str
     """The manufacturer code or internal reference code for the implant. This code is used to identify the implant in 
     additional datasheets and lab ordering documents."""
     implant_ap_coordinate_mm: float
@@ -89,7 +89,7 @@ class InjectionData:
     """The name of the brain region targeted by the injection."""
     injection_volume_nl: float
     """The volume of substance, in nanoliters, delivered during the injection."""
-    injection_code: int
+    injection_code: str
     """The manufacturer code or internal reference code for the injected substance. This code is used to identify the 
     substance in additional datasheets and lab ordering documents."""
     injection_ap_coordinate_mm: float
@@ -108,22 +108,22 @@ class DrugData:
 
     lactated_ringers_solution_volume_ml: float
     """Stores the volume of Lactated Ringer's Solution (LRS) administered during surgery, in ml."""
-    lactated_ringers_solution_code: int
+    lactated_ringers_solution_code: str
     """Stores the manufacturer code or internal reference code for Lactated Ringer's Solution (LRS). This code is used 
     to identify the LRS batch in additional datasheets and lab ordering documents."""
     ketoprofen_volume_ml: float
     """Stores the volume of ketoprofen diluted with saline administered during surgery, in ml."""
-    ketoprofen_code: int
+    ketoprofen_code: str
     """Stores the manufacturer code or internal reference code for ketoprofen. This code is used to identify the 
     ketoprofen batch in additional datasheets and lab ordering documents."""
     buprenorphine_volume_ml: float
     """Stores the volume of buprenorphine diluted with saline administered during surgery, in ml."""
-    buprenorphine_code: int
+    buprenorphine_code: str
     """Stores the manufacturer code or internal reference code for buprenorphine. This code is used to identify the 
     buprenorphine batch in additional datasheets and lab ordering documents."""
     dexamethasone_volume_ml: float
     """Stores the volume of dexamethasone diluted with saline administered during surgery, in ml."""
-    dexamethasone_code: int
+    dexamethasone_code: str
     """Stores the manufacturer code or internal reference code for dexamethasone. This code is used to identify the 
     dexamethasone batch in additional datasheets and lab ordering documents."""
 

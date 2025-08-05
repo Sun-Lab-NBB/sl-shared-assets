@@ -104,9 +104,6 @@ class LickTrainingDescriptor(YamlConfig):
     dispensed during the paused (idle) state."""
     pause_dispensed_water_volume_ml: float = 0.0
     """Stores the total water volume, in milliliters, dispensed during the paused (idle) state."""
-    experimenter_notes: str = "Replace this with your notes."
-    """This field is not set during runtime. It is expected that each experimenter replaces this field with their 
-    notes made during runtime."""
     experimenter_given_water_volume_ml: float = 0.0
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the session.
     """
@@ -116,6 +113,9 @@ class LickTrainingDescriptor(YamlConfig):
     incomplete: bool = False
     """If this field is set to True, the session is marked as 'incomplete' and automatically excluded from all further 
     Sun lab automated processing and analysis."""
+    experimenter_notes: str = "Replace this with your notes."
+    """This field is not set during runtime. It is expected that each experimenter replaces this field with their 
+    notes made during runtime."""
 
 
 @dataclass()
@@ -160,9 +160,6 @@ class RunTrainingDescriptor(YamlConfig):
     dispensed during the paused (idle) state."""
     pause_dispensed_water_volume_ml: float = 0.0
     """Stores the total water volume, in milliliters, dispensed during the paused (idle) state."""
-    experimenter_notes: str = "Replace this with your notes."
-    """This field is not set during runtime. It is expected that each experimenter will replace this field with their 
-    notes made during runtime."""
     experimenter_given_water_volume_ml: float = 0.0
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the session.
     """
@@ -172,6 +169,9 @@ class RunTrainingDescriptor(YamlConfig):
     incomplete: bool = False
     """If this field is set to True, the session is marked as 'incomplete' and automatically excluded from all further 
     Sun lab automated processing and analysis."""
+    experimenter_notes: str = "Replace this with your notes."
+    """This field is not set during runtime. It is expected that each experimenter will replace this field with their 
+    notes made during runtime."""
 
 
 @dataclass()
@@ -191,9 +191,6 @@ class MesoscopeExperimentDescriptor(YamlConfig):
     dispensed during the paused (idle) state."""
     pause_dispensed_water_volume_ml: float = 0.0
     """Stores the total water volume, in milliliters, dispensed during the paused (idle) state."""
-    experimenter_notes: str = "Replace this with your notes."
-    """This field is not set during runtime. It is expected that each experimenter will replace this field with their 
-    notes made during runtime."""
     experimenter_given_water_volume_ml: float = 0.0
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the session.
     """
@@ -203,6 +200,9 @@ class MesoscopeExperimentDescriptor(YamlConfig):
     incomplete: bool = False
     """If this field is set to True, the session is marked as 'incomplete' and automatically excluded from all further 
     Sun lab automated processing and analysis."""
+    experimenter_notes: str = "Replace this with your notes."
+    """This field is not set during runtime. It is expected that each experimenter will replace this field with their 
+    notes made during runtime."""
 
 
 @dataclass()
@@ -217,14 +217,14 @@ class WindowCheckingDescriptor(YamlConfig):
 
     experimenter: str
     """The ID of the experimenter running the session."""
-    experimenter_notes: str = "Replace this with your notes."
-    """The notes on the quality of the cranial window and animal's suitability for the target project."""
     surgery_quality: int = 0
     """The quality of the cranial window and surgical intervention on a scale from 0 (non-usable) to 
     3 (high-tier publication grade) inclusive."""
     incomplete: bool = True
     """Window checking sessions are always considered 'incomplete', as they do not contain the full range of 
     information collected as part of a 'standard' behavior training or experiment session."""
+    experimenter_notes: str = "Replace this with your notes."
+    """The notes on the quality of the cranial window and animal's suitability for the target project."""
 
 
 @dataclass()

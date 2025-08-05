@@ -37,7 +37,7 @@ class ImplantData:
 
     implant: str
     implant_target: str
-    implant_code: int
+    implant_code: str
     implant_ap_coordinate_mm: float
     implant_ml_coordinate_mm: float
     implant_dv_coordinate_mm: float
@@ -52,7 +52,7 @@ class InjectionData:
     injection: str
     injection_target: str
     injection_volume_nl: float
-    injection_code: int
+    injection_code: str
     injection_ap_coordinate_mm: float
     injection_ml_coordinate_mm: float
     injection_dv_coordinate_mm: float
@@ -64,13 +64,13 @@ class DrugData:
     """
 
     lactated_ringers_solution_volume_ml: float
-    lactated_ringers_solution_code: int
+    lactated_ringers_solution_code: str
     ketoprofen_volume_ml: float
-    ketoprofen_code: int
+    ketoprofen_code: str
     buprenorphine_volume_ml: float
-    buprenorphine_code: int
+    buprenorphine_code: str
     dexamethasone_volume_ml: float
-    dexamethasone_code: int
+    dexamethasone_code: str
 
 @dataclass
 class SurgeryData(YamlConfig):
