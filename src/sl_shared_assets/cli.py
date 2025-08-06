@@ -21,6 +21,7 @@ from .data_classes import SessionData, TrackerFileNames, get_processing_tracker
 @click.option(
     "-id",
     "--manager_id",
+    type=int,
     required=True,
     default=0,
     show_default=True,
