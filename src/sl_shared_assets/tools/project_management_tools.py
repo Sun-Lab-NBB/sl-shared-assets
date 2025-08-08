@@ -148,7 +148,9 @@ class ProjectManifest:
 
         This provides a tuple of all animal IDs participating in the target project.
         """
-        return tuple(self._data.select("animal").unique().sort("animal").to_series().to_list())
+        return tuple(
+            [str(animal) for animal in self._data.select("animal").unique().sort("animal").to_series().to_list()]
+        )
 
     def _get_filtered_sessions(
         self,
