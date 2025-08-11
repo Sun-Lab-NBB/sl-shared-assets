@@ -5,4 +5,4 @@ shared server."""
 from .job import Job, JupyterJob
 from .server import Server, ServerCredentials, generate_server_credentials
 
-__all__ = ["Server", "ServerCredentials", "generate_server_credentials", "Job", "JupyterJob"]
+__all__ = ["Job", "JupyterJob", "Server", "ServerCredentials", "generate_server_credentials"]

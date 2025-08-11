@@ -56,16 +56,24 @@ class TrackerFileNames(StrEnum):
     via the get_processing_tracker() function to generate ProcessingTracker instances.
     """
 
+    INTEGRITY = "integrity_verification_tracker.yaml"
+    """This file is used to track the state of the data integrity verification pipeline."""
+    PREPARATION = "processing_preparation_tracker.yaml"
+    """This file is used to track the state of the data processing preparation pipeline."""
     BEHAVIOR = "behavior_processing_tracker.yaml"
     """This file is used to track the state of the behavior log processing pipeline."""
     SUITE2P = "suite2p_processing_tracker.yaml"
     """This file is used to track the state of the single-day suite2p processing pipeline."""
-    DATASET = "dataset_formation_tracker.yaml"
-    """This file is used to track the state of the dataset formation pipeline."""
     VIDEO = "video_processing_tracker.yaml"
     """This file is used to track the state of the video (DeepLabCut) processing pipeline."""
-    INTEGRITY = "integrity_verification_tracker.yaml"
-    """This file is used to track the state of the data integrity verification pipeline."""
+    DATASET = "dataset_marker_tracker.yaml"
+    """This file is used to track the state of the dataset marker resolution (creation or removal) pipeline."""
+    MULTIDAY = "multiday_processing_tracker.yaml"
+    """This file is used to track the state of the multiday suite2p processing pipeline."""
+    FORGING = "dataset_forging_tracker.yaml"
+    """This file is used to track the state of the dataset creation (forging) pipeline."""
+    ARCHIVE = "data_archiving_tracker.yaml"
+    """This file is used to track the state of the data archiving pipeline."""
 
 
 @dataclass()
@@ -776,10 +784,10 @@ class ProcessingTracker(YamlConfig):
         """
         lock = FileLock(self._lock_path)
         with lock.acquire(timeout=10.0):
-            # Loads tracker state from the .yaml file
+            # Loads tracker state from the .yaml file.
             self._load_state()
 
-            # Resets the tracker file to the default state. Note, does not indicate that the runtime is complete nor
+            # Resets the tracker file to the default state. Note, does not indicate that the runtime completed nor
             # that it has encountered an error.
             self._running = False
             self._manager_id = -1

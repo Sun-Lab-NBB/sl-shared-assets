@@ -545,7 +545,7 @@ def verify_session_checksum(
         )
 
         # Loads the checksum stored inside the ax_checksum.txt file
-        with open(session_data.raw_data.checksum_path, "r") as f:
+        with session_data.raw_data.checksum_path.open() as f:
             stored_checksum = f.read().strip()
 
         # If the two checksums do not match, this likely indicates data corruption.

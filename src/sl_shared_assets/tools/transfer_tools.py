@@ -109,7 +109,7 @@ def transfer_directory(source: Path, destination: Path, num_threads: int = 1, ve
     # Verifies the integrity of the transferred directory by rerunning xxHash3-128 calculation.
     if verify_integrity:
         destination_checksum = calculate_directory_checksum(directory=destination, batch=False, save_checksum=False)
-        with open(file=source.joinpath("ax_checksum.txt"), mode="r") as local_checksum:
+        with source.joinpath("ax_checksum.txt").open("r") as local_checksum:
             message = (
                 f"Checksum mismatch detected when transferring {Path(*source.parts[-6:])} to "
                 f"{Path(*destination.parts[-6:])}! The data was likely corrupted in transmission. User intervention "

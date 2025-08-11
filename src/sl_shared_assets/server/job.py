@@ -7,7 +7,6 @@ Since version 3.0.0, this module also provides the specialized JupyterJob class 
 notebook servers.
 """
 
-# noinspection PyProtectedMember
 import re
 from pathlib import Path
 import datetime
@@ -222,7 +221,7 @@ class JupyterJob(Job):
         connection_info: Stores the JupyterConnectionInfo instance after the Jupyter server is instantiated.
         host: Stores the hostname of the remote server.
         user: Stores the username used to connect with the remote server.
-        connection_info_file: The absolute path to the file that stores connection information, relative to the remote
+        connection_info_file: The absolute path to the file that stores connection information relative to the remote
             server root.
         _command: Stores the shell command for launching the Jupyter server.
     """
@@ -273,12 +272,12 @@ class JupyterJob(Job):
         """Builds the command to launch the Jupyter notebook server on the remote Sun lab server."""
 
         # Gets the hostname of the compute node and caches it in the connection data file. Also caches the port name.
-        self.add_command('echo "COMPUTE_NODE: $(hostname)" > {}'.format(self.connection_info_file))
-        self.add_command('echo "PORT: {}" >> {}'.format(self.port, self.connection_info_file))
+        self.add_command(f'echo "COMPUTE_NODE: $(hostname)" > {self.connection_info_file}')
+        self.add_command(f'echo "PORT: {self.port}" >> {self.connection_info_file}')
 
         # Generates a random access token for security and caches it in the connection data file.
         self.add_command("TOKEN=$(openssl rand -hex 24)")
-        self.add_command('echo "TOKEN: $TOKEN" >> {}'.format(self.connection_info_file))
+        self.add_command(f'echo "TOKEN: $TOKEN" >> {self.connection_info_file}')
 
         # Builds Jupyter startup command.
         jupyter_cmd = [
@@ -312,7 +311,7 @@ class JupyterJob(Job):
                 information to be parsed.
         """
 
-        with open(info_file, "r") as f:
+        with info_file.open() as f:
             content = f.read()
 
         # Extracts information using regex

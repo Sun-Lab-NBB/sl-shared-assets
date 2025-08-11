@@ -55,7 +55,7 @@ def _calculate_file_checksum(base_directory: Path, file_path: Path) -> tuple[str
 
     # Extends the checksum to reflect the file data state. Uses 8 MB chunks to avoid excessive RAM hogging at the cost
     # of slightly reduced throughput.
-    with open(file_path, "rb") as f:
+    with file_path.open("rb") as f:
         for chunk in iter(lambda: f.read(1024 * 1024 * 8), b""):
             checksum.update(chunk)
 
@@ -146,7 +146,7 @@ def calculate_directory_checksum(
     # Writes the hash to ax_checksum.txt in the root directory
     if save_checksum:
         checksum_path = directory / "ax_checksum.txt"
-        with open(checksum_path, "w") as f:
+        with checksum_path.open("w") as f:
             f.write(checksum_hexstr)
 
     return checksum_hexstr

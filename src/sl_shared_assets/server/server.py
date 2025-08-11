@@ -11,7 +11,6 @@ import tempfile
 from dataclasses import field, dataclass
 
 import paramiko
-
 # noinspection PyProtectedMember
 from simple_slurm import Slurm  # type: ignore
 from ataraxis_time import PrecisionTimer
@@ -332,7 +331,7 @@ class Server:
             fixed_script_content = job.command_script
 
             # Creates a temporary script file locally and dumps translated command data into the file
-            with open(local_script_path, "w") as f:
+            with local_script_path.open("w") as f:
                 f.write(fixed_script_content)
 
             # Uploads the command script to the server
@@ -603,7 +602,7 @@ class Server:
             sftp.rmdir(str(remote_path))
 
         except Exception as e:
-            console.echo(f"Unable to remove the specified directory {remote_path}: {str(e)}", level=LogLevel.WARNING)
+            console.echo(f"Unable to remove the specified directory {remote_path}: {e!s}", level=LogLevel.WARNING)
 
     def create_directory(self, remote_path: Path, parents: bool = True) -> None:
         """Creates the specified directory tree on the managed remote server via SFTP.
@@ -672,12 +671,13 @@ class Server:
             # Checks if the target file or directory exists by trying to 'stat' it
             sftp.stat(str(remote_path))
 
-            # If the request does not err, returns True (file or directory exists)
-            return True
-
         # If the directory or file does not exist, returns False
         except FileNotFoundError:
             return False
+
+        else:
+            # If the request does not err, returns True (file or directory exists)
+            return True
 
     def close(self) -> None:
         """Closes the SSH connection to the server.
