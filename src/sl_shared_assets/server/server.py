@@ -1,4 +1,4 @@
-"""This module provides the tools for working with the Sun lab BioHPC cluster. Specifically, the classes from this
+"""This module provides the tools for working with remote compute servers Specifically, the classes from this
 module establish an API for submitting jobs to the shared data processing cluster (managed via SLURM) and monitoring
 the running job status. All lab processing and analysis pipelines use this interface for accessing shared compute
 resources.
@@ -11,6 +11,7 @@ import tempfile
 from dataclasses import field, dataclass
 
 import paramiko
+
 # noinspection PyProtectedMember
 from simple_slurm import Slurm  # type: ignore
 from ataraxis_time import PrecisionTimer
@@ -305,7 +306,7 @@ class Server:
         # include connection data received from the server.
         return self.submit_job(job)  # type: ignore[return-value]
 
-    def submit_job(self, job: Job | JupyterJob) -> Job | JupyterJob:
+    def submit_job(self, job: Job | JupyterJob, verbose: bool = True) -> Job | JupyterJob:
         """Submits the input job to the managed BioHPC server via SLURM job manager.
 
         This method submits various jobs for execution via the SLURM-managed BioHPC cluster. As part of its runtime, the
@@ -314,6 +315,9 @@ class Server:
 
         Args:
             job: The Job object that contains all job data.
+            verbose: Determines whether to notify the user about non-error states of the job submission task. Typically,
+                this is disabled when batch-submitting jobs (for example, as part of running a processing pipeline) and
+                enabled when submitting single jobs.
 
         Returns:
             The job object whose 'job_id' attribute had been modified with the job ID if the job was successfully
@@ -322,7 +326,8 @@ class Server:
         Raises:
             RuntimeError: If job submission to the server fails.
         """
-        console.echo(message=f"Submitting '{job.job_name}' job to the remote server {self.host}...")
+        if verbose:
+            console.echo(message=f"Submitting '{job.job_name}' job to the remote server {self.host}...")
 
         # Generates a temporary shell script on the local machine. Uses tempfile to automatically remove the
         # local script as soon as it is uploaded to the server.
@@ -399,6 +404,9 @@ class Server:
 
                 timer.delay_noblock(delay=5, allow_sleep=True)  # Waits for 5 seconds before checking again
             else:
+                # Aborts the job if the server is busy running other jobs
+                self.abort_job(job=job)
+
                 # Only raises the timeout error if the while loop is not broken in 120 seconds
                 message = (
                     f"Remote jupyter server job {job.job_name} with id {job.job_id} did not start within 120 seconds "
@@ -408,7 +416,8 @@ class Server:
                 console.error(message, TimeoutError)
                 raise TimeoutError(message)  # Fallback to appease mypy
 
-        console.echo(message=f"{job.job_name} job: Submitted to {self.host}.", level=LogLevel.SUCCESS)
+        if verbose:
+            console.echo(message=f"{job.job_name} job: Submitted to {self.host}.", level=LogLevel.SUCCESS)
 
         # Returns the updated job object
         return job

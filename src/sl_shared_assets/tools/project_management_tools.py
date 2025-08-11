@@ -10,15 +10,14 @@ import polars as pl
 from filelock import FileLock
 from ataraxis_base_utilities import LogLevel, console
 
+from ..server import TrackerFileNames, ProcessingTracker
 from ..data_classes import (
     SessionData,
     SessionTypes,
-    TrackerFileNames,
     RunTrainingDescriptor,
     LickTrainingDescriptor,
     WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor,
-    get_processing_tracker,
 )
 from .packaging_tools import calculate_directory_checksum
 
@@ -414,8 +413,8 @@ def generate_project_manifest(
             manifest["complete"].append(session_data.raw_data.telomere_path.exists())
 
             # Data verification status
-            tracker = get_processing_tracker(
-                root=session_data.raw_data.raw_data_path, file_name=TrackerFileNames.INTEGRITY
+            tracker = ProcessingTracker(
+                file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.INTEGRITY)
             )
             manifest["integrity"].append(tracker.is_complete)
 
@@ -430,20 +429,20 @@ def generate_project_manifest(
                 continue  # Cycles to the next session
 
             # Suite2p (single-day) processing status.
-            tracker = get_processing_tracker(
-                file_name=TrackerFileNames.SUITE2P, root=session_data.processed_data.processed_data_path
+            tracker = ProcessingTracker(
+                file_path=session_data.processed_data.processed_data_path.joinpath(TrackerFileNames.SUITE2P)
             )
             manifest["suite2p"].append(tracker.is_complete)
 
             # Behavior data processing status.
-            tracker = get_processing_tracker(
-                file_name=TrackerFileNames.BEHAVIOR, root=session_data.processed_data.processed_data_path
+            tracker = ProcessingTracker(
+                file_path=session_data.processed_data.processed_data_path.joinpath(TrackerFileNames.BEHAVIOR)
             )
             manifest["behavior"].append(tracker.is_complete)
 
             # DeepLabCut (video) processing status.
-            tracker = get_processing_tracker(
-                file_name=TrackerFileNames.VIDEO, root=session_data.processed_data.processed_data_path
+            tracker = ProcessingTracker(
+                file_path=session_data.processed_data.processed_data_path.joinpath(TrackerFileNames.VIDEO)
             )
             manifest["video"].append(tracker.is_complete)
 
@@ -486,7 +485,7 @@ def generate_project_manifest(
         )
 
 
-def verify_session_checksum(
+def resolve_checksum(
     session_path: Path,
     manager_id: int,
     create_processed_data_directory: bool = True,
@@ -532,7 +531,7 @@ def verify_session_checksum(
     )
 
     # Initializes the ProcessingTracker instance for the verification tracker file
-    tracker = get_processing_tracker(root=session_data.raw_data.raw_data_path, file_name=TrackerFileNames.INTEGRITY)
+    tracker = ProcessingTracker(file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.INTEGRITY))
     console.echo(f"{tracker.file_path}")
 
     # Updates the tracker data to communicate that the verification process has started. This automatically clears
@@ -705,11 +704,11 @@ def resolve_p53_marker(
     error: bool = False
     if session_type == SessionTypes.LICK_TRAINING or session_type == SessionTypes.RUN_TRAINING:
         # Ensures that the session is not being processed with one of the supported pipelines.
-        behavior_tracker = get_processing_tracker(
-            file_name=TrackerFileNames.BEHAVIOR, root=session_data.processed_data.processed_data_path
+        behavior_tracker = ProcessingTracker(
+            file_path=session_data.processed_data.processed_data_path.joinpath(TrackerFileNames.BEHAVIOR)
         )
-        video_tracker = get_processing_tracker(
-            file_name=TrackerFileNames.VIDEO, root=session_data.processed_data.processed_data_path
+        video_tracker = ProcessingTracker(
+            file_path=session_data.processed_data.processed_data_path.joinpath(TrackerFileNames.VIDEO)
         )
         if behavior_tracker.is_running or video_tracker.is_running:
             # Note, training runtimes do not require suite2p processing.
@@ -717,14 +716,14 @@ def resolve_p53_marker(
 
     # Mesoscope experiment sessions require additional processing with suite2p
     elif session_type == SessionTypes.MESOSCOPE_EXPERIMENT:
-        behavior_tracker = get_processing_tracker(
-            file_name=TrackerFileNames.BEHAVIOR, root=session_data.processed_data.processed_data_path
+        behavior_tracker = ProcessingTracker(
+            file_path=session_data.processed_data.processed_data_path.joinpath(TrackerFileNames.BEHAVIOR)
         )
-        suite2p_tracker = get_processing_tracker(
-            file_name=TrackerFileNames.SUITE2P, root=session_data.processed_data.processed_data_path
+        suite2p_tracker = ProcessingTracker(
+            file_path=session_data.processed_data.processed_data_path.joinpath(TrackerFileNames.SUITE2P)
         )
-        video_tracker = get_processing_tracker(
-            file_name=TrackerFileNames.VIDEO, root=session_data.processed_data.processed_data_path
+        video_tracker = ProcessingTracker(
+            file_path=session_data.processed_data.processed_data_path.joinpath(TrackerFileNames.VIDEO)
         )
         console.echo(f"{behavior_tracker.is_running}")
         if behavior_tracker.is_running or video_tracker.is_running or suite2p_tracker.is_running:

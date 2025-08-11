@@ -1,6 +1,6 @@
-"""This module provides methods for moving session runtime data between the local machine, the ScanImage (Mesoscope) PC,
-the Synology NAS drive, and the lab BioHPC server. All methods in this module expect that the destinations and sources
-are mounted on the host file-system via the SMB or an equivalent protocol.
+"""This module provides tools for moving the data between destinations within or across machines (PCs). All methods in
+this module expect that the destinations and sources are mounted on the host-machine file-system via the SMB or an
+equivalent protocol.
 """
 
 import shutil
@@ -32,22 +32,18 @@ def _transfer_file(source_file: Path, source_directory: Path, destination_direct
     shutil.copy2(source_file, dest_file)
 
 
-def transfer_directory(source: Path, destination: Path, num_threads: int = 1, verify_integrity: bool = True) -> None:
+def transfer_directory(source: Path, destination: Path, num_threads: int = 1, verify_integrity: bool = False) -> None:
     """Copies the contents of the input directory tree from source to destination while preserving the folder
     structure.
-
-    This function is used to assemble the experimental data from all remote machines used in the acquisition process on
-    the VRPC before the data is preprocessed. It is also used to transfer the preprocessed data from the VRPC to the
-    SynologyNAS and the Sun lab BioHPC server.
 
     Notes:
         This method recreates the moved directory hierarchy on the destination if the hierarchy does not exist. This is
         done before copying the files.
 
-        The method executes a multithreading copy operation. It does not clean up the source files. That job is handed
-        to the specific preprocessing function from the sl_experiment or sl-forgery libraries that call this function.
+        The method executes a multithreading copy operation and does not remove the source data after the copy is
+        complete. This behavior is intended and relies on other modules cleaning up the no-longer source data.
 
-        If the method is configured to verify transferred file integrity, it reruns the xxHash3-128 checksum calculation
+        If the method is configured to verify transferred data integrity, it reruns the xxHash3-128 checksum calculation
         and compares the returned checksum to the one stored in the source directory. The method assumes that all input
         directories contain the 'ax_checksum.txt' file that stores the 'source' directory checksum at the highest level
         of the input directory tree.
@@ -60,15 +56,20 @@ def transfer_directory(source: Path, destination: Path, num_threads: int = 1, ve
             transfers, setting this number above 1 will likely provide a performance boost. For remote transfers using
             a single TCP / IP socket (such as non-multichannel SMB protocol), the number should be set to 1.
         verify_integrity: Determines whether to perform integrity verification for the transferred files. Note,
-            integrity verification is a time-consuming process and generally would not be a concern for most runtimes.
-            Therefore, it is often fine to disable this option to optimize method runtime speed.
+            transfer integrity is generally not a concern for most runtimes and may require considerable processing
+            time. Therefore, it is often preferable to disable this option to optimize method runtime speed.
 
     Raises:
         RuntimeError: If the transferred files do not pass the xxHas3-128 checksum integrity verification.
     """
     if not source.exists():
-        message = f"Unable to move the directory {source}, as it does not exist."
+        message = f"Unable to transfer the source directory {source}, as it does not exist."
         console.error(message=message, error=FileNotFoundError)
+
+    # If transfer integrity verification is enabled, but the source directory does not contain the 'ax_checksum.txt'
+    # file, checksums the directory before the transfer operation.
+    if verify_integrity and not source.joinpath("ax_checksum.txt").exists():
+        calculate_directory_checksum(directory=source, batch=False, save_checksum=True)
 
     # Ensures the destination root directory exists.
     ensure_directory_exists(destination)
@@ -112,8 +113,7 @@ def transfer_directory(source: Path, destination: Path, num_threads: int = 1, ve
         with source.joinpath("ax_checksum.txt").open("r") as local_checksum:
             message = (
                 f"Checksum mismatch detected when transferring {Path(*source.parts[-6:])} to "
-                f"{Path(*destination.parts[-6:])}! The data was likely corrupted in transmission. User intervention "
-                f"required."
+                f"{Path(*destination.parts[-6:])}! The data was likely corrupted in transmission."
             )
             if not destination_checksum == local_checksum.readline().strip():
                 console.error(message=message, error=RuntimeError)

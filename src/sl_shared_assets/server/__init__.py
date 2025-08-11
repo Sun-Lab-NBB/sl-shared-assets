@@ -1,8 +1,28 @@
-"""This package provides the classes and methods used by all Sun lab libraries to submit remote jobs to the BioHPC
-and other compute servers. This package is also used across all Sun lab members' private code to interface with the
-shared server."""
+"""This package provides the classes and methods used by all Sun lab libraries to work with the data stored on remote
+compute servers, such as the BioHPC server. It provides tools for submitting and monitoring jobs, running complex
+processing pipelines and interactively working with the data via a Jupyter lab server."""
 
 from .job import Job, JupyterJob
 from .server import Server, ServerCredentials, generate_server_credentials
+from .pipeline import (
+    ProcessingStatus,
+    TrackerFileNames,
+    ProcessingTracker,
+    ProcessingPipeline,
+    ProcessingPipelines,
+    generate_manager_id,
+)
 
-__all__ = ["Job", "JupyterJob", "Server", "ServerCredentials", "generate_server_credentials"]
+__all__ = [
+    "Job",
+    "JupyterJob",
+    "ProcessingPipeline",
+    "ProcessingPipelines",
+    "ProcessingStatus",
+    "ProcessingTracker",
+    "Server",
+    "ServerCredentials",
+    "TrackerFileNames",
+    "generate_manager_id",
+    "generate_server_credentials",
+]
