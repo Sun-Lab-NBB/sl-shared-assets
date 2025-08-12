@@ -9,6 +9,7 @@ from ataraxis_base_utilities import console
 
 from .tools import (
     ProjectManifest,
+    delete_directory,
     resolve_p53_marker,
     transfer_directory,
     generate_project_manifest,
@@ -96,6 +97,7 @@ __all__ = [
     "WindowCheckingDescriptor",
     "ZaberPositions",
     "calculate_directory_checksum",
+    "delete_directory",
     "generate_manager_id",
     "generate_project_manifest",
     "get_system_configuration_data",

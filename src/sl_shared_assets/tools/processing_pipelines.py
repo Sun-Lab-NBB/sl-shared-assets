@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from ataraxis_base_utilities import LogLevel, console
+from ataraxis_base_utilities import console
 from ataraxis_time.time_helpers import get_timestamp
 
 from ..server import Job, Server, ProcessingStatus, TrackerFileNames, ProcessingPipeline, ProcessingPipelines
@@ -34,6 +34,7 @@ def compose_processing_pipeline(
     manager_id: int,
     local_working_directory: Path,
     keep_job_logs: bool = False,
+    recalculate_checksum: bool = False,
 ) -> ProcessingPipeline:
     """Generates and returns the ProcessingPipeline instance used to execute the requested pipeline for the target
     session on the specified remote compute server.
@@ -67,12 +68,15 @@ def compose_processing_pipeline(
     # Otherwise, constructs the session processing pipeline and returns it to caller. Behavior processing pipeline is
     # executed as a single job, so it does not require an extensive setup process (unlike the suite2p pipeline).
 
-    # Parses the paths to the shared Sun lab directories used to store raw and processed session data on the remote
-    # server.
+    # Parses the paths to the shared Sun lab directories used to store raw session data on the remote server.
     remote_session_path = Path(server.processed_data_root).joinpath(project, animal, session)
 
+    # Precreates the dictionary for storing job instances and their working directories
+    jobs: dict[int, tuple[tuple[Job, Path], ...]] = {}
+    stage = 1  # This is used to iteratively fill processing stage data for multi-stage pipelines.
+
     # Integrity verification pipeline
-    if pipeline == ProcessingPipelines.BEHAVIOR:
+    if pipeline == ProcessingPipelines.INTEGRITY:
         job_name = f"{session}_integrity_verification"
         working_directory = _get_remote_job_work_directory(server=server, job_name=job_name)
         job = Job(
@@ -85,12 +89,47 @@ def compose_processing_pipeline(
             ram_gb=10,
             time_limit=30,
         )
-        job.add_command(
-            f"sl-verify-session -sp {remote_session_path} -id {manager_id} -c -pdr {server.processed_data_root} -um"
+        if recalculate_checksum:
+            job.add_command(
+                f"sl-verify-session -sp {remote_session_path} -id {manager_id} -cpd "
+                f"-pdr {server.processed_data_root} -um -r"
+            )
+        else:
+            job.add_command(
+                f"sl-verify-session -sp {remote_session_path} -id {manager_id} -cpd "
+                f"-pdr {server.processed_data_root} -um"
+            )
+        jobs[stage] = ((job, working_directory),)
+
+    elif pipeline == ProcessingPipelines.PREPARATION:
+        job_name = f"{session}_raw_data_preparation"
+        working_directory = _get_remote_job_work_directory(server=server, job_name=job_name)
+        job = Job(
+            job_name=job_name,
+            output_log=working_directory.joinpath(f"output.txt"),
+            error_log=working_directory.joinpath(f"errors.txt"),
+            working_directory=working_directory,
+            conda_environment="manage",
+            cpus_to_use=20,
+            ram_gb=10,
+            time_limit=30,
+        )
+
+        job_name = f"{session}_processed_data_preparation"
+        working_directory = _get_remote_job_work_directory(server=server, job_name=job_name)
+        job = Job(
+            job_name=job_name,
+            output_log=working_directory.joinpath(f"output.txt"),
+            error_log=working_directory.joinpath(f"errors.txt"),
+            working_directory=working_directory,
+            conda_environment="manage",
+            cpus_to_use=20,
+            ram_gb=10,
+            time_limit=30,
         )
 
     # Behavior processing pipeline
-    if pipeline == ProcessingPipelines.BEHAVIOR:
+    elif pipeline == ProcessingPipelines.BEHAVIOR:
         job_name = f"{session}_behavior_processing"
         working_directory = _get_remote_job_work_directory(server=server, job_name=job_name)
         job = Job(

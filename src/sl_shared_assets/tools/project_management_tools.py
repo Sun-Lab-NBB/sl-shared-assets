@@ -19,6 +19,7 @@ from ..data_classes import (
     WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor,
 )
+from .transfer_tools import delete_directory, transfer_directory
 from .packaging_tools import calculate_directory_checksum
 
 
@@ -226,12 +227,100 @@ def generate_project_manifest(raw_project_directory: Path, processed_data_root: 
         sorted_df.write_ipc(file=manifest_path, compression="lz4")
 
 
+def resolve_checksum(
+    session_path: Path,
+    manager_id: int,
+    regenerate_checksum: bool = False,
+    create_processed_data_directory: bool = True,
+    processed_data_root: None | Path = None,
+) -> None:
+    """Verifies the integrity of the session's data by generating the checksum of the raw_data directory and comparing
+    it against the checksum stored in the ax_checksum.txt file.
+
+    Primarily, this function is used to verify data integrity after transferring it from the data acquisition system PC
+    to the remote server for long-term storage.
+
+    Notes:
+        Any session that does not successfully pass checksum verification (or recreation) is automatically excluded
+        from all further automatic processing steps.
+
+        Since version 5.0.0, this function also supports recalculating and overwriting the checksum stored inside the
+        ax_checksum.txt file. This allows this function to re-checksum session data, which is helpful if the
+        experimenter deliberately alters the session's data post-acquisition (for example, to comply with new data
+        storage guidelines).
+
+    Args:
+        session_path: The path to the session directory to be verified or re-checksummed.
+        manager_id: The unique identifier of the manager process that manages the integrity verification runtime.
+        regenerate_checksum: Determines whether to update the checksum stored in the ax_checksum.txt file before
+            carrying out the verification. In this case, the verification necessarily succeeds and the session's
+            reference checksum is changed to reflect the current state of the session data.
+        create_processed_data_directory: Determines whether to create the processed data hierarchy during runtime.
+        processed_data_root: The path to the root directory used to store the processed data from all Sun lab projects,
+            if different from the session data root.
+    """
+
+    # Loads session data layout. If configured to do so, also creates the processed data hierarchy
+    session_data = SessionData.load(
+        session_path=session_path,
+        processed_data_root=processed_data_root,
+        make_processed_data_directory=create_processed_data_directory,
+    )
+
+    # Initializes the ProcessingTracker instance for the verification tracker file
+    tracker = ProcessingTracker(file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.INTEGRITY))
+
+    # Updates the tracker data to communicate that the verification process has started. This automatically clears
+    # the previous 'completed' status.
+    tracker.start(manager_id=manager_id)
+    try:
+        console.echo(
+            message=f"Resolving the data integrity checksum for session '{session_data.session_name}'...",
+            level=LogLevel.INFO,
+        )
+
+        # Regenerates the checksum for the raw_data directory. Note, if the 'regenerate_checksum' flag is True, this
+        # guarantees that the check below succeeds as the function replaces the checksum in the ax_checksum.txt file
+        # with the newly calculated value.
+        calculated_checksum = calculate_directory_checksum(
+            directory=session_data.raw_data.raw_data_path, batch=False, save_checksum=regenerate_checksum
+        )
+
+        # Loads the checksum stored inside the ax_checksum.txt file
+        with session_data.raw_data.checksum_path.open() as f:
+            stored_checksum = f.read().strip()
+
+        # If the two checksums do not match, this likely indicates data corruption.
+        if stored_checksum != calculated_checksum:
+            tracker.error(manager_id=manager_id)
+            console.echo(
+                message=f"Session '{session_data.session_name}' raw data integrity: Compromised.", level=LogLevel.ERROR
+            )
+
+        else:
+            # Sets the tracker to indicate that the verification runtime completed successfully.
+            console.echo(
+                message=f"Session '{session_data.session_name}' raw data integrity: Verified.", level=LogLevel.SUCCESS
+            )
+            tracker.stop(manager_id=manager_id)
+
+    finally:
+        # If the code reaches this section while the tracker indicates that the processing is still running,
+        # this means that the verification runtime encountered an error.
+        if tracker.is_running:
+            tracker.error(manager_id=manager_id)
+
+        # Updates or generates the manifest file inside the root raw data project directory
+        generate_project_manifest(
+            raw_project_directory=session_path.parents[1],
+            processed_data_root=processed_data_root,
+        )
+
+
 def reset_trackers(
     session_path: Path,
     trackers: tuple[TrackerFileNames, ...] | None = None,
     processed_data_root: None | Path = None,
-    create_processed_data_directory: bool = True,
-    update_manifest: bool = False,
 ) -> None:
     """Resets all requested tracker files for the target session to the original (unprocessed) state.
 
@@ -248,18 +337,20 @@ def reset_trackers(
         session_path: The path to the root session directory for which to reset the trackers.
         trackers: A tuple that stores the TrackerFileNames instances, one for each tracker file to be reset. If this
             argument is set to None, this function resets all files defined in the TrackerFileNames enumeration.
-        create_processed_data_directory: Determines whether to create the processed data hierarchy during runtime.
         processed_data_root: The path to the root directory used to store the processed data from all Sun lab projects,
             if different from the session data root.
-        update_manifest: Determines whether to update (regenerate) the project manifest file for the processed session's
-            project.
     """
 
     # Loads session data layout. If configured to do so, also creates the processed data hierarchy
     session_data = SessionData.load(
         session_path=session_path,
         processed_data_root=processed_data_root,
-        make_processed_data_directory=create_processed_data_directory,
+        make_processed_data_directory=False,
+    )
+
+    console.echo(
+        message=f"Resetting processing trackers for session '{session_data.session_name}'...",
+        level=LogLevel.INFO,
     )
 
     # If the user did not specify an explicit set of trackers to process, evaluates all valid tracker files.
@@ -289,103 +380,98 @@ def reset_trackers(
                 level=LogLevel.SUCCESS,
             )
 
-    # If the runtime is configured to generate the project manifest file, attempts to generate and overwrite the
-    # existing manifest file for the target project.
-    if update_manifest:
-        # Generates the manifest file inside the root raw data project directory
-        generate_project_manifest(
-            raw_project_directory=session_path.parents[1],
-            processed_data_root=processed_data_root,
-        )
-
-
-def resolve_checksum(
-    session_path: Path,
-    manager_id: int,
-    regenerate_checksum: bool = False,
-    create_processed_data_directory: bool = True,
-    processed_data_root: None | Path = None,
-    update_manifest: bool = False,
-) -> None:
-    """Verifies the integrity of the session's data by generating the checksum of the raw_data directory and comparing
-    it against the checksum stored in the ax_checksum.txt file.
-
-    Primarily, this function is used to verify data integrity after transferring it from the data acquisition system PC
-    to the remote server for long-term storage.
-
-    Notes:
-        This function removes the telomere.bin marker for the session if it fails verification. Removing the
-        telomere.bin marker file marks the session as incomplete, excluding it from all further automatic processing.
-
-        Since version 5.0.0, this function also supports recalculating and overwriting the checksum stored inside the
-        ax_checksum.txt file. This allows this function to re-checksum session data, which is helpful if the
-        experimenter deliberately alters the session's data post-acquisition (for example, to comply with new data
-        storage guidelines).
-
-    Args:
-        session_path: The path to the session directory to be verified or re-checksummed.
-        manager_id: The unique identifier of the manager process that manages the integrity verification runtime.
-        regenerate_checksum: Determines whether to update the checksum stored in the ax_checksum.txt file before
-            carrying out the verification. In this case, the verification necessarily succeeds and the session's
-            reference checksum is changed to reflect the current state of the session data.
-        create_processed_data_directory: Determines whether to create the processed data hierarchy during runtime.
-        processed_data_root: The path to the root directory used to store the processed data from all Sun lab projects,
-            if different from the session data root.
-        update_manifest: Determines whether to update (regenerate) the project manifest file for the processed session's
-            project.
-    """
-
-    # Loads session data layout. If configured to do so, also creates the processed data hierarchy
-    session_data = SessionData.load(
-        session_path=session_path,
+    # Updates or generates the manifest file inside the root raw data project directory
+    generate_project_manifest(
+        raw_project_directory=session_path.parents[1],
         processed_data_root=processed_data_root,
-        make_processed_data_directory=create_processed_data_directory,
     )
 
-    # Initializes the ProcessingTracker instance for the verification tracker file
-    tracker = ProcessingTracker(file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.INTEGRITY))
 
-    # Updates the tracker data to communicate that the verification process has started. This automatically clears
+def prepare_session(
+    session_path: Path,
+    manager_id: int,
+    create_processed_directories: bool,
+    processed_data_root: Path | None,
+    unarchive_processed_data: bool,
+) -> None:
+    """Prepares the target session for processing.
+
+    This function is primarily designed to be used on remote compute servers that use different data volumes for
+    storage and processing. Since storage volumes are often slow, the session data needs to be copied to the fast
+    volume before executing processing pipelines. In addition to copying the raw data, depending on configuration, this
+    function also moves (archived) processed data and resets the requested processing pipeline trackers for the managed
+    session.
+    """
+    # Resolves the data hierarchy for the processed session
+    session_data = SessionData.load(
+        session_path=session_path,
+        make_processed_data_directory=create_processed_directories,
+        processed_data_root=processed_data_root,
+    )
+
+    # Initializes the ProcessingTracker instance for the preparation tracker file
+    tracker = ProcessingTracker(file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.PREPARATION))
+
+    # Updates the tracker data to communicate that the preparation process has started. This automatically clears
     # the previous 'completed' status.
     tracker.start(manager_id=manager_id)
     try:
-        # Regenerates the checksum for the raw_data directory. Note, if the 'regenerate_checksum' flag is True, this
-        # guarantees that the check below succeeds as the function replaces the checksum in the ax_checksum.txt file
-        # with the newly calculated value.
-        calculated_checksum = calculate_directory_checksum(
-            directory=session_data.raw_data.raw_data_path, batch=False, save_checksum=regenerate_checksum
+        console.echo(
+            message=f"Preparing session '{session_data.session_name}' for data processing...", level=LogLevel.INFO
         )
 
-        # Loads the checksum stored inside the ax_checksum.txt file
-        with session_data.raw_data.checksum_path.open() as f:
-            stored_checksum = f.read().strip()
+        # Infers the raw_data root from the resolved session path
+        raw_data_root = session_path.parents[2]
 
-        # If the two checksums do not match, this likely indicates data corruption.
-        if stored_checksum != calculated_checksum:
-            # If the telomere.bin file exists, removes this file. This marks the session as incomplete, excluding it
-            # from all further automated processing.
-            session_data.raw_data.telomere_path.unlink(missing_ok=True)
-            tracker.error(manager_id=manager_id)
+        # If the processed data root is provided and is different from the raw data root, copies the raw_data directory
+        # to the processed data root.
+        if processed_data_root is not None and raw_data_root != processed_data_root:
+            console.echo(message=f"Transferring raw data directory to the processed data root...", level=LogLevel.INFO)
+            transfer_directory(
+                source=session_data.raw_data.raw_data_path,
+                destination=session_data.processed_data.processed_data_path.parent.joinpath("raw_data"),
+                num_threads=0,
+                verify_integrity=False,
+            )
 
-        else:
-            # Sets the tracker to indicate that the verification runtime completed successfully.
-            tracker.stop(manager_id=manager_id)
+            # If the function is configured to unarchive the processed data folder and has an archived processed_data
+            # folder, copies it to the processed_data hierarchy.
+            archive_tracker = ProcessingTracker(
+                file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.ARCHIVE)
+            )
+            if (
+                unarchive_processed_data
+                and archive_tracker.is_complete
+                and session_path.joinpath("processed_data").exists()
+            ):
+                console.echo(
+                    message=f"Transferring teh archived processed data directory to the processed data root...",
+                    level=LogLevel.INFO,
+                )
+                transfer_directory(
+                    source=session_path.joinpath("processed_data"),
+                    destination=session_data.processed_data.processed_data_path,
+                    num_threads=0,
+                    verify_integrity=False,
+                )
+
+                # Removes the transferred directory to ensure that the data transfer can only occur once until the
+                # processed data is archived again.
+                console.echo(
+                    message=f"Removing the archived processed data directory following the successful transfer...",
+                    level=LogLevel.INFO,
+                )
+                delete_directory(session_path.joinpath("processed_data"))
+
+        # Preparation is complete
+        tracker.stop(manager_id=manager_id)
+        console.echo(message=f"Session '{session_data.session_name}': Prepared for processing.", level=LogLevel.SUCCESS)
 
     finally:
         # If the code reaches this section while the tracker indicates that the processing is still running,
-        # this means that the verification runtime encountered an error. Configures the tracker to indicate that this
-        # runtime finished with an error to prevent deadlocking the runtime.
+        # this means that the runtime encountered an error.
         if tracker.is_running:
             tracker.error(manager_id=manager_id)
-
-        # If the runtime is configured to generate the project manifest file, attempts to generate and overwrite the
-        # existing manifest file for the target project.
-        if update_manifest:
-            # Generates the manifest file inside the root raw data project directory
-            generate_project_manifest(
-                raw_project_directory=session_path.parents[1],
-                processed_data_root=processed_data_root,
-            )
 
 
 def resolve_p53_marker(

@@ -3,11 +3,13 @@ this module expect that the destinations and sources are mounted on the host-mac
 equivalent protocol.
 """
 
+import os
 import shutil
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from tqdm import tqdm
+from ataraxis_time import PrecisionTimer
 from ataraxis_base_utilities import console, ensure_directory_exists
 
 from .packaging_tools import calculate_directory_checksum
@@ -54,7 +56,8 @@ def transfer_directory(source: Path, destination: Path, num_threads: int = 1, ve
         num_threads: The number of threads to use for parallel file transfer. This number should be set depending on the
             type of transfer (local or remote) and is not guaranteed to provide improved transfer performance. For local
             transfers, setting this number above 1 will likely provide a performance boost. For remote transfers using
-            a single TCP / IP socket (such as non-multichannel SMB protocol), the number should be set to 1.
+            a single TCP / IP socket (such as non-multichannel SMB protocol), the number should be set to 1. Setting
+            this value to a number below 1 instructs the function to use all available CPU cores.
         verify_integrity: Determines whether to perform integrity verification for the transferred files. Note,
             transfer integrity is generally not a concern for most runtimes and may require considerable processing
             time. Therefore, it is often preferable to disable this option to optimize method runtime speed.
@@ -65,6 +68,14 @@ def transfer_directory(source: Path, destination: Path, num_threads: int = 1, ve
     if not source.exists():
         message = f"Unable to transfer the source directory {source}, as it does not exist."
         console.error(message=message, error=FileNotFoundError)
+
+    # If the number of threads is less than 1, interprets this as a directive to use all available CPU cores.
+    if num_threads < 1:
+        cpu_count = os.cpu_count()
+        if cpu_count is not None:
+            num_threads = cpu_count
+        else:
+            num_threads = 1
 
     # If transfer integrity verification is enabled, but the source directory does not contain the 'ax_checksum.txt'
     # file, checksums the directory before the transfer operation.
@@ -117,3 +128,48 @@ def transfer_directory(source: Path, destination: Path, num_threads: int = 1, ve
             )
             if not destination_checksum == local_checksum.readline().strip():
                 console.error(message=message, error=RuntimeError)
+
+
+def delete_directory(directory_path: Path) -> None:
+    """Removes the input directory and all its subdirectories using parallel processing.
+
+    This function outperforms default approaches like subprocess call with rm -rf and shutil rmtree for directories with
+    a comparably small number of large files. For example, this is the case for the mesoscope frame directories, which
+    are deleted ~6 times faster with this method over sh.rmtree. Potentially, it may also outperform these approaches
+    for all comparatively shallow directories.
+
+    Notes:
+        This function is often combined with the transfer_directory function to remove the source directory after
+        it has been transferred.
+
+    Args:
+        directory_path: The path to the directory to delete.
+    """
+    # Checks if the directory exists and, if not, aborts early
+    if not directory_path.exists():
+        return
+
+    # Builds the list of files and directories inside the input directory using Path
+    files = [p for p in directory_path.iterdir() if p.is_file()]
+    subdirectories = [p for p in directory_path.iterdir() if p.is_dir()]
+
+    # Deletes files in parallel
+    with ThreadPoolExecutor() as executor:
+        list(executor.map(os.unlink, files))  # Forces completion of all tasks
+
+    # Recursively deletes subdirectories
+    for subdir in subdirectories:
+        delete_directory(subdir)
+
+    # Removes the now-empty root directory. Since Windows is sometimes slow to release file handles, adds
+    # an optional delay step to give Windows time to release file handles.
+    max_attempts = 5
+    delay_timer = PrecisionTimer("ms")
+    for attempt in range(max_attempts):
+        # noinspection PyBroadException
+        try:
+            directory_path.rmdir()
+            break  # Breaks early if the call succeeds
+        except Exception:
+            delay_timer.delay_noblock(delay=500, allow_sleep=True)  # For each failed attempt, sleeps for 500 ms
+            continue

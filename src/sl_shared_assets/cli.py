@@ -5,9 +5,130 @@ from pathlib import Path
 import click
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 
-from .tools import resolve_checksum, resolve_p53_marker, generate_project_manifest
-from .server import Server, JupyterJob, TrackerFileNames, ProcessingTracker, generate_server_credentials
-from .data_classes import SessionData
+from .tools import reset_trackers, prepare_session, resolve_checksum, resolve_p53_marker, generate_project_manifest
+from .server import Server, JupyterJob, TrackerFileNames, generate_server_credentials
+
+
+@click.command()
+@click.option(
+    "-sp",
+    "--session_path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=True,
+    help="The absolute path to the session directory for which to verify or create the data checksum.",
+)
+@click.option(
+    "-id",
+    "--manager_id",
+    type=int,
+    required=True,
+    default=0,
+    show_default=True,
+    help="The unique identifier for the process that manages this runtime.",
+)
+@click.option(
+    "-pdr",
+    "--processed_data_root",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=False,
+    help=(
+        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
+        "this command, if it is different from raw session's data location."
+    ),
+)
+@click.option(
+    "-cpd",
+    "--create_processed_directories",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Determines whether to create the processed data hierarchy as part of runtime, if it does not exist.",
+)
+@click.option(
+    "-r",
+    "--recalculate_checksum",
+    is_flag=True,
+    help=(
+        "Determines whether to recalculate and overwrite the checksum stored inside the ax_checksum.txt file of the "
+        "processed session. When the command is called with this flag, it effectively re-checksums the data instead of "
+        "verifying it."
+    ),
+)
+def resolve_session_checksum(
+    session_path: Path,
+    manager_id: int,
+    processed_data_root: Path | None,
+    create_processed_directories: bool,
+    recalculate_checksum: bool,
+) -> None:
+    """Checks the integrity of the target session's 'raw_data' directory or (re)generates the directory checksum.
+
+    This command assumes that the data has been checksummed during acquisition and contains an ax_checksum.txt file
+    that stores the data checksum. It only works with the 'raw_data' session directory and ignores the 'processed_data'
+    and any other directory. If the command is called with the --recalculate_checksum flag, it instead recalculates and
+    overwrites the checksum stored in the ax_checksum.txt file.
+    """
+
+    resolve_checksum(
+        session_path=session_path,
+        manager_id=manager_id,
+        create_processed_data_directory=create_processed_directories,
+        processed_data_root=processed_data_root,
+        regenerate_checksum=recalculate_checksum,
+    )
+
+
+@click.command()
+@click.option(
+    "-sp",
+    "--session_path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=True,
+    help="The absolute path to the session directory for which to reset the processing trackers.",
+)
+@click.option(
+    "-t",
+    "--tracker",
+    type=str,
+    required=False,
+    help=(
+        "The name fo the processing tracker file to reset. Note, the input name must match one of the options "
+        "available from the TrackerFileNames enumeration. If this argument is not provided, the command resets all "
+        "available trackers."
+    ),
+)
+@click.option(
+    "-pdr",
+    "--processed_data_root",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=False,
+    help=(
+        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
+        "this command, if it is different from raw session's data location."
+    ),
+)
+def reset_session_trackers(
+    session_path: Path,
+    tracker: str | None | tuple[TrackerFileNames, ...],
+    processed_data_root: Path | None,
+) -> None:
+    """Resets the requested processing tracker files for the target session to the initial state.
+
+    This command is primarily intended to be used on remote compute servers to recover unexpectedly aborted pipelines.
+    As part of its runtime, it loops over each requested tracker file and uses the ProcessingTracker.abort() method to
+    reset the trackers to pre-pipeline-runtime states.
+    """
+
+    # Resolves the tracker(s) to target and casts to TrackerFileNames enumeration type.
+    if isinstance(tracker, str):
+        tracker = (TrackerFileNames(tracker),)
+
+    # Resets the target trackers
+    reset_trackers(
+        session_path=session_path,
+        trackers=tracker,
+        processed_data_root=processed_data_root,
+    )
 
 
 @click.command()
@@ -25,23 +146,7 @@ from .data_classes import SessionData
     required=True,
     default=0,
     show_default=True,
-    help=(
-        "The xxHash-64 hash value that represents the unique identifier for the process that manages this runtime. "
-        "This is primarily used when calling this CLI on remote compute servers to ensure that only a single process "
-        "can execute the CLI at a time."
-    ),
-)
-@click.option(
-    "-c",
-    "--create_processed_directories",
-    is_flag=True,
-    show_default=True,
-    default=False,
-    help=(
-        "Determines whether to create the processed data hierarchy. This flag should be disabled for most runtimes. "
-        "Primarily, it is used by acquisition systems to generate processed data directories on the remote "
-        "compute servers as part of the data preprocessing pipeline."
-    ),
+    help="The unique identifier for the process that manages this runtime.",
 )
 @click.option(
     "-pdr",
@@ -50,61 +155,50 @@ from .data_classes import SessionData
     required=False,
     help=(
         "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
-        "this command. This argument is used when calling the CLI on the BioHPC server, which uses different data "
-        "volumes for raw and processed data. Note, the input path must point to the root directory, as it will be "
-        "automatically modified to include the project name, the animal id, and the session ID. This argument is only "
-        "used if 'create_processed_directories' flag is True."
+        "this command, if it is different from raw session's data location."
     ),
 )
 @click.option(
-    "-um",
-    "--update_manifest",
+    "-cpd",
+    "--create-processed-directories",
     is_flag=True,
+    show_default=True,
+    default=False,
+    help="Determines whether to create the processed data hierarchy as part of runtime, if it does not exist.",
+)
+@click.option(
+    "-upd",
+    "--unarchive_processed_data",
+    is_flag=True,
+    show_default=True,
+    default=False,
     help=(
-        "Determines whether to (re)generate the manifest file for the processed session's project. This flag "
-        "should always be enabled when this CLI is executed on the remote compute server(s) to ensure that the "
-        "manifest file always reflects the most actual state of each project."
+        "Determines whether to copy the archived processed data folder from the storage (raw data) root to the working "
+        "(processed data) root. This is only performed if archived processed data is available and the raw "
+        "data root is different from the processed data root."
     ),
 )
-def verify_session_integrity(
+def prepare_session_for_processing(
     session_path: Path,
     manager_id: int,
     create_processed_directories: bool,
     processed_data_root: Path | None,
-    update_manifest: bool,
+    unarchive_processed_data: bool,
 ) -> None:
-    """Checks the integrity of the target session's raw data (contents of the raw_data directory).
+    """Prepares the target session data for processing by ensuring that both raw and processed data is stored on the
+    processed data volume of the filesystem.
 
-    This command assumes that the data has been checksummed during acquisition and contains an ax_checksum.txt file
-    that stores the data checksum generated before transferring the data to the long-term storage destination. This
-    function always verified the integrity of the 'raw_data' directory. It does not work with 'processed_data' or any
-    other directories. If the session data was corrupted, the command removes the 'telomere.bin' file, marking the
-    session as 'incomplete' and automatically excluding it from all further automated processing runtimes. If the
-    session data is intact, it generates a 'verified.bin' marker file inside the session's raw_data folder.
-
-    The command is also used by Sun lab data acquisition systems to generate the processed data hierarchy for each
-    processed session. This use case is fully automated and should not be triggered manually by the user.
+    This command is primarily intended to run on remote compute servers that use slow HDD volumes to maximize data
+    integrity and fast NVME volumes to maximize data processing speed. For such systems, moving data to fast volumes
+    before processing results in a measurable processing speed increase.
     """
-    session = Path(session_path)
-    session_data = SessionData.load(session_path=session)
-
-    # Runs the verification process
-    resolve_checksum(
-        session_path=session,
+    prepare_session(
+        session_path=session_path,
         manager_id=manager_id,
-        create_processed_data_directory=create_processed_directories,
+        create_processed_directories=create_processed_directories,
         processed_data_root=processed_data_root,
-        update_manifest=update_manifest,
+        unarchive_processed_data=unarchive_processed_data,
     )
-
-    # Checks the outcome of the verification process
-    tracker = ProcessingTracker(file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.INTEGRITY))
-    if tracker.is_complete:
-        # noinspection PyTypeChecker
-        console.echo(message=f"Session {session.stem} raw data integrity: Verified.", level=LogLevel.SUCCESS)
-    else:
-        # noinspection PyTypeChecker
-        console.echo(message=f"Session {session.stem} raw data integrity: Compromised!", level=LogLevel.ERROR)
 
 
 @click.command()

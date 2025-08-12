@@ -86,8 +86,10 @@ dev = [
 
 # Exports CLIs upon library installation into an environment
 [project.scripts]
-sl-verify-session = "sl_shared_assets.cli:verify_session_integrity"
-sl-project-manifest = "sl_shared_assets.cli:generate_project_manifest_file"
+sl-resolve-checksum = "sl_shared_assets.cli:resolve_session_checksum"
+sl-reset-trackers = "sl_shared_assets.cli:reset_session_trackers"
+sl-prepare-session = "sl_shared_assets.cli:prepare_session_for_processing"
+sl-create-manifest = "sl_shared_assets.cli:generate_project_manifest_file"
 sl-create-server-credentials = "sl_shared_assets.cli:generate_server_credentials_file"
 sl-ascend-tyche = "sl_shared_assets.cli:ascend_tyche_directory"
 sl-start-jupyter = "sl_shared_assets.cli:start_jupyter_server"
