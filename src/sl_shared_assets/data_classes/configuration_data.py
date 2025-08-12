@@ -429,8 +429,8 @@ class MesoscopeSystemConfiguration(YamlConfig):
         if not all(
             isinstance(item, tuple)
             and len(item) == 2
-            and isinstance(item[0], (int, float))
-            and isinstance(item[1], (int, float))
+            and isinstance(item[0], (int | float))
+            and isinstance(item[1], (int | float))
             for item in valve_calibration_data
         ):
             message = (
@@ -537,7 +537,7 @@ def set_system_configuration_file(path: Path) -> None:
     ensure_directory_exists(path)
 
     # Replaces the contents of the configuration_path.txt file with the provided path
-    with open(path_file, "w") as f:
+    with path_file.open("w") as f:
         f.write(str(path))
 
 
@@ -570,7 +570,7 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
         console.error(message=message, error=FileNotFoundError)
 
     # Once the location of the path storage file is resolved, reads the file path from the file
-    with open(path_file, "r") as f:
+    with path_file.open("r") as f:
         configuration_file = Path(f.read().strip())
 
     # If the configuration file does not exist, also aborts with an error

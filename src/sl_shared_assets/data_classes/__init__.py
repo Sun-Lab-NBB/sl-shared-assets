@@ -1,7 +1,6 @@
-"""This package provides the classes used to store data acquired at various stages of the data workflow and to
-configure various pipelines used in the Sun lab. These classes are used across all stages of data acquisition,
-preprocessing, and processing in the lab. Many classes in this package are designed to be saved to disk as .yaml files
-and restored from the .yaml files as needed."""
+"""This package provides the classes used to store data acquired at all stages of the Sun lab data workflow and to
+configure the pipelines used in the workflow. Many classes in this package are designed to be saved to disk as .yaml
+files and restored from the .yaml files as needed."""
 
 from .runtime_data import (
     ZaberPositions,
@@ -17,10 +16,6 @@ from .session_data import (
     SessionData,
     SessionTypes,
     ProcessedData,
-    TrackerFileNames,
-    ProcessingTracker,
-    generate_manager_id,
-    get_processing_tracker,
 )
 from .surgery_data import (
     DrugData,
@@ -45,36 +40,32 @@ from .configuration_data import (
 )
 
 __all__ = [
+    "AcquisitionSystems",
     "DrugData",
-    "ImplantData",
-    "SessionData",
-    "RawData",
-    "ProcessedData",
-    "SubjectData",
-    "SurgeryData",
-    "InjectionData",
-    "ProcedureData",
-    "ZaberPositions",
     "ExperimentState",
-    "MesoscopePositions",
-    "MesoscopeHardwareState",
-    "RunTrainingDescriptor",
+    "ExperimentTrial",
+    "ImplantData",
+    "InjectionData",
     "LickTrainingDescriptor",
+    "MesoscopeAdditionalFirmware",
+    "MesoscopeCameras",
     "MesoscopeExperimentConfiguration",
     "MesoscopeExperimentDescriptor",
-    "MesoscopeSystemConfiguration",
-    "set_system_configuration_file",
-    "get_system_configuration_data",
-    "MesoscopePaths",
-    "MesoscopeCameras",
+    "MesoscopeHardwareState",
     "MesoscopeMicroControllers",
-    "MesoscopeAdditionalFirmware",
-    "ProcessingTracker",
-    "ExperimentTrial",
-    "AcquisitionSystems",
+    "MesoscopePaths",
+    "MesoscopePositions",
+    "MesoscopeSystemConfiguration",
+    "ProcedureData",
+    "ProcessedData",
+    "RawData",
+    "RunTrainingDescriptor",
+    "SessionData",
     "SessionTypes",
+    "SubjectData",
+    "SurgeryData",
     "WindowCheckingDescriptor",
-    "get_processing_tracker",
-    "generate_manager_id",
-    "TrackerFileNames",
+    "ZaberPositions",
+    "get_system_configuration_data",
+    "set_system_configuration_file",
 ]

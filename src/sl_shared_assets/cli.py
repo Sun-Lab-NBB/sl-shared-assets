@@ -5,9 +5,9 @@ from pathlib import Path
 import click
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 
-from .tools import ascend_tyche_data, resolve_p53_marker, verify_session_checksum, generate_project_manifest
-from .server import Server, JupyterJob, generate_server_credentials
-from .data_classes import SessionData, TrackerFileNames, get_processing_tracker
+from .tools import resolve_checksum, resolve_p53_marker, generate_project_manifest
+from .server import Server, JupyterJob, TrackerFileNames, ProcessingTracker, generate_server_credentials
+from .data_classes import SessionData
 
 
 @click.command()
@@ -89,7 +89,7 @@ def verify_session_integrity(
     session_data = SessionData.load(session_path=session)
 
     # Runs the verification process
-    verify_session_checksum(
+    resolve_checksum(
         session_path=session,
         manager_id=manager_id,
         create_processed_data_directory=create_processed_directories,
@@ -98,7 +98,7 @@ def verify_session_integrity(
     )
 
     # Checks the outcome of the verification process
-    tracker = get_processing_tracker(root=session_data.raw_data.raw_data_path, file_name=TrackerFileNames.INTEGRITY)
+    tracker = ProcessingTracker(file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.INTEGRITY))
     if tracker.is_complete:
         # noinspection PyTypeChecker
         console.echo(message=f"Session {session.stem} raw data integrity: Verified.", level=LogLevel.SUCCESS)
@@ -265,27 +265,6 @@ def generate_server_credentials_file(
 
 @click.command()
 @click.option(
-    "-id",
-    "--input_directory",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-    required=True,
-    help="The absolute path to the directory that stores original Tyche animal folders.",
-)
-def ascend_tyche_directory(input_directory: Path) -> None:
-    """Restructures old Tyche project data to use the modern Sun lab data structure and uploads them to the processing
-    server.
-
-    This command is used to convert ('ascend') the old Tyche project data to the modern Sun lab structure. After
-    ascension, the data can be processed and analyzed using all modern Sun lab (sl-) tools and libraries. Note, this
-    process expects the input data to be preprocessed using an old Sun lab mesoscope data preprocessing pipeline. It
-    will not work for any other project or data. Also, this command will only work on a machine (PC) that belongs to a
-    valid Sun lab data acquisition system, such as VRPC of the Mesoscope-VR system.
-    """
-    ascend_tyche_data(root_directory=Path(input_directory))
-
-
-@click.command()
-@click.option(
     "-cp",
     "--credentials_path",
     type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
@@ -425,7 +404,7 @@ def start_jupyter_server(
     # Ensures that the server created as part of this CLI is always terminated when the CLI terminates
     finally:
         # Terminates the server job
-        if job is not None:
+        if isinstance(job, JupyterJob) and not server.job_complete(job):
             server.abort_job(job)
 
         # Closes the server connection if it is still open
