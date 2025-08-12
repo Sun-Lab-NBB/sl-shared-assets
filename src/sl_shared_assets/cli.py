@@ -116,13 +116,6 @@ def verify_session_integrity(
     help="The absolute path to the project directory where raw session data is stored.",
 )
 @click.option(
-    "-od",
-    "--output_directory",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-    required=True,
-    help="The absolute path to the directory where to store the generated project manifest file.",
-)
-@click.option(
     "-pdr",
     "--processed_data_root",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
@@ -136,9 +129,7 @@ def verify_session_integrity(
         "project."
     ),
 )
-def generate_project_manifest_file(
-    project_path: Path, output_directory: Path, processed_data_root: Path | None
-) -> None:
+def generate_project_manifest_file(project_path: Path, processed_data_root: Path | None) -> None:
     """Generates the manifest .feather file that provides information about the data-processing state of all available
     project sessions.
 
@@ -148,7 +139,6 @@ def generate_project_manifest_file(
     """
     generate_project_manifest(
         raw_project_directory=Path(project_path),
-        output_directory=Path(output_directory),
         processed_data_root=Path(processed_data_root) if processed_data_root else None,
     )
     # noinspection PyTypeChecker

@@ -22,9 +22,7 @@ from ..data_classes import (
 from .packaging_tools import calculate_directory_checksum
 
 
-def generate_project_manifest(
-    raw_project_directory: Path, processed_data_root: Path | None = None
-) -> None:
+def generate_project_manifest(raw_project_directory: Path, processed_data_root: Path | None = None) -> None:
     """Builds and saves the project manifest .feather file under the specified output directory.
 
     This function evaluates the input project directory and builds the 'manifest' file for the project. The file
@@ -225,9 +223,7 @@ def generate_project_manifest(
         sorted_df = df.sort(["animal", "session"])
 
         # Saves the generated manifest to the project-specific manifest .feather file for further processing.
-        sorted_df.write_ipc(
-            file=manifest_path, compression="lz4"
-        )
+        sorted_df.write_ipc(file=manifest_path, compression="lz4")
 
 
 def reset_trackers(
