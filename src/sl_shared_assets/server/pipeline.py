@@ -175,6 +175,16 @@ class ProcessingTracker(YamlConfig):
         # Generates the .lock file path for the target tracker .yaml file.
         if self.file_path is not None:
             self._lock_path = str(self.file_path.with_suffix(self.file_path.suffix + ".lock"))
+
+            # Ensures that the input processing tracker file name is supported.
+            if self.file_path.name not in tuple(TrackerFileNames):
+                message = (
+                    f"Unsupported processing tracker file encountered when instantiating a ProcessingTracker "
+                    f"instance: {self.file_path}. Currently, only the following tracker file names are "
+                    f"supported: {', '.join(tuple(TrackerFileNames))}."
+                )
+                console.error(message=message, error=ValueError)
+
         else:
             self._lock_path = ""
 
@@ -441,6 +451,16 @@ class ProcessingPipeline:
 
     def __post_init__(self) -> None:
         """Carries out the necessary filesystem setup tasks to support pipeline execution."""
+
+        # Ensures that the input processing tracker file name is supported.
+        if self.pipeline_type not in tuple(ProcessingPipelines):
+            message = (
+                f"Unsupported processing pipeline type encountered when instantiating a ProcessingPipeline "
+                f"instance: {self.pipeline_type}. Currently, only the following pipeline types are "
+                f"supported: {', '.join(tuple(ProcessingPipelines))}."
+            )
+            console.error(message=message, error=ValueError)
+
         ensure_directory_exists(self.local_tracker_path)  # Ensures that the local temporary directory exists
 
     def runtime_cycle(self) -> None:
