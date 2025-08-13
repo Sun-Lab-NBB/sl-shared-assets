@@ -39,15 +39,16 @@ def compose_processing_pipeline(
     """Generates and returns the ProcessingPipeline instance used to execute the requested pipeline for the target
     session on the specified remote compute server.
 
-    This function composes the processing pipeline and packages it into the ProcessingPipeline. As part of this process,
-    it resolves the necessary local and remote filesystem paths and generates the Job instances for all jobs making up
-    the pipeline.
+    This function composes the processing pipeline execution graph and packages it into the ProcessingPipeline instance.
+    As part of this process, it resolves the necessary local and remote filesystem paths and generates the Job
+    instances for all jobs making up the pipeline.
 
     Notes:
         This function does not start executing the pipeline. Instead, the pipeline starts executing the first time
         the manager process calls its runtime_cycle() method.
 
     Args:
+        pipeline: The ProcessingPipelines enumeration value specifying the target pipeline to compose.
         project: The name of the project for which to compose the processing pipeline.
         animal: The ID of the animal for which to compose the processing pipeline.
         session: The ID of the session to process with the processing pipeline.
@@ -58,22 +59,22 @@ def compose_processing_pipeline(
         keep_job_logs: Determines whether to keep the logs for completed pipeline jobs on the server or (default)
             remove them after runtime. If any job of the pipeline fails, the logs for all jobs are kept regardless of
             this argument.
+        recalculate_checksum: Only for integrity verification pipelines. Determines whether to verify the checksum
+            integrity (if false) or whether to recalculate and overwrite the checksum stored in the ax_checksum.txt file
+            (if true).
 
     Returns:
-        The ProcessingPipeline instance configured to execute and manage the behavior processing pipeline on the
-        server if the session can be processed with this pipeline. None, if the session is excluded from processing
-        for any reason.
+        The ProcessingPipeline instance configured to execute and manage the target processing pipeline on the remote
+        server.
     """
-
-    # Otherwise, constructs the session processing pipeline and returns it to caller. Behavior processing pipeline is
-    # executed as a single job, so it does not require an extensive setup process (unlike the suite2p pipeline).
-
     # Parses the paths to the shared Sun lab directories used to store raw session data on the remote server.
     remote_session_path = Path(server.processed_data_root).joinpath(project, animal, session)
 
     # Precreates the dictionary for storing job instances and their working directories
     jobs: dict[int, tuple[tuple[Job, Path], ...]] = {}
     stage = 1  # This is used to iteratively fill processing stage data for multi-stage pipelines.
+    # This is used to store the Tracker file name for the constructed pipeline once it is resolved below
+    tracker: TrackerFileNames
 
     # Integrity verification pipeline
     if pipeline == ProcessingPipelines.INTEGRITY:
@@ -91,18 +92,18 @@ def compose_processing_pipeline(
         )
         if recalculate_checksum:
             job.add_command(
-                f"sl-verify-session -sp {remote_session_path} -id {manager_id} -cpd "
-                f"-pdr {server.processed_data_root} -um -r"
+                f"sl-resolve-checksum -sp {remote_session_path} -pdr {server.processed_data_root} -id {manager_id} -r"
             )
         else:
             job.add_command(
-                f"sl-verify-session -sp {remote_session_path} -id {manager_id} -cpd "
-                f"-pdr {server.processed_data_root} -um"
+                f"sl-resolve-checksum -sp {remote_session_path} -pdr {server.processed_data_root} -id {manager_id}"
             )
         jobs[stage] = ((job, working_directory),)
+        tracker = TrackerFileNames.INTEGRITY
 
+    # Processing preparation pipeline
     elif pipeline == ProcessingPipelines.PREPARATION:
-        job_name = f"{session}_raw_data_preparation"
+        job_name = f"{session}_processing_preparation"
         working_directory = _get_remote_job_work_directory(server=server, job_name=job_name)
         job = Job(
             job_name=job_name,
@@ -114,8 +115,15 @@ def compose_processing_pipeline(
             ram_gb=10,
             time_limit=30,
         )
+        job.add_command(
+            f"sl-prepare-session -sp {remote_session_path} -pdr {server.processed_data_root} -id {manager_id}"
+        )
+        jobs[stage] = ((job, working_directory),)
+        tracker = TrackerFileNames.PREPARATION
 
-        job_name = f"{session}_processed_data_preparation"
+    # Archiving pipeline
+    elif pipeline == ProcessingPipelines.ARCHIVE:
+        job_name = f"{session}_archiving"
         working_directory = _get_remote_job_work_directory(server=server, job_name=job_name)
         job = Job(
             job_name=job_name,
@@ -127,6 +135,11 @@ def compose_processing_pipeline(
             ram_gb=10,
             time_limit=30,
         )
+        job.add_command(
+            f"sl-archive-session -sp {remote_session_path} -pdr {server.processed_data_root} -id {manager_id}"
+        )
+        jobs[stage] = ((job, working_directory),)
+        tracker = TrackerFileNames.ARCHIVE
 
     # Behavior processing pipeline
     elif pipeline == ProcessingPipelines.BEHAVIOR:
@@ -143,21 +156,28 @@ def compose_processing_pipeline(
             time_limit=180,
         )
         job.add_command(f"sl-process-behavior -sp {remote_session_path!s} -um")
+        jobs[stage] = ((job, working_directory),)
+        tracker = TrackerFileNames.BEHAVIOR
+
+    else:
+        message = (
+            f"Unsupported pipeline {pipeline} encountered when attempting to construct a ProcessingPipeline instance. "
+            f"Currently, only the following pipelines listed in the ProcessingPipelines enumeration are supported: "
+            f"{', '.join(tuple(ProcessingPipelines))}."
+        )
+        console.error(message=message, error=ValueError)
+        raise ValueError(message)  # Fallback to appease mypy, should not be reachable
 
     # Resolves paths to pipeline tracker files.
-    remote_tracker_path = Path(server.processed_data_root).joinpath(
-        project, animal, session, "processed_data", TrackerFileNames.BEHAVIOR
-    )
-    local_tracker_path = local_working_directory.joinpath(
-        project, f"{session}_behavior_processing", TrackerFileNames.BEHAVIOR
-    )
+    remote_tracker_path = Path(server.raw_data_root).joinpath(project, animal, session, "raw_data", tracker)
+    local_tracker_path = local_working_directory.joinpath(tracker)
 
     # Packages job data into a ProcessingPipeline object and returns it to the caller.
     processing_pipeline = ProcessingPipeline(
-        jobs={1: ((job, working_directory),)},
+        jobs=jobs,
         server=server,
         manager_id=manager_id,
-        pipeline_type=ProcessingPipelines.BEHAVIOR,
+        pipeline_type=pipeline,
         remote_tracker_path=remote_tracker_path,
         local_tracker_path=local_tracker_path,
         session=session,
