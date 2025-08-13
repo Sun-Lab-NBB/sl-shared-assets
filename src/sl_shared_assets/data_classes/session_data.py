@@ -132,6 +132,15 @@ class RawData:
     runtime initialization. Since runtime initialization is a complex process that may encounter a runtime error, the 
     marker is used to discover sessions that failed to initialize. Since uninitialized sessions by definition do not 
     contain any valuable data, they are marked for immediate deletion from all managed destinations."""
+    root_path: Path = Path()
+    """Stores the path to the root directory of the volume that stores raw data from all Sun lab projects. Primarily,
+    this is necessary for pipelines working with the data on the remote compute server to efficiently move it between 
+    storage and working (processing) volumes."""
+    processed_data_path: Path = Path()
+    """Stores the path to the processed_data directory archived to the raw data volume. Archiving is a procedure only 
+    carried out on remote compute servers, which consists of moving the processed_data folder from the fast working 
+    volume to the slow storage volume. Typically, this is done for the 'cool' data that is no longer frequently 
+    accessed."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -162,6 +171,11 @@ class RawData:
         self.telomere_path = self.raw_data_path.joinpath("telomere.bin")
         self.ubiquitin_path = self.raw_data_path.joinpath("ubiquitin.bin")
         self.nk_path = self.raw_data_path.joinpath("nk.bin")
+
+        # Infers the path to the root raw data directory under which the session's project is stored. This assumes that
+        # the raw_data directory is found under root/project/animal/session_id/raw_data
+        self.root_path = root_directory_path.parents[3]
+        self.processed_data_path = root_directory_path.parent.joinpath("processed_data")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories.
@@ -203,6 +217,10 @@ class ProcessedData:
     into any dataset, as it may be actively worked on by processing pipelines. Conversely, if the marker exists, 
     processing pipelines are not allowed to work with the session, as it may be actively integrated into one or more 
     datasets."""
+    root_path: Path = Path()
+    """Stores the path to the root directory of the volume that stores processed data from all Sun lab projects. 
+    Primarily, this is necessary for pipelines working with the data on the remote compute server to efficiently move it
+    between storage and working (processing) volumes."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -220,6 +238,10 @@ class ProcessedData:
         self.mesoscope_data_path = self.processed_data_path.joinpath("mesoscope_data")
         self.behavior_data_path = self.processed_data_path.joinpath("behavior_data")
         self.p53_path = self.processed_data_path.joinpath("p53.bin")
+
+        # Infers the path to the root processed data directory under which the session's project is stored. This
+        # assumes that the processed_data directory is found under root/project/animal/session_id/processed_data
+        self.root_path = root_directory_path.parents[3]
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories.
@@ -280,14 +302,23 @@ class SessionData(YamlConfig):
     """Stores absolute paths to all directories and files that jointly make the session's processed data hierarchy. 
     Typically, this hierarchy is only used on the lab's processing server(s), but it can also be used to run local 
     testing on end-user machines."""
+    source_data: RawData = field(default_factory=lambda: RawData())
+    """This is the same as the raw_data field, but with all data and paths resolved relative to the processed_data 
+    root. On systems that use the same root for processed and raw data, the source and raw directories are identical. 
+    On systems that use different root directories for processed and raw data, the source and raw directories are 
+    different. This is used to optimize data processing ont he remote compute server by temporarily copying all session 
+    data to the fast processed data volume."""
 
     def __post_init__(self) -> None:
-        """Ensures raw_data and processed_data are always instances of RawData and ProcessedData."""
+        """Ensures raw_data, processed_data, and source_data are always instances of RawData and ProcessedData."""
         if not isinstance(self.raw_data, RawData):
             self.raw_data = RawData()
 
         if not isinstance(self.processed_data, ProcessedData):
             self.processed_data = ProcessedData()
+
+        if not isinstance(self.source_data, RawData):
+            self.raw_data = RawData()
 
     @classmethod
     def create(
@@ -392,6 +423,11 @@ class SessionData(YamlConfig):
         processed_data = ProcessedData()
         processed_data.resolve_paths(root_directory_path=session_path.joinpath("processed_data"))
 
+        # Added in version 5.0.0. While source data is not used when the session is created (and is set to the same
+        # directory as raw_data), it is created here for completeness.
+        source_data = RawData()
+        source_data.resolve_paths(root_directory_path=session_path.joinpath("raw_data"))
+
         # Packages the sections generated above into a SessionData instance
         # noinspection PyArgumentList
         instance = SessionData(
@@ -401,6 +437,7 @@ class SessionData(YamlConfig):
             session_type=session_type,
             acquisition_system=acquisition_system.name,
             raw_data=raw_data,
+            source_data=source_data,
             processed_data=processed_data,
             experiment_name=experiment_name,
             python_version=python_version,
@@ -437,7 +474,6 @@ class SessionData(YamlConfig):
         cls,
         session_path: Path,
         processed_data_root: Path | None = None,
-        make_processed_data_directory: bool = False,
     ) -> "SessionData":
         """Loads the SessionData instance from the target session's session_data.yaml file.
 
@@ -455,55 +491,65 @@ class SessionData(YamlConfig):
                 provide the path to the root project directory (directory that stores all Sun lab projects) on that
                 drive. The method will automatically resolve the project/animal/session/processed_data hierarchy using
                 this root path. If raw and processed data are kept on the same drive, keep this set to None.
-            make_processed_data_directory: Determines whether this method should create the processed_data directory if
-                it does not exist.
 
         Returns:
             An initialized SessionData instance for the session whose data is stored at the provided path.
 
         Raises:
-            FileNotFoundError: If the 'session_data.yaml' file is not found under the session_path/raw_data/ subfolder.
+            FileNotFoundError: If multiple or no 'session_data.yaml' file instances are found under the input session
+                path directory.
 
         """
-        # To properly initialize the SessionData instance, the provided path should contain the raw_data directory
-        # with the session_data.yaml file.
-        session_data_path = session_path.joinpath("raw_data", "session_data.yaml")
-        if not session_data_path.exists():
+        # To properly initialize the SessionData instance, the provided path should contain a single session_data.yaml
+        # file at any hierarchy level.
+        session_data_files = [file for file in session_path.rglob("*session_data.yaml")]
+        if len(session_data_files) != 1:
             message = (
-                f"Unable to load the SessionData class for the target session: {session_path.stem}. No "
-                f"session_data.yaml file was found inside the raw_data folder of the session. This likely "
-                f"indicates that the session runtime was interrupted before recording any data, or that the "
-                f"session path does not point to a valid session."
+                f"Unable to load the SessionData class for the target session. Expected a single session_data.yaml "
+                f"file to be located under the directory tree specified by the input path: {session_path}. Instead, "
+                f"encountered {len(session_data_files)} candidate files. This indicates that the input path does not "
+                f"point to a valid session directory."
             )
             console.error(message=message, error=FileNotFoundError)
 
-        # Loads class data from the .yaml file
+        # If a single candidate is found (as expected), extracts it from the list and uses it to resolve the
+        # session data hierarchy.
+        session_data_path = session_data_files.pop()
+
+        # Loads class data from the.yaml file
         instance: SessionData = cls.from_yaml(file_path=session_data_path)  # type: ignore
 
         # The method assumes that the 'donor' .yaml file is always stored inside the raw_data directory of the session
-        # to be processed. Since the directory itself might have moved (between or even within the same PC) relative to
-        # where it was when the SessionData snapshot was generated, reconfigures the paths to all raw_data files using
-        # the root from above.
-        local_root = session_path.parents[2]
-
-        # RAW DATA
-        new_root = local_root.joinpath(instance.project_name, instance.animal_id, instance.session_name, "raw_data")
-        instance.raw_data.resolve_paths(root_directory_path=new_root)
+        # to be processed. In turn, that directory is expected to be found under the path root/project/animal/session.
+        # The code below uses this heuristic to discover the raw data root based on the session data file path.
+        local_root = session_data_path.parents[4]  # Raw data root session directory
 
         # Unless a different root is provided for processed data, it uses the same root as raw_data.
         if processed_data_root is None:
             processed_data_root = local_root
 
-        # Regenerates the processed_data path depending on the root resolution above
+        # RAW DATA
+        instance.raw_data.resolve_paths(
+            root_directory_path=local_root.joinpath(
+                instance.project_name, instance.animal_id, instance.session_name, "raw_data"
+            )
+        )
+
+        # PROCESSED DATA
         instance.processed_data.resolve_paths(
             root_directory_path=processed_data_root.joinpath(
                 instance.project_name, instance.animal_id, instance.session_name, "processed_data"
             )
         )
+        instance.processed_data.make_directories()  # Ensures processed data directories exist
 
-        # Generates processed data directories if requested and necessary
-        if make_processed_data_directory:
-            instance.processed_data.make_directories()
+        # SOURCE DATA
+        instance.source_data.resolve_paths(
+            root_directory_path=processed_data_root.joinpath(
+                instance.project_name, instance.animal_id, instance.session_name, "raw_data"
+            )
+        )
+        # Note, since source data is populated as part of the 'preparation' runtime, does not make the directories.
 
         # Returns the initialized SessionData instance to caller
         return instance
@@ -534,6 +580,7 @@ class SessionData(YamlConfig):
         # prevents the SessionData instance from being loaded from the disk.
         origin.raw_data = None  # type: ignore
         origin.processed_data = None  # type: ignore
+        origin.source_data = None  # type: ignore
 
         # Converts StringEnum instances to strings
         origin.session_type = str(origin.session_type)

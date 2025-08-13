@@ -5,7 +5,14 @@ from pathlib import Path
 import click
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 
-from .tools import reset_trackers, prepare_session, resolve_checksum, resolve_p53_marker, generate_project_manifest
+from .tools import (
+    reset_trackers,
+    archive_session,
+    prepare_session,
+    resolve_checksum,
+    resolve_p53_marker,
+    generate_project_manifest,
+)
 from .server import Server, JupyterJob, TrackerFileNames, generate_server_credentials
 
 
@@ -18,15 +25,6 @@ from .server import Server, JupyterJob, TrackerFileNames, generate_server_creden
     help="The absolute path to the session directory for which to verify or create the data checksum.",
 )
 @click.option(
-    "-id",
-    "--manager_id",
-    type=int,
-    required=True,
-    default=0,
-    show_default=True,
-    help="The unique identifier for the process that manages this runtime.",
-)
-@click.option(
     "-pdr",
     "--processed_data_root",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
@@ -37,12 +35,13 @@ from .server import Server, JupyterJob, TrackerFileNames, generate_server_creden
     ),
 )
 @click.option(
-    "-cpd",
-    "--create_processed_directories",
-    is_flag=True,
+    "-id",
+    "--manager_id",
+    type=int,
+    required=True,
+    default=0,
     show_default=True,
-    default=False,
-    help="Determines whether to create the processed data hierarchy as part of runtime, if it does not exist.",
+    help="The unique identifier for the process that manages this runtime.",
 )
 @click.option(
     "-r",
@@ -58,7 +57,6 @@ def resolve_session_checksum(
     session_path: Path,
     manager_id: int,
     processed_data_root: Path | None,
-    create_processed_directories: bool,
     recalculate_checksum: bool,
 ) -> None:
     """Checks the integrity of the target session's 'raw_data' directory or (re)generates the directory checksum.
@@ -72,7 +70,6 @@ def resolve_session_checksum(
     resolve_checksum(
         session_path=session_path,
         manager_id=manager_id,
-        create_processed_data_directory=create_processed_directories,
         processed_data_root=processed_data_root,
         regenerate_checksum=recalculate_checksum,
     )
@@ -87,6 +84,16 @@ def resolve_session_checksum(
     help="The absolute path to the session directory for which to reset the processing trackers.",
 )
 @click.option(
+    "-pdr",
+    "--processed_data_root",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=False,
+    help=(
+        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
+        "this command, if it is different from raw session's data location."
+    ),
+)
+@click.option(
     "-t",
     "--tracker",
     type=str,
@@ -95,16 +102,6 @@ def resolve_session_checksum(
         "The name fo the processing tracker file to reset. Note, the input name must match one of the options "
         "available from the TrackerFileNames enumeration. If this argument is not provided, the command resets all "
         "available trackers."
-    ),
-)
-@click.option(
-    "-pdr",
-    "--processed_data_root",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-    required=False,
-    help=(
-        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
-        "this command, if it is different from raw session's data location."
     ),
 )
 def reset_session_trackers(
@@ -140,6 +137,16 @@ def reset_session_trackers(
     help="The absolute path to the session directory whose raw data needs to be verified for potential corruption.",
 )
 @click.option(
+    "-pdr",
+    "--processed_data_root",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=False,
+    help=(
+        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
+        "this command, if it is different from raw session's data location."
+    ),
+)
+@click.option(
     "-id",
     "--manager_id",
     type=int,
@@ -147,6 +154,33 @@ def reset_session_trackers(
     default=0,
     show_default=True,
     help="The unique identifier for the process that manages this runtime.",
+)
+def prepare_session_for_processing(
+    session_path: Path,
+    manager_id: int,
+    processed_data_root: Path | None,
+) -> None:
+    """Prepares the target session data for processing by ensuring that both raw and processed data is stored on the
+    processed data volume (fast drive) of the filesystem.
+
+    This command is primarily intended to run on remote compute servers that use slow HDD volumes to maximize data
+    integrity and fast NVME volumes to maximize data processing speed. For such systems, moving data to fast volumes
+    before processing results in a measurable processing speed increase.
+    """
+    prepare_session(
+        session_path=session_path,
+        manager_id=manager_id,
+        processed_data_root=processed_data_root,
+    )
+
+
+@click.command()
+@click.option(
+    "-sp",
+    "--session_path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=True,
+    help="The absolute path to the session directory whose raw data needs to be verified for potential corruption.",
 )
 @click.option(
     "-pdr",
@@ -159,45 +193,30 @@ def reset_session_trackers(
     ),
 )
 @click.option(
-    "-cpd",
-    "--create-processed-directories",
-    is_flag=True,
+    "-id",
+    "--manager_id",
+    type=int,
+    required=True,
+    default=0,
     show_default=True,
-    default=False,
-    help="Determines whether to create the processed data hierarchy as part of runtime, if it does not exist.",
+    help="The unique identifier for the process that manages this runtime.",
 )
-@click.option(
-    "-upd",
-    "--unarchive_processed_data",
-    is_flag=True,
-    show_default=True,
-    default=False,
-    help=(
-        "Determines whether to copy the archived processed data folder from the storage (raw data) root to the working "
-        "(processed data) root. This is only performed if archived processed data is available and the raw "
-        "data root is different from the processed data root."
-    ),
-)
-def prepare_session_for_processing(
+def archive_session_for_storage(
     session_path: Path,
     manager_id: int,
-    create_processed_directories: bool,
     processed_data_root: Path | None,
-    unarchive_processed_data: bool,
 ) -> None:
-    """Prepares the target session data for processing by ensuring that both raw and processed data is stored on the
-    processed data volume of the filesystem.
+    """Prepares the target session data for long-term storage by ensuring that both raw and processed data is stored
+    only on the raw data (slow drive) volume.
 
     This command is primarily intended to run on remote compute servers that use slow HDD volumes to maximize data
-    integrity and fast NVME volumes to maximize data processing speed. For such systems, moving data to fast volumes
-    before processing results in a measurable processing speed increase.
+    integrity and fast NVME volumes to maximize data processing speed. For such systems, all sessions that are no longer
+    actively processed or analyzed should be moved to the slow drive volume for long-term storage.
     """
-    prepare_session(
+    archive_session(
         session_path=session_path,
         manager_id=manager_id,
-        create_processed_directories=create_processed_directories,
         processed_data_root=processed_data_root,
-        unarchive_processed_data=unarchive_processed_data,
     )
 
 
@@ -233,7 +252,7 @@ def generate_project_manifest_file(project_path: Path, processed_data_root: Path
     """
     generate_project_manifest(
         raw_project_directory=Path(project_path),
-        processed_data_root=Path(processed_data_root) if processed_data_root else None,
+        processed_data_root=processed_data_root,
     )
     # noinspection PyTypeChecker
     console.echo(message=f"Project {Path(project_path).stem} data manifest file: generated.", level=LogLevel.SUCCESS)
@@ -504,14 +523,6 @@ def start_jupyter_server(
     help="The absolute path to the session directory for which to resolve the dataset integration readiness marker.",
 )
 @click.option(
-    "-c",
-    "--create_processed_directories",
-    is_flag=True,
-    show_default=True,
-    default=False,
-    help="Determines whether to create the processed data hierarchy. This flag should be disabled for most runtimes.",
-)
-@click.option(
     "-pdr",
     "--processed_data_root",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
@@ -531,22 +542,10 @@ def start_jupyter_server(
     default=False,
     help="Determines whether the command should create or remove the dataset integration marker.",
 )
-@click.option(
-    "-um",
-    "--update_manifest",
-    is_flag=True,
-    help=(
-        "Determines whether to (re)generate the manifest file for the processed session's project. This flag "
-        "should always be enabled when this CLI is executed on the remote compute server(s) to ensure that the "
-        "manifest file always reflects the most actual state of each project."
-    ),
-)
 def resolve_dataset_marker(
     session_path: Path,
-    create_processed_directories: bool,
     processed_data_root: Path | None,
     remove: bool,
-    update_manifest: bool,
 ) -> None:
     """Depending on configuration, either creates or removes the p53.bin marker from the target session.
 
@@ -557,8 +556,6 @@ def resolve_dataset_marker(
     """
     resolve_p53_marker(
         session_path=session_path,
-        create_processed_data_directory=create_processed_directories,
         processed_data_root=processed_data_root,
         remove=remove,
-        update_manifest=update_manifest,
     )

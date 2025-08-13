@@ -64,12 +64,17 @@ def generate_project_manifest(raw_project_directory: Path, processed_data_root: 
         "animal": [],  # Animal IDs.
         "session": [],  # Session names.
         "date": [],  # Session names stored as timezone-aware date-time objects in EST.
-        "type": [],  # Type of the session (e.g., Experiment, Training, etc.).
+        "type": [],  # Type of the session (e.g., mesoscope experiment, run training, etc.).
+        "system": [],  # Acquisition system used to acquire the session (e.g. mesoscope-vr, etc.).
         "notes": [],  # The experimenter notes about the session.
         # Determines whether the session data is complete (ran for the intended duration and has all expected data).
         "complete": [],
         # Determines whether the session data integrity has been verified upon transfer to a storage machine.
         "integrity": [],
+        # Determines whether the session's data has been prepared for data processing.
+        "prepared": [],
+        # Determines whether the session's data has been archived for long-term storage.
+        "archived": [],
         "suite2p": [],  # Determines whether the session has been processed with the single-day s2p pipeline.
         # Determines whether the session has been processed with the behavior extraction pipeline.
         "behavior": [],
@@ -95,7 +100,6 @@ def generate_project_manifest(raw_project_directory: Path, processed_data_root: 
             session_data = SessionData.load(
                 session_path=directory,
                 processed_data_root=processed_data_root,
-                make_processed_data_directory=False,
             )
 
             # Fills the manifest dictionary with data for the processed session:
@@ -104,6 +108,7 @@ def generate_project_manifest(raw_project_directory: Path, processed_data_root: 
             manifest["animal"].append(session_data.animal_id)
             manifest["session"].append(session_data.session_name)
             manifest["type"].append(session_data.session_type)
+            manifest["system"].append(session_data.acquisition_system)
 
             # Parses session name into the date-time object to simplify working with date-time data in the future
             date_time_components = session_data.session_name.split("-")
@@ -170,6 +175,8 @@ def generate_project_manifest(raw_project_directory: Path, processed_data_root: 
                 manifest["dataset"].append(False)
                 manifest["behavior"].append(False)
                 manifest["video"].append(False)
+                manifest["prepared"].append(False)
+                manifest["archived"].append(False)
                 continue  # Cycles to the next session
 
             # Suite2p (single-day) processing status.
@@ -190,6 +197,16 @@ def generate_project_manifest(raw_project_directory: Path, processed_data_root: 
             )
             manifest["video"].append(tracker.is_complete)
 
+            # Preparation and Archiving status
+            tracker = ProcessingTracker(
+                file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.PREPARATION)
+            )
+            manifest["prepared"].append(tracker.is_complete)
+            tracker = ProcessingTracker(
+                file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.ARCHIVE)
+            )
+            manifest["archived"].append(tracker.is_complete)
+
             # Tracks whether the session's data is currently in the processing or dataset integration mode.
             manifest["dataset"].append(session_data.processed_data.p53_path.exists())
 
@@ -209,9 +226,12 @@ def generate_project_manifest(raw_project_directory: Path, processed_data_root: 
             "date": pl.Datetime,
             "session": pl.String,
             "type": pl.String,
+            "system": pl.String,
             "notes": pl.String,
             "complete": pl.UInt8,
             "integrity": pl.UInt8,
+            "prepared": pl.UInt8,
+            "archived": pl.UInt8,
             "suite2p": pl.UInt8,
             "dataset": pl.UInt8,
             "behavior": pl.UInt8,
@@ -231,7 +251,6 @@ def resolve_checksum(
     session_path: Path,
     manager_id: int,
     regenerate_checksum: bool = False,
-    create_processed_data_directory: bool = True,
     processed_data_root: None | Path = None,
 ) -> None:
     """Verifies the integrity of the session's data by generating the checksum of the raw_data directory and comparing
@@ -255,7 +274,6 @@ def resolve_checksum(
         regenerate_checksum: Determines whether to update the checksum stored in the ax_checksum.txt file before
             carrying out the verification. In this case, the verification necessarily succeeds and the session's
             reference checksum is changed to reflect the current state of the session data.
-        create_processed_data_directory: Determines whether to create the processed data hierarchy during runtime.
         processed_data_root: The path to the root directory used to store the processed data from all Sun lab projects,
             if different from the session data root.
     """
@@ -264,7 +282,6 @@ def resolve_checksum(
     session_data = SessionData.load(
         session_path=session_path,
         processed_data_root=processed_data_root,
-        make_processed_data_directory=create_processed_data_directory,
     )
 
     # Initializes the ProcessingTracker instance for the verification tracker file
@@ -312,7 +329,7 @@ def resolve_checksum(
 
         # Updates or generates the manifest file inside the root raw data project directory
         generate_project_manifest(
-            raw_project_directory=session_path.parents[1],
+            raw_project_directory=session_data.raw_data.root_path.joinpath(session_data.project_name),
             processed_data_root=processed_data_root,
         )
 
@@ -345,7 +362,6 @@ def reset_trackers(
     session_data = SessionData.load(
         session_path=session_path,
         processed_data_root=processed_data_root,
-        make_processed_data_directory=False,
     )
 
     console.echo(
@@ -382,7 +398,7 @@ def reset_trackers(
 
     # Updates or generates the manifest file inside the root raw data project directory
     generate_project_manifest(
-        raw_project_directory=session_path.parents[1],
+        raw_project_directory=session_data.raw_data.root_path.joinpath(session_data.project_name),
         processed_data_root=processed_data_root,
     )
 
@@ -390,9 +406,7 @@ def reset_trackers(
 def prepare_session(
     session_path: Path,
     manager_id: int,
-    create_processed_directories: bool,
     processed_data_root: Path | None,
-    unarchive_processed_data: bool,
 ) -> None:
     """Prepares the target session for processing.
 
@@ -401,85 +415,181 @@ def prepare_session(
     volume before executing processing pipelines. In addition to copying the raw data, depending on configuration, this
     function also moves (archived) processed data and resets the requested processing pipeline trackers for the managed
     session.
+
+    Notes:
+        This function inverses the result of running the archive_session() function.
     """
     # Resolves the data hierarchy for the processed session
     session_data = SessionData.load(
         session_path=session_path,
-        make_processed_data_directory=create_processed_directories,
         processed_data_root=processed_data_root,
     )
 
-    # Initializes the ProcessingTracker instance for the preparation tracker file
-    tracker = ProcessingTracker(file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.PREPARATION))
+    # Initializes the ProcessingTracker instances for the archiving and preparation pipelines (which are in essence the
+    # inverses of each-other).
+    archive_tracker = ProcessingTracker(
+        file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.ARCHIVE)
+    )
+    preparation_tracker = ProcessingTracker(
+        file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.PREPARATION)
+    )
 
     # Updates the tracker data to communicate that the preparation process has started. This automatically clears
     # the previous 'completed' status.
-    tracker.start(manager_id=manager_id)
+    preparation_tracker.start(manager_id=manager_id)
     try:
         console.echo(
             message=f"Preparing session '{session_data.session_name}' for data processing...", level=LogLevel.INFO
         )
 
-        # Infers the raw_data root from the resolved session path
-        raw_data_root = session_path.parents[2]
-
-        # If the processed data root is provided and is different from the raw data root, copies the raw_data directory
-        # to the processed data root.
-        if processed_data_root is not None and raw_data_root != processed_data_root:
-            console.echo(message=f"Transferring raw data directory to the processed data root...", level=LogLevel.INFO)
+        # If the processed data root is different from the raw data root, copies the raw_data directory to the
+        # session's source_data directory (a copy of raw_data stored on the processed_data volume)
+        if session_data.raw_data.root_path != session_data.processed_data.root_path:
+            console.echo(
+                message=f"Transferring the 'raw_data' directory to the processed data root...", level=LogLevel.INFO
+            )
             transfer_directory(
                 source=session_data.raw_data.raw_data_path,
-                destination=session_data.processed_data.processed_data_path.parent.joinpath("raw_data"),
+                destination=session_data.source_data.raw_data_path,
                 num_threads=0,
                 verify_integrity=False,
             )
 
-            # If the function is configured to unarchive the processed data folder and has an archived processed_data
-            # folder, copies it to the processed_data hierarchy.
-            archive_tracker = ProcessingTracker(
-                file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.ARCHIVE)
-            )
-            if (
-                unarchive_processed_data
-                and archive_tracker.is_complete
-                and session_path.joinpath("processed_data").exists()
-            ):
+            # If the session contains archived processed data, replaced the contents of the 'processed_data' folder
+            # on the processed data volume with the contents of the 'processed_data' folder on the raw data (storage)
+            # volume.
+            if archive_tracker.is_complete and session_data.raw_data.processed_data_path.exists():
                 console.echo(
-                    message=f"Transferring teh archived processed data directory to the processed data root...",
+                    message=f"Transferring the archived 'processed_data' directory to the processed data root...",
                     level=LogLevel.INFO,
                 )
                 transfer_directory(
-                    source=session_path.joinpath("processed_data"),
+                    source=session_data.raw_data.processed_data_path,
                     destination=session_data.processed_data.processed_data_path,
                     num_threads=0,
                     verify_integrity=False,
                 )
 
-                # Removes the transferred directory to ensure that the data transfer can only occur once until the
-                # processed data is archived again.
+                # Removes the transferred directory to ensure only a single copy of the 'processed_data' directory
+                # exists on the processing machine. While not strictly necessary, this is a good error-preventing
+                # practice.
                 console.echo(
-                    message=f"Removing the archived processed data directory following the successful transfer...",
+                    message=f"Removing the now-redundant archived 'processed_data' directory...",
                     level=LogLevel.INFO,
                 )
                 delete_directory(session_path.joinpath("processed_data"))
 
         # Preparation is complete
-        tracker.stop(manager_id=manager_id)
-        console.echo(message=f"Session '{session_data.session_name}': Prepared for processing.", level=LogLevel.SUCCESS)
+        preparation_tracker.stop(manager_id=manager_id)
+        # Clears the archiving tracker state to properly reflect that the session is no longer archived
+        archive_tracker.abort()
+        console.echo(
+            message=f"Session '{session_data.session_name}': Prepared for data processing.", level=LogLevel.SUCCESS
+        )
 
     finally:
         # If the code reaches this section while the tracker indicates that the processing is still running,
         # this means that the runtime encountered an error.
-        if tracker.is_running:
-            tracker.error(manager_id=manager_id)
+        if preparation_tracker.is_running:
+            preparation_tracker.error(manager_id=manager_id)
+
+        # Updates or generates the manifest file inside the root raw data project directory
+        generate_project_manifest(
+            raw_project_directory=session_data.raw_data.root_path.joinpath(session_data.project_name),
+            processed_data_root=processed_data_root,
+        )
+
+
+def archive_session(
+    session_path: Path,
+    manager_id: int,
+    processed_data_root: Path | None = None,
+) -> None:
+    """Prepares the target session for long-term storage.
+
+    This function is primarily designed to be used on remote compute servers that use different data volumes for
+    storage and processing. It should be called for sessions that are no longer frequently processed or accessed to move
+    all session data to the (slow) storage volume and free up the fast processing volume for working with other data.
+
+    Notes:
+        This function inverses the result of running the process_session() function.
+    """
+    # Resolves the data hierarchy for the processed session
+    session_data = SessionData.load(
+        session_path=session_path,
+        processed_data_root=processed_data_root,
+    )
+
+    # Initializes the ProcessingTracker instances for the archiving and preparation pipelines (which are in essence the
+    # inverses of each-other).
+    archive_tracker = ProcessingTracker(
+        file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.ARCHIVE)
+    )
+    preparation_tracker = ProcessingTracker(
+        file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.PREPARATION)
+    )
+
+    # Starts the runtime
+    archive_tracker.start(manager_id=manager_id)
+    try:
+        console.echo(message=f"Arching session '{session_data.session_name}'...", level=LogLevel.INFO)
+
+        # If the processed data root is different from the raw data root, transfers the processed_data directory from
+        # the processed_data root to the raw_data root.
+        if (
+            session_data.raw_data.root_path != session_data.processed_data.root_path
+            and not session_data.raw_data.processed_data_path.exists()
+        ):
+            console.echo(
+                message=f"Transferring (archiving) 'processed_data' directory to the raw data volume...",
+                level=LogLevel.INFO,
+            )
+            transfer_directory(
+                source=session_data.processed_data.processed_data_path,
+                destination=session_data.raw_data.processed_data_path,
+                num_threads=0,
+                verify_integrity=False,
+            )
+
+            # Removes the transferred directory to ensure that the data transfer can only occur once until the
+            # processed data is prepared again.
+            console.echo(
+                message=f"Removing the 'processed_data' directory from the processed data volume...",
+                level=LogLevel.INFO,
+            )
+            delete_directory(session_data.processed_data.processed_data_path)
+
+            # Also removes the raw_data (source_data) directory from the processed data volume.
+            if session_data.source_data.raw_data_path.exists():
+                console.echo(
+                    message=f"Removing the 'raw_data' directory from the processed data volume...",
+                    level=LogLevel.INFO,
+                )
+                delete_directory(session_data.source_data.raw_data_path)
+
+        # Archiving is complete
+        archive_tracker.stop(manager_id=manager_id)
+        # Clears the preparation tracker state to properly reflect that the session is no longer prepared
+        preparation_tracker.abort()
+        console.echo(message=f"Session '{session_data.session_name}': Archived.", level=LogLevel.SUCCESS)
+
+    finally:
+        # If the code reaches this section while the tracker indicates that the processing is still running,
+        # this means that the runtime encountered an error.
+        if archive_tracker.is_running:
+            archive_tracker.error(manager_id=manager_id)
+
+        # Updates or generates the manifest file inside the root raw data project directory
+        generate_project_manifest(
+            raw_project_directory=session_data.raw_data.root_path.joinpath(session_data.project_name),
+            processed_data_root=processed_data_root,
+        )
 
 
 def resolve_p53_marker(
     session_path: Path,
-    create_processed_data_directory: bool = True,
     processed_data_root: None | Path = None,
     remove: bool = False,
-    update_manifest: bool = False,
 ) -> None:
     """Depending on configuration, either creates or removes the p53.bin marker file for the target session.
 
@@ -497,21 +607,16 @@ def resolve_p53_marker(
     Args:
         session_path: The path to the session directory for which the p53.bin marker needs to be resolved. Note, the
             input session directory must contain the 'raw_data' subdirectory.
-        create_processed_data_directory: Determines whether to create the processed data hierarchy during runtime.
         processed_data_root: The root directory where to store the processed data hierarchy. This path has to point to
             the root directory where to store the processed data from all projects, and it will be automatically
             modified to include the project name, the animal name, and the session ID.
         remove: Determines whether this function is called to create or remove the p53.bin marker.
-        update_manifest: Determines whether to update (regenerate) the project manifest file for the processed session's
-            project. This should always be enabled when working with remote compute server(s) to ensure that the
-            project manifest file contains the most actual snapshot of the project's state.
     """
 
     # Loads session data layout. If configured to do so, also creates the processed data hierarchy
     session_data = SessionData.load(
         session_path=session_path,
         processed_data_root=processed_data_root,
-        make_processed_data_directory=create_processed_data_directory,
     )
 
     # If the p53.bin marker exists and the runtime is configured to remove it, attempts to remove the marker file.
@@ -640,14 +745,11 @@ def resolve_p53_marker(
     )
     console.echo(message=message, level=LogLevel.SUCCESS)
 
-    # If the runtime is configured to generate the project manifest file, attempts to generate and overwrite the
-    # existing manifest file for the target project.
-    if update_manifest:
-        # Generates the manifest file inside the root raw data project directory
-        generate_project_manifest(
-            raw_project_directory=session_path.parents[1],
-            processed_data_root=processed_data_root,
-        )
+    # Generates the manifest file inside the root raw data project directory
+    generate_project_manifest(
+        raw_project_directory=session_data.raw_data.root_path.joinpath(session_data.project_name),
+        processed_data_root=processed_data_root,
+    )
 
 
 class ProjectManifest:
@@ -704,8 +806,11 @@ class ProjectManifest:
             "date",
             "session",
             "type",
+            "system",
             "complete",
             "integrity",
+            "prepared",
+            "archived",
             "suite2p",
             "behavior",
             "video",
@@ -746,7 +851,7 @@ class ProjectManifest:
         """
 
         # Pre-selects the columns to display
-        df = self._data.select(["animal", "date", "session", "type", "notes"])
+        df = self._data.select(["animal", "date", "session", "type", "system", "notes"])
 
         # Optionally filters the data for the target animal
         if animal is not None:

@@ -6,6 +6,7 @@ from .packaging_tools import calculate_directory_checksum
 from .project_management_tools import (
     ProjectManifest,
     reset_trackers,
+    archive_session,
     prepare_session,
     resolve_checksum,
     resolve_p53_marker,
@@ -14,6 +15,7 @@ from .project_management_tools import (
 
 __all__ = [
     "ProjectManifest",
+    "archive_session",
     "calculate_directory_checksum",
     "delete_directory",
     "generate_project_manifest",
