@@ -387,9 +387,7 @@ def generate_server_credentials_file(
     required=False,
     help=(
         "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
-        "this command. This argument is used when calling the CLI on the BioHPC server, which uses different data "
-        "volumes for raw and processed data. Note, the input path must point to the root directory, as it will be "
-        "automatically modified to include the project name."
+        "this command, if different from the directory used to store raw data."
     ),
 )
 @click.option(
