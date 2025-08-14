@@ -11,8 +11,8 @@ from ..server import (
     TrackerFileNames,
     ProcessingPipeline,
     ProcessingPipelines,
-    get_working_directory,
 )
+from ..data_classes import get_working_directory
 
 
 def _get_remote_job_work_directory(server: Server, job_name: str) -> Path:
@@ -34,7 +34,7 @@ def _get_remote_job_work_directory(server: Server, job_name: str) -> Path:
     return working_directory
 
 
-def compose_processing_pipeline(
+def compose_remote_processing_pipeline(
     pipeline: ProcessingPipelines,
     project: str,
     animal: str,
@@ -87,7 +87,7 @@ def compose_processing_pipeline(
     tracker: TrackerFileNames
 
     # Integrity verification pipeline
-    if pipeline == ProcessingPipelines.INTEGRITY:
+    if pipeline == ProcessingPipelines.CHECKSUM:
         job_name = f"{session}_integrity_verification"
         working_directory = _get_remote_job_work_directory(server=server, job_name=job_name)
         job = Job(
@@ -109,7 +109,7 @@ def compose_processing_pipeline(
                 f"sl-resolve-checksum -sp {remote_session_path} -pdr {server.processed_data_root} -id {manager_id}"
             )
         jobs[stage] = ((job, working_directory),)
-        tracker = TrackerFileNames.INTEGRITY
+        tracker = TrackerFileNames.CHECKSUM
 
     # Processing preparation pipeline
     elif pipeline == ProcessingPipelines.PREPARATION:
@@ -130,26 +130,6 @@ def compose_processing_pipeline(
         )
         jobs[stage] = ((job, working_directory),)
         tracker = TrackerFileNames.PREPARATION
-
-    # Archiving pipeline
-    elif pipeline == ProcessingPipelines.ARCHIVE:
-        job_name = f"{session}_archiving"
-        working_directory = _get_remote_job_work_directory(server=server, job_name=job_name)
-        job = Job(
-            job_name=job_name,
-            output_log=working_directory.joinpath(f"output.txt"),
-            error_log=working_directory.joinpath(f"errors.txt"),
-            working_directory=working_directory,
-            conda_environment="manage",
-            cpus_to_use=20,
-            ram_gb=10,
-            time_limit=30,
-        )
-        job.add_command(
-            f"sl-archive-session -sp {remote_session_path} -pdr {server.processed_data_root} -id {manager_id}"
-        )
-        jobs[stage] = ((job, working_directory),)
-        tracker = TrackerFileNames.ARCHIVE
 
     # Behavior processing pipeline
     elif pipeline == ProcessingPipelines.BEHAVIOR:
@@ -348,3 +328,65 @@ def fetch_remote_project_manifest(project: str, server: Server) -> None:
         local_file_path=local_manifest_path,
         remote_file_path=remote_manifest_path,
     )
+
+
+def resolve_remote_dataset_marker(
+    project: str,
+    animal: str,
+    session: str,
+    server: Server,
+    keep_job_logs: bool = False,
+) -> None:
+    # Resolves the name and the working directory for the remote job
+    job_name = f"{session}_dataset_marker_resolution"
+    server_working_directory = _get_remote_job_work_directory(server=server, job_name=job_name)
+
+    # Parses the paths to the shared Sun lab directories used to store raw and processed project data on the remote
+    # server.
+    session_path = server.raw_data_root.joinpath(project, animal, session)
+
+    # Generates the remote job header
+    job = Job(
+        job_name=job_name,
+        output_log=server_working_directory.joinpath(f"output.txt"),
+        error_log=server_working_directory.joinpath(f"errors.txt"),
+        working_directory=server_working_directory,
+        conda_environment="manage",
+        cpus_to_use=1,
+        ram_gb=10,
+        time_limit=20,
+    )
+
+    # Configures the job to use the sl-shared-assets package installed on the server to generate the manifest file
+    # inside the project's root raw data directory
+    job.add_command(f"sl-dataset-marker -sp {session_path} -pdr {server.processed_data_root}")
+
+    # If the function is configured to remove job logs after runtime, adds a command to delete job working directory.
+    if not keep_job_logs:
+        job.add_command(f"rm -rf {server_working_directory!s}")
+
+    # Submits the remote job to the server
+    job = server.submit_job(job)
+
+    # Waits for the server to complete the job
+    delay_timer = PrecisionTimer("s")
+    message = f"Waiting for the manifest generation job with ID {job.job_id} to complete..."
+    console.echo(message=message, level=LogLevel.INFO)
+    while not server.job_complete(job=job):
+        delay_timer.delay_noblock(delay=5, allow_sleep=True)
+
+    # Resolves the path to the remote and local manifest files
+    remote_marker_path = session_path.joinpath(f"tracking_data", f"p53.bin")
+
+    # Verifies that the job ran as expected. For this, ensures that the remote manifest file exists (was created).
+    if not server.exists(remote_path=remote_marker_path):
+        # Closes the SSH connection
+        server.close()
+
+        message = (
+            f"Unable to locate the manifest file for '{project}' project one the remote server. This indicates that "
+            f"the remote manifest creation job ran into an error and did not generate the file. Check the error logs "
+            f"for the {job_name} job stored in the {server_working_directory} server directory for more details about "
+            f"the error."
+        )
+        console.error(message=message, error=FileNotFoundError)

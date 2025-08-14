@@ -1,14 +1,13 @@
 """This module stores the Command-Line Interfaces (CLIs) exposes by the library as part of the installation process."""
 
+from typing import Any
 from pathlib import Path
 
 import click
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 
-from .tools import (
+from ..tools import (
     ProjectManifest,
-    reset_trackers,
-    archive_session,
     prepare_session,
     resolve_checksum,
     resolve_p53_marker,
@@ -16,24 +15,29 @@ from .tools import (
     fetch_remote_project_manifest,
     generate_remote_project_manifest,
 )
-from .server import (
+from ..server import (
     Server,
     JupyterJob,
-    TrackerFileNames,
-    get_working_directory,
-    set_working_directory,
-    get_credentials_file_path,
     generate_server_credentials,
 )
+from ..data_classes import get_working_directory, set_working_directory, get_credentials_file_path
 
 
-@click.command()
+@click.group("manage")
+def manage() -> None:
+    """This Command-Line Interface exposes subgroups of commands used to manage session and project data acquired in
+    the Sun lab."""
+
+
+# Session data management commands
+@manage.group("session")
 @click.option(
     "-sp",
     "--session_path",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    help="The absolute path to the session directory for which to verify or create the data checksum.",
+    help="The absolute path to the root session directory to process. The root directory must contain the 'raw_data' "
+    "subdirectory.",
 )
 @click.option(
     "-pdr",
@@ -41,8 +45,8 @@ from .server import (
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=False,
     help=(
-        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
-        "this command, if it is different from raw session's data location."
+        "The absolute path to the directory that stores the processed data from all Sun lab projects, if it is "
+        "different from the root directory of the path provided to the 'session_path' argument."
     ),
 )
 @click.option(
@@ -52,124 +56,69 @@ from .server import (
     required=True,
     default=0,
     show_default=True,
-    help="The unique identifier for the process that manages this runtime.",
+    help="The unique identifier of the process that manages this runtime.",
 )
+@click.pass_context
+def manage_session(ctx: Any, session_path: Path, processed_data_root: Path | None, manager_id: int) -> None:
+    """Exposes commands to manage Sun lab session data.
+
+    Commands from this CLI are intended to run on the remote compute server to support data processing, dataset
+    integration, and 'cold' storage of the session's data. The end-user should not use this command block directly in
+    most intended use contexts."""
+    ctx.ensure_object(dict)
+    ctx.obj["session_path"] = session_path
+    ctx.obj["processed_data_root"] = processed_data_root
+    ctx.obj["manager_id"] = manager_id
+
+
+# noinspection PyUnresolvedReferences
+@manage_session.command("checksum")
+@click.pass_context
 @click.option(
-    "-r",
-    "--recalculate_checksum",
+    "-rc",
+    "--recalculate-checksum",
     is_flag=True,
     help=(
-        "Determines whether to recalculate and overwrite the checksum stored inside the ax_checksum.txt file of the "
-        "processed session. When the command is called with this flag, it effectively re-checksums the data instead of "
-        "verifying it."
+        "Determines whether to recalculate and overwrite the cached checksum value for the processed session. When "
+        "the command is called with this flag, it effectively re-checksums the data instead of verifying its integrity."
     ),
 )
-def resolve_session_checksum(
-    session_path: Path,
-    manager_id: int,
-    processed_data_root: Path | None,
-    recalculate_checksum: bool,
-) -> None:
-    """Checks the integrity of the target session's 'raw_data' directory or (re)generates the directory checksum.
+@click.option(
+    "-rt",
+    "--reset-tracker",
+    type=str,
+    required=False,
+    help=(
+        "Determines whether to forcibly reset the processing tracker for the checksum resolution pipeline before "
+        "executing the processing. This flag should only be used to recover from tracking failures and not."
+    ),
+)
+def resolve_session_checksum(ctx: Any, recalculate_checksum: bool, reset_tracker: bool) -> None:
+    """Resolves the 'raw_data' directory integrity checksum.
 
-    This command assumes that the data has been checksummed during acquisition and contains an ax_checksum.txt file
-    that stores the data checksum. It only works with the 'raw_data' session directory and ignores the 'processed_data'
-    and any other directory. If the command is called with the --recalculate_checksum flag, it instead recalculates and
-    overwrites the checksum stored in the ax_checksum.txt file.
+    This command can be used to either verify an existing 'raw_data' directory checksum or generate a new checksum.
+    It only works with the 'raw_data' session directory, ignoring all other directories.
     """
+
+    # Extracts shared parameters from context
+    session_path = ctx.obj["session_path"]
+    processed_data_root = ctx.obj["processed_data_root"]
+    manager_id = ctx.obj["manager_id"]
 
     resolve_checksum(
         session_path=session_path,
         manager_id=manager_id,
         processed_data_root=processed_data_root,
         regenerate_checksum=recalculate_checksum,
+        reset_tracker=reset_tracker,
     )
 
 
-@click.command()
-@click.option(
-    "-sp",
-    "--session_path",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-    required=True,
-    help="The absolute path to the session directory for which to reset the processing trackers.",
-)
-@click.option(
-    "-pdr",
-    "--processed_data_root",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-    required=False,
-    help=(
-        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
-        "this command, if it is different from raw session's data location."
-    ),
-)
-@click.option(
-    "-t",
-    "--tracker",
-    type=str,
-    required=False,
-    help=(
-        "The name fo the processing tracker file to reset. Note, the input name must match one of the options "
-        "available from the TrackerFileNames enumeration. If this argument is not provided, the command resets all "
-        "available trackers."
-    ),
-)
-def reset_session_trackers(
-    session_path: Path,
-    tracker: str | None | tuple[TrackerFileNames, ...],
-    processed_data_root: Path | None,
-) -> None:
-    """Resets the requested processing tracker files for the target session to the initial state.
-
-    This command is primarily intended to be used on remote compute servers to recover unexpectedly aborted pipelines.
-    As part of its runtime, it loops over each requested tracker file and uses the ProcessingTracker.abort() method to
-    reset the trackers to pre-pipeline-runtime states.
-    """
-
-    # Resolves the tracker(s) to target and casts to TrackerFileNames enumeration type.
-    if isinstance(tracker, str):
-        tracker = (TrackerFileNames(tracker),)
-
-    # Resets the target trackers
-    reset_trackers(
-        session_path=session_path,
-        trackers=tracker,
-        processed_data_root=processed_data_root,
-    )
-
-
-@click.command()
-@click.option(
-    "-sp",
-    "--session_path",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-    required=True,
-    help="The absolute path to the session directory whose raw data needs to be verified for potential corruption.",
-)
-@click.option(
-    "-pdr",
-    "--processed_data_root",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-    required=False,
-    help=(
-        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
-        "this command, if it is different from raw session's data location."
-    ),
-)
-@click.option(
-    "-id",
-    "--manager_id",
-    type=int,
-    required=True,
-    default=0,
-    show_default=True,
-    help="The unique identifier for the process that manages this runtime.",
-)
+# noinspection PyUnresolvedReferences
+@manage_session.command("prepare")
+@click.pass_context
 def prepare_session_for_processing(
-    session_path: Path,
-    manager_id: int,
-    processed_data_root: Path | None,
+    ctx: Any,
 ) -> None:
     """Prepares the target session data for processing by ensuring that both raw and processed data is stored on the
     processed data volume (fast drive) of the filesystem.
@@ -178,6 +127,11 @@ def prepare_session_for_processing(
     integrity and fast NVME volumes to maximize data processing speed. For such systems, moving data to fast volumes
     before processing results in a measurable processing speed increase.
     """
+    # Extracts shared parameters from context
+    session_path = ctx.obj["session_path"]
+    processed_data_root = ctx.obj["processed_data_root"]
+    manager_id = ctx.obj["manager_id"]
+
     prepare_session(
         session_path=session_path,
         manager_id=manager_id,
@@ -185,49 +139,36 @@ def prepare_session_for_processing(
     )
 
 
-@click.command()
+# noinspection PyUnresolvedReferences
+@manage_session.command("dataset-marker")
+@click.pass_context
 @click.option(
-    "-sp",
-    "--session_path",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-    required=True,
-    help="The absolute path to the session directory whose raw data needs to be verified for potential corruption.",
-)
-@click.option(
-    "-pdr",
-    "--processed_data_root",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-    required=False,
-    help=(
-        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
-        "this command, if it is different from raw session's data location."
-    ),
-)
-@click.option(
-    "-id",
-    "--manager_id",
-    type=int,
-    required=True,
-    default=0,
+    "-r",
+    "--remove",
+    is_flag=True,
     show_default=True,
-    help="The unique identifier for the process that manages this runtime.",
+    default=False,
+    help="Determines whether the command should create or remove the dataset integration marker.",
 )
-def archive_session_for_storage(
-    session_path: Path,
-    manager_id: int,
-    processed_data_root: Path | None,
+def resolve_dataset_marker(
+    ctx: Any,
+    remove: bool,
 ) -> None:
-    """Prepares the target session data for long-term storage by ensuring that both raw and processed data is stored
-    only on the raw data (slow drive) volume.
+    """Depending on configuration, either creates or removes the p53.bin marker from the target session.
 
-    This command is primarily intended to run on remote compute servers that use slow HDD volumes to maximize data
-    integrity and fast NVME volumes to maximize data processing speed. For such systems, all sessions that are no longer
-    actively processed or analyzed should be moved to the slow drive volume for long-term storage.
+    The p53.bin marker determines whether the session is ready for dataset integration. When the marker exists,
+    processing pipelines are not allowed to work with the session data, ensuring that all processed data remains
+    unchanged. If the marker does not exist, dataset integration pipelines are not allowed to work with the session
+    data, enabling processing pipelines to safely modify the data at any time.
     """
-    archive_session(
+    # Extracts shared parameters from context
+    session_path = ctx.obj["session_path"]
+    processed_data_root = ctx.obj["processed_data_root"]
+
+    resolve_p53_marker(
         session_path=session_path,
-        manager_id=manager_id,
         processed_data_root=processed_data_root,
+        remove=remove,
     )
 
 
@@ -370,51 +311,6 @@ def generate_server_credentials_file(
     message = f"File location: {output_directory}"
     # noinspection PyTypeChecker
     console.echo(message=message, level=LogLevel.SUCCESS)
-
-
-@click.command()
-@click.option(
-    "-sp",
-    "--session_path",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-    required=True,
-    help="The absolute path to the session directory for which to resolve the dataset integration readiness marker.",
-)
-@click.option(
-    "-pdr",
-    "--processed_data_root",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-    required=False,
-    help=(
-        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
-        "this command, if different from the directory used to store raw data."
-    ),
-)
-@click.option(
-    "-r",
-    "--remove",
-    is_flag=True,
-    show_default=True,
-    default=False,
-    help="Determines whether the command should create or remove the dataset integration marker.",
-)
-def resolve_dataset_marker(
-    session_path: Path,
-    processed_data_root: Path | None,
-    remove: bool,
-) -> None:
-    """Depending on configuration, either creates or removes the p53.bin marker from the target session.
-
-    The p53.bin marker determines whether the session is ready for dataset integration. When the marker exists,
-    processing pipelines are not allowed to work with the session data, ensuring that all processed data remains
-    unchanged. If the marker does not exist, dataset integration pipelines are not allowed to work with the session
-    data, enabling processing pipelines to safely modify the data at any time.
-    """
-    resolve_p53_marker(
-        session_path=session_path,
-        processed_data_root=processed_data_root,
-        remove=remove,
-    )
 
 
 @click.command()

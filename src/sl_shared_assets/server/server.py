@@ -1,4 +1,4 @@
-"""This module provides the tools for working with remote compute servers Specifically, the classes from this
+"""This module provides the tools for working with remote compute servers. Specifically, the classes from this
 module establish an API for submitting jobs to the shared data processing cluster (managed via SLURM) and monitoring
 the running job status. All lab processing and analysis pipelines use this interface for accessing shared compute
 resources.
@@ -111,11 +111,11 @@ class ServerCredentials(YamlConfig):
 
 
 class Server:
-    """Encapsulates access to the Sun lab BioHPC processing server.
+    """Encapsulates access to a Sun lab processing server.
 
-    This class provides the API that allows accessing the BioHPC server to create and submit various SLURM-managed jobs
-    to the server. It functions as the central interface used by all processing pipelines in the lab to execute costly
-    data processing on the server.
+    This class provides the API that allows accessing the remote processing server to create and submit various
+    SLURM-managed jobs to the server. It functions as the central interface used by all processing pipelines in the
+    lab to execute costly data processing on the server.
 
     Notes:
         All lab processing pipelines expect the data to be stored on the server and all processing logic to be packaged
@@ -732,3 +732,13 @@ class Server:
     def user(self) -> str:
         """Returns the username used to authenticate with the server."""
         return self._credentials.username
+
+    @property
+    def suite2p_configurations_directory(self) -> Path:
+        """Returns the absolute path to the shared directory that stores all sl-suite2p runtime configuration files."""
+        return self.raw_data_root.joinpath("suite2p_configurations")
+
+    @property
+    def dlc_projects_directory(self) -> Path:
+        """Returns the absolute path to the shared directory that stores all DeepLabCut projects."""
+        return self.raw_data_root.joinpath("deeplabcut_projects")

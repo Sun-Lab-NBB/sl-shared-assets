@@ -86,6 +86,7 @@ dev = [
 
 # Exports CLIs upon library installation into an environment
 [project.scripts]
+sl-manage = "sl_shared_assets.command_line_interfaces.manage:manage"
 sl-resolve-checksum = "sl_shared_assets.cli:resolve_session_checksum"
 sl-reset-trackers = "sl_shared_assets.cli:reset_session_trackers"
 sl-prepare-session = "sl_shared_assets.cli:prepare_session_for_processing"

@@ -13,16 +13,15 @@ from .tools import (
     resolve_p53_marker,
     transfer_directory,
     generate_project_manifest,
-    compose_processing_pipeline,
     calculate_directory_checksum,
     fetch_remote_project_manifest,
     generate_remote_project_manifest,
+    compose_remote_processing_pipeline,
 )
 from .server import (
     Job,
     Server,
     JupyterJob,
-    RemotePaths,
     ProcessingStatus,
     TrackerFileNames,
     ProcessingTracker,
@@ -30,9 +29,6 @@ from .server import (
     ProcessingPipeline,
     ProcessingPipelines,
     generate_manager_id,
-    get_working_directory,
-    get_credentials_file_path,
-    get_remote_filesystem_paths,
 )
 from .data_classes import (
     RawData,
@@ -61,8 +57,9 @@ from .data_classes import (
     MesoscopeSystemConfiguration,
     MesoscopeExperimentDescriptor,
     MesoscopeExperimentConfiguration,
+    get_working_directory,
+    get_credentials_file_path,
     get_system_configuration_data,
-    set_system_configuration_file,
 )
 
 # Ensures console is enabled when this library is imported
@@ -93,7 +90,6 @@ __all__ = [
     "ProcessingTracker",
     "ProjectManifest",
     "RawData",
-    "RemotePaths",
     "RunTrainingDescriptor",
     "Server",
     "ServerCredentials",
@@ -105,17 +101,15 @@ __all__ = [
     "WindowCheckingDescriptor",
     "ZaberPositions",
     "calculate_directory_checksum",
-    "compose_processing_pipeline",
+    "compose_remote_processing_pipeline",
     "delete_directory",
     "fetch_remote_project_manifest",
     "generate_manager_id",
     "generate_project_manifest",
     "generate_remote_project_manifest",
     "get_credentials_file_path",
-    "get_remote_filesystem_paths",
     "get_system_configuration_data",
     "get_working_directory",
     "resolve_p53_marker",
-    "set_system_configuration_file",
     "transfer_directory",
 ]

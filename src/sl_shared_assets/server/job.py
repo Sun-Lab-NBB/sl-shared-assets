@@ -48,7 +48,7 @@ class _JupyterConnectionInfo:
 
 
 class Job:
-    """Aggregates the data of a single SLURM-managed job to be executed on the Sun lab BioHPC cluster.
+    """Aggregates the data of a single SLURM-managed job to be executed on the Sun lab's remote compute server.
 
     This class provides the API for constructing any server-side job in the Sun lab. Internally, it wraps an instance
     of a Slurm class to package the job data into the format expected by the SLURM job manager. All jobs managed by this

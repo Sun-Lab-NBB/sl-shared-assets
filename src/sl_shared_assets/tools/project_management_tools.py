@@ -19,7 +19,7 @@ from ..data_classes import (
     WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor,
 )
-from .transfer_tools import delete_directory, transfer_directory
+from .transfer_tools import transfer_directory
 from .packaging_tools import calculate_directory_checksum
 
 
@@ -73,8 +73,6 @@ def generate_project_manifest(raw_project_directory: Path, processed_data_root: 
         "integrity": [],
         # Determines whether the session's data has been prepared for data processing.
         "prepared": [],
-        # Determines whether the session's data has been archived for long-term storage.
-        "archived": [],
         "suite2p": [],  # Determines whether the session has been processed with the single-day s2p pipeline.
         # Determines whether the session has been processed with the behavior extraction pipeline.
         "behavior": [],
@@ -163,7 +161,7 @@ def generate_project_manifest(raw_project_directory: Path, processed_data_root: 
 
             # Data verification status
             tracker = ProcessingTracker(
-                file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.INTEGRITY)
+                file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.CHECKSUM)
             )
             manifest["integrity"].append(tracker.is_complete)
 
@@ -176,7 +174,6 @@ def generate_project_manifest(raw_project_directory: Path, processed_data_root: 
                 manifest["behavior"].append(False)
                 manifest["video"].append(False)
                 manifest["prepared"].append(False)
-                manifest["archived"].append(False)
                 continue  # Cycles to the next session
 
             # Suite2p (single-day) processing status.
@@ -202,13 +199,9 @@ def generate_project_manifest(raw_project_directory: Path, processed_data_root: 
                 file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.PREPARATION)
             )
             manifest["prepared"].append(tracker.is_complete)
-            tracker = ProcessingTracker(
-                file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.ARCHIVE)
-            )
-            manifest["archived"].append(tracker.is_complete)
 
             # Tracks whether the session's data is currently in the processing or dataset integration mode.
-            manifest["dataset"].append(session_data.processed_data.p53_path.exists())
+            manifest["dataset"].append(session_data.tracking_data.p53_path.exists())
 
         # If all animal IDs are integer-convertible, stores them as numbers to promote proper sorting. Otherwise, stores
         # them as strings. The latter options are primarily kept for compatibility with Tyche data
@@ -231,7 +224,6 @@ def generate_project_manifest(raw_project_directory: Path, processed_data_root: 
             "complete": pl.UInt8,
             "integrity": pl.UInt8,
             "prepared": pl.UInt8,
-            "archived": pl.UInt8,
             "suite2p": pl.UInt8,
             "dataset": pl.UInt8,
             "behavior": pl.UInt8,
@@ -250,8 +242,9 @@ def generate_project_manifest(raw_project_directory: Path, processed_data_root: 
 def resolve_checksum(
     session_path: Path,
     manager_id: int,
-    regenerate_checksum: bool = False,
+    reset_tracker: bool = False,
     processed_data_root: None | Path = None,
+    regenerate_checksum: bool = False,
 ) -> None:
     """Verifies the integrity of the session's data by generating the checksum of the raw_data directory and comparing
     it against the checksum stored in the ax_checksum.txt file.
@@ -269,13 +262,15 @@ def resolve_checksum(
         storage guidelines).
 
     Args:
-        session_path: The path to the session directory to be verified or re-checksummed.
-        manager_id: The unique identifier of the manager process that manages the integrity verification runtime.
+        session_path: The path to the session directory to be processed.
+        manager_id: The unique identifier of the manager process that manages the runtime.
+        processed_data_root: The path to the root directory used to store the processed data from all Sun lab projects,
+            if different from the 'session_path' root.
+        reset_tracker: Determines whether to reset the tracker file before executing the runtime. This allows
+            recovering from deadlocked runtimes, but otherwise should not be used to ensure runtime safety.
         regenerate_checksum: Determines whether to update the checksum stored in the ax_checksum.txt file before
             carrying out the verification. In this case, the verification necessarily succeeds and the session's
             reference checksum is changed to reflect the current state of the session data.
-        processed_data_root: The path to the root directory used to store the processed data from all Sun lab projects,
-            if different from the session data root.
     """
 
     # Loads session data layout. If configured to do so, also creates the processed data hierarchy
@@ -285,7 +280,11 @@ def resolve_checksum(
     )
 
     # Initializes the ProcessingTracker instance for the verification tracker file
-    tracker = ProcessingTracker(file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.INTEGRITY))
+    tracker = ProcessingTracker(file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.CHECKSUM))
+
+    # If requested, reset the tracker to the default state before starting the verification process.
+    if reset_tracker:
+        tracker.abort()
 
     # Updates the tracker data to communicate that the verification process has started. This automatically clears
     # the previous 'completed' status.
@@ -334,87 +333,25 @@ def resolve_checksum(
         )
 
 
-def reset_trackers(
-    session_path: Path,
-    trackers: tuple[TrackerFileNames, ...] | None = None,
-    processed_data_root: None | Path = None,
-) -> None:
-    """Resets all requested tracker files for the target session to the original (unprocessed) state.
-
-    This function loops over all specified tracker files and uses the 'abort' method of the ProcessingTracker class to
-    reset them to the default state. Primarily, this function is designed to recover the tracker files when their
-    pipelines are interrupted without going through the typical Python error handling loop. For example, this is the
-    case if the pipeline runs for too long and is forcibly terminated by the SLURM manager of the server that executes
-    the pipeline.
-
-    Notes:
-        If any of the target tracker files do not exist, the function silently skips processing these files.
-
-    Args:
-        session_path: The path to the root session directory for which to reset the trackers.
-        trackers: A tuple that stores the TrackerFileNames instances, one for each tracker file to be reset. If this
-            argument is set to None, this function resets all files defined in the TrackerFileNames enumeration.
-        processed_data_root: The path to the root directory used to store the processed data from all Sun lab projects,
-            if different from the session data root.
-    """
-
-    # Loads session data layout. If configured to do so, also creates the processed data hierarchy
-    session_data = SessionData.load(
-        session_path=session_path,
-        processed_data_root=processed_data_root,
-    )
-
-    console.echo(
-        message=f"Resetting processing trackers for session '{session_data.session_name}'...",
-        level=LogLevel.INFO,
-    )
-
-    # If the user did not specify an explicit set of trackers to process, evaluates all valid tracker files.
-    if trackers is None:
-        trackers = tuple(TrackerFileNames)
-
-    # Loops over and resets all requested trackers if they are found under the raw_data or processed_data session
-    # directory.
-    for tracker in trackers:
-        # If the tracker file exists in the raw data directory, resets it by calling the 'abort' method.
-        tracker_path = session_data.raw_data.raw_data_path.joinpath(str(tracker))
-        if tracker_path.exists():
-            processing_tracker = ProcessingTracker(file_path=tracker_path)
-            processing_tracker.abort()
-            console.echo(
-                message=f"Tracker file '{tracker}' for session '{session_data.session_name}': Reset.",
-                level=LogLevel.SUCCESS,
-            )
-
-        # If the tracker file exists in the processed data directory, resets it by calling the 'abort' method.
-        tracker_path = session_data.processed_data.processed_data_path.joinpath(str(tracker))
-        if tracker_path.exists():
-            processing_tracker = ProcessingTracker(file_path=tracker_path)
-            processing_tracker.abort()
-            console.echo(
-                message=f"Tracker file '{tracker}' for session '{session_data.session_name}': Reset",
-                level=LogLevel.SUCCESS,
-            )
-
-    # Updates or generates the manifest file inside the root raw data project directory
-    generate_project_manifest(
-        raw_project_directory=session_data.raw_data.root_path.joinpath(session_data.project_name),
-        processed_data_root=processed_data_root,
-    )
-
-
 def prepare_session(
     session_path: Path,
     manager_id: int,
     processed_data_root: Path | None,
+    reset_tracker: bool = False,
 ) -> None:
     """Prepares the target session for processing.
 
     This function is primarily designed to be used on remote compute servers that use different data volumes for
     storage and processing. Since storage volumes are often slow, the session data needs to be copied to the fast
-    volume before executing processing pipelines. In addition to copying the raw data, depending on configuration, this
-    function also moves (archived) processed data and resets the requested processing pipeline trackers for the managed
-    session.
+    volume before executing processing pipelines.
+
+    Args:
+        session_path: The path to the session directory to be processed.
+        manager_id: The unique identifier of the manager process that manages the runtime.
+        processed_data_root: The path to the root directory used to store the processed data from all Sun lab projects,
+            if different from the 'session_path' root.
+        reset_tracker: Determines whether to reset the tracker file before executing the runtime. This allows
+            recovering from deadlocked runtimes, but otherwise should not be used to ensure runtime safety.
 
     Notes:
         This function inverses the result of running the archive_session() function.
@@ -425,17 +362,18 @@ def prepare_session(
         processed_data_root=processed_data_root,
     )
 
-    # Initializes the ProcessingTracker instances for the archiving and preparation pipelines (which are in essence the
-    # inverses of each-other).
-    archive_tracker = ProcessingTracker(
-        file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.ARCHIVE)
-    )
+    # Initializes the ProcessingTracker instances to query the state of various processing pipelines that may interfere
+    # with this pipeline.
     preparation_tracker = ProcessingTracker(
         file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.PREPARATION)
     )
 
-    # Updates the tracker data to communicate that the preparation process has started. This automatically clears
-    # the previous 'completed' status.
+    # Resets the preparation tracker, if requested.
+    if reset_tracker:
+        preparation_tracker.abort()
+
+    # Note, starts both the archiving and preparation trackers to ensure that archiving cannot be called while the
+    # preparation is ongoing.
     preparation_tracker.start(manager_id=manager_id)
     try:
         console.echo(
@@ -453,36 +391,11 @@ def prepare_session(
                 destination=session_data.source_data.raw_data_path,
                 num_threads=0,
                 verify_integrity=False,
+                remove_source=False,
             )
-
-            # If the session contains archived processed data, replaced the contents of the 'processed_data' folder
-            # on the processed data volume with the contents of the 'processed_data' folder on the raw data (storage)
-            # volume.
-            if archive_tracker.is_complete and session_data.raw_data.processed_data_path.exists():
-                console.echo(
-                    message=f"Transferring the archived 'processed_data' directory to the processed data root...",
-                    level=LogLevel.INFO,
-                )
-                transfer_directory(
-                    source=session_data.raw_data.processed_data_path,
-                    destination=session_data.processed_data.processed_data_path,
-                    num_threads=0,
-                    verify_integrity=False,
-                )
-
-                # Removes the transferred directory to ensure only a single copy of the 'processed_data' directory
-                # exists on the processing machine. While not strictly necessary, this is a good error-preventing
-                # practice.
-                console.echo(
-                    message=f"Removing the now-redundant archived 'processed_data' directory...",
-                    level=LogLevel.INFO,
-                )
-                delete_directory(session_path.joinpath("processed_data"))
 
         # Preparation is complete
         preparation_tracker.stop(manager_id=manager_id)
-        # Clears the archiving tracker state to properly reflect that the session is no longer archived
-        archive_tracker.abort()
         console.echo(
             message=f"Session '{session_data.session_name}': Prepared for data processing.", level=LogLevel.SUCCESS
         )
@@ -492,92 +405,6 @@ def prepare_session(
         # this means that the runtime encountered an error.
         if preparation_tracker.is_running:
             preparation_tracker.error(manager_id=manager_id)
-
-        # Updates or generates the manifest file inside the root raw data project directory
-        generate_project_manifest(
-            raw_project_directory=session_data.raw_data.root_path.joinpath(session_data.project_name),
-            processed_data_root=processed_data_root,
-        )
-
-
-def archive_session(
-    session_path: Path,
-    manager_id: int,
-    processed_data_root: Path | None = None,
-) -> None:
-    """Prepares the target session for long-term storage.
-
-    This function is primarily designed to be used on remote compute servers that use different data volumes for
-    storage and processing. It should be called for sessions that are no longer frequently processed or accessed to move
-    all session data to the (slow) storage volume and free up the fast processing volume for working with other data.
-
-    Notes:
-        This function inverses the result of running the process_session() function.
-    """
-    # Resolves the data hierarchy for the processed session
-    session_data = SessionData.load(
-        session_path=session_path,
-        processed_data_root=processed_data_root,
-    )
-
-    # Initializes the ProcessingTracker instances for the archiving and preparation pipelines (which are in essence the
-    # inverses of each-other).
-    archive_tracker = ProcessingTracker(
-        file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.ARCHIVE)
-    )
-    preparation_tracker = ProcessingTracker(
-        file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.PREPARATION)
-    )
-
-    # Starts the runtime
-    archive_tracker.start(manager_id=manager_id)
-    try:
-        console.echo(message=f"Arching session '{session_data.session_name}'...", level=LogLevel.INFO)
-
-        # If the processed data root is different from the raw data root, transfers the processed_data directory from
-        # the processed_data root to the raw_data root.
-        if (
-            session_data.raw_data.root_path != session_data.processed_data.root_path
-            and not session_data.raw_data.processed_data_path.exists()
-        ):
-            console.echo(
-                message=f"Transferring (archiving) 'processed_data' directory to the raw data volume...",
-                level=LogLevel.INFO,
-            )
-            transfer_directory(
-                source=session_data.processed_data.processed_data_path,
-                destination=session_data.raw_data.processed_data_path,
-                num_threads=0,
-                verify_integrity=False,
-            )
-
-            # Removes the transferred directory to ensure that the data transfer can only occur once until the
-            # processed data is prepared again.
-            console.echo(
-                message=f"Removing the 'processed_data' directory from the processed data volume...",
-                level=LogLevel.INFO,
-            )
-            delete_directory(session_data.processed_data.processed_data_path)
-
-            # Also removes the raw_data (source_data) directory from the processed data volume.
-            if session_data.source_data.raw_data_path.exists():
-                console.echo(
-                    message=f"Removing the 'raw_data' directory from the processed data volume...",
-                    level=LogLevel.INFO,
-                )
-                delete_directory(session_data.source_data.raw_data_path)
-
-        # Archiving is complete
-        archive_tracker.stop(manager_id=manager_id)
-        # Clears the preparation tracker state to properly reflect that the session is no longer prepared
-        preparation_tracker.abort()
-        console.echo(message=f"Session '{session_data.session_name}': Archived.", level=LogLevel.SUCCESS)
-
-    finally:
-        # If the code reaches this section while the tracker indicates that the processing is still running,
-        # this means that the runtime encountered an error.
-        if archive_tracker.is_running:
-            archive_tracker.error(manager_id=manager_id)
 
         # Updates or generates the manifest file inside the root raw data project directory
         generate_project_manifest(
@@ -620,12 +447,12 @@ def resolve_p53_marker(
     )
 
     # Acquires the lock to prevent other processes from modifying the p53.bin marker
-    p53_path = session_data.processed_data.p53_path
+    p53_path = session_data.tracking_data.p53_path
     p53_lock = p53_path.with_suffix(p53_path.suffix + ".lock")
     lock = FileLock(str(p53_lock))
     with lock.acquire(timeout=20.0):
         # If the p53.bin marker exists and the runtime is configured to remove it, attempts to remove the marker file.
-        if session_data.processed_data.p53_path.exists() and remove:
+        if session_data.tracking_data.p53_path.exists() and remove:
             # This section deals with a unique nuance related to the Sun lab processing server organization.
             # Specifically, the user accounts are not allowed to modify or create files in the data directories owned
             # by the service accounts. In turn, this prevents user accounts from modifying the processed data
@@ -662,7 +489,7 @@ def resolve_p53_marker(
 
             # If the session does not have a corresponding semaphore marker in any user directories, removes the
             # p53 marker file.
-            session_data.processed_data.p53_path.unlink()
+            session_data.tracking_data.p53_path.unlink()
             message = (
                 f"Dataset marker for the session '{session_data.session_name}' acquired for the animal "
                 f"'{session_data.animal_id}' under the '{session_data.project_name}' project: Removed."
@@ -671,7 +498,7 @@ def resolve_p53_marker(
             return  # Ends remove runtime
 
         # If the marker does not exist and the function is called in 'remove' mode, aborts the runtime early
-        elif not session_data.processed_data.p53_path.exists() and remove:
+        elif not session_data.tracking_data.p53_path.exists() and remove:
             message = (
                 f"Dataset marker for the session '{session_data.session_name}' acquired for the animal "
                 f"'{session_data.animal_id}' under the '{session_data.project_name}' project: Does not exist. No "
@@ -680,7 +507,7 @@ def resolve_p53_marker(
             console.echo(message=message, level=LogLevel.SUCCESS)
             return  # Ends remove runtime
 
-        elif session_data.processed_data.p53_path.exists():
+        elif session_data.tracking_data.p53_path.exists():
             message = (
                 f"Dataset marker for the session '{session_data.session_name}' acquired for the animal "
                 f"'{session_data.animal_id}' under the '{session_data.project_name}' project: Already exists. No "
@@ -745,7 +572,7 @@ def resolve_p53_marker(
 
         # If the runtime reached this point, the session is eligible for dataset integration. Creates the p53.bin marker
         # file, preventing the session from being processed again as long as the marker exists.
-        session_data.processed_data.p53_path.touch()
+        session_data.tracking_data.p53_path.touch()
         message = (
             f"Dataset marker for the session '{session_data.session_name}' acquired for the animal "
             f"'{session_data.animal_id}' under the '{session_data.project_name}' project: Created."
@@ -817,7 +644,6 @@ class ProjectManifest:
             "complete",
             "integrity",
             "prepared",
-            "archived",
             "suite2p",
             "behavior",
             "video",

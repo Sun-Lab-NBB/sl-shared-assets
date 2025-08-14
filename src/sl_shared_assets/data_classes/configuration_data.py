@@ -1,6 +1,7 @@
 """This module provides classes used to configure data acquisition and processing runtimes in the Sun lab. All lab
-projects use classes from this module to configure experiment runtimes and determine how to interact with the
-particular data acquisition and runtime management system (hardware) they run on."""
+projects use assets from this module to configure experiment runtimes and determine how to interact with the
+particular data acquisition and runtime management system (hardware) they run on. Similarly, all lab projects use
+assets from this module to process and analyze the data acquired in the lab."""
 
 import copy
 from enum import StrEnum
@@ -10,6 +11,8 @@ from dataclasses import field, dataclass
 import appdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
+
+from ..server import ServerCredentials
 
 
 class AcquisitionSystems(StrEnum):
@@ -180,14 +183,6 @@ class MesoscopeExperimentConfiguration(YamlConfig):
 class MesoscopePaths:
     """Stores the filesystem configuration parameters for the Mesoscope-VR data acquisition system."""
 
-    server_credentials_path: Path = Path("/media/Data/Experiments/server_credentials.yaml")
-    """
-    The path to the locally stored .YAML file that contains the credentials for accessing the BioHPC server machine. 
-    While the filesystem of the server machine should already be mounted to the local machine via SMB or equivalent 
-    protocol, this data is used to establish SSH connection to the server and start newly acquired data processing 
-    after it is transferred to the server. This allows data acquisition, preprocessing, and processing to be controlled 
-    by the same runtime and prevents unprocessed data from piling up on the server.
-    """
     google_credentials_path: Path = Path("/media/Data/Experiments/sl-surgery-log-0f651e492767.json")
     """
     The path to the locally stored .JSON file that contains the service account credentials used to read and write 
@@ -409,7 +404,6 @@ class MesoscopeSystemConfiguration(YamlConfig):
         upon class instantiation."""
 
         # Converts all paths loaded as strings to Path objects used inside the library
-        self.paths.server_credentials_path = Path(self.paths.server_credentials_path)
         self.paths.google_credentials_path = Path(self.paths.google_credentials_path)
         self.paths.root_directory = Path(self.paths.root_directory)
         self.paths.server_storage_directory = Path(self.paths.server_storage_directory)
@@ -457,7 +451,6 @@ class MesoscopeSystemConfiguration(YamlConfig):
 
         # Converts all Path objects to strings before dumping the data, as .yaml encoder does not properly recognize
         # Path objects
-        original.paths.server_credentials_path = str(original.paths.server_credentials_path)  # type: ignore
         original.paths.google_credentials_path = str(original.paths.google_credentials_path)  # type: ignore
         original.paths.root_directory = str(original.paths.root_directory)  # type: ignore
         original.paths.server_storage_directory = str(original.paths.server_storage_directory)  # type: ignore
@@ -586,3 +579,188 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
     # instantiated class to caller
     file_name = configuration_file.name
     return _supported_configuration_files[file_name].from_yaml(file_path=configuration_file)  # type: ignore
+
+
+def set_working_directory(path: Path) -> None:
+    """Sets the specified directory as the Sun lab working directory for the local machine (PC).
+
+    This function is used to initially configure any machine to work with Sun lab data stored on remote compute
+    server(s) by setting up the local working directory for all remote data processing pipelines and tasks. The path
+    to the working directory is stored inside the user's data directory so that all Sun lab libraries can automatically
+    access and use the same working directory. Since the storage directory is typically hidden and varies between OSes
+    and machines, this function provides a convenient way for setting that path without manually editing the storage
+    cache.
+
+    Notes:
+        If the input path does not point to an existing directory, the function will automatically generate the
+        requested directory.
+
+        If the directory does not have the 'user_credentials.yaml' or 'service_credentials.yaml' files, the precursors
+        for these files will be created as part of runtime.
+
+    Args:
+        path: The path to the directory to set as the local Sun lab working directory.
+    """
+
+    # If the directory specified by the 'path' does not exist, generates the specified directory tree. As part of this
+    # process, also generate the precursor server_credentials.yaml file to use for accessing the remote server used to
+    # store project data.
+    if not path.exists():
+        message = (
+            f"The specified working directory ({path}) does not exist. Generating the directory at the "
+            f"specified path..."
+        )
+        console.echo(message=message, level=LogLevel.INFO)
+
+    # Resolves the path to the static .txt file used to store the path to the system configuration file
+    app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
+    path_file = app_dir.joinpath("working_directory_path.txt")
+
+    # In case this function is called before the app directory is created, ensures the app directory exists
+    ensure_directory_exists(path_file)
+
+    # Ensures that the input path's directory exists
+    ensure_directory_exists(path)
+
+    # Replaces the contents of the working_directory_path.txt file with the provided path
+    with path_file.open("w") as f:
+        f.write(str(path))
+
+    if not path.joinpath("user_credentials.yaml").exists():
+        message = (
+            f"Unable to locate the 'user_credentials.yaml' file in the Sun lab working directory {path}. Creating a "
+            f"precursor credentials file in the directory. Edit the file to store your BioHPC access credentials. This "
+            f"is a prerequisite for generating datasets and analysing the processed data stored on the remote server."
+        )
+        console.echo(message=message, level=LogLevel.WARNING)
+        ServerCredentials().to_yaml(file_path=path.joinpath("user_credentials.yaml"))
+
+    if not path.joinpath("service_credentials.yaml").exists():
+        message = (
+            f"Unable to locate the 'service_credentials.yaml' file in the Sun lab working directory {path}. Creating a "
+            f"precursor credentials file in the directory. Edit the file to store the Sun lab service BioHPC access "
+            f"credentials. Editing this file is only required if you intend to run data processing pipelines, which is "
+            f"not typically done directly by lab users. Most lab users do not need to use this file."
+        )
+        console.echo(message=message, level=LogLevel.WARNING)
+        ServerCredentials().to_yaml(file_path=path.joinpath("service_credentials.yaml"))
+
+
+def get_working_directory() -> Path:
+    """Resolves and returns the path to the local Sun lab working directory.
+
+    This service function is primarily used when working with Sun lab data stored on remote compute server(s) to
+    establish local working directories for various jobs and pipelines.
+
+    Returns:
+        The path to the local working directory.
+
+    Raises:
+        FileNotFoundError: If the local machine does not have the Sun lab data directory, or the local working
+            directory does not exist (has not been configured).
+    """
+    # Uses appdirs to locate the user data directory and resolve the path to the configuration file
+    app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
+    path_file = app_dir.joinpath("working_directory_path.txt")
+
+    # If the cache file or the Sun lab data directory does not exist, aborts with an error
+    if not path_file.exists():
+        message = (
+            "Unable to resolve the path to the local working directory, as local machine does not have the "
+            "Sun lab data directory. This indicates that the local directory has not been designated. Designate the "
+            "local working directory by calling the 'sl-set-working-directory' CLI command and rerun the command that "
+            "produced this error."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    # Once the location of the path storage file is resolved, reads the file path from the file
+    with path_file.open() as f:
+        working_directory = Path(f.read().strip())
+
+    # If the configuration file does not exist, also aborts with an error
+    if not working_directory.exists():
+        message = (
+            "Unable to resolve the path to the local working directory, as the directory pointed by the path stored "
+            "in Sun lab data directory does not exist. Designate a new working directory by calling the "
+            "'sl-set-working-directory' CLI command and rerun the command that produced this error."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    # Returns the path to the working directory
+    return working_directory
+
+
+def get_credentials_file_path(require_service: bool = False) -> Path:
+    """Resolves and returns the path to the requested .yaml file that stores access credentials for the Sun lab
+    remote compute server.
+
+    Depending on the configuration, either returns the path to the 'user_credentials.yaml' file (default) or the
+    'service_credentials.yaml' file.
+
+    Notes:
+        Assumes that the local working directory has been configured before calling this function.
+
+    Args:
+        require_service: Determines whether this function must evaluate and return the path to the
+            'service_credentials.yaml' file (if true) or the 'user_credentials.yaml' file (if false).
+
+    Raises:
+        FileNotFoundError: If either the 'service_credentials.yaml' or the 'user_credentials.yaml' files do not exist
+            in the local Sun lab working directory.
+        ValueError: If both credential files exist, but the requested credentials file is not configured.
+    """
+
+    # Gets the path to the local working directory.
+    working_directory = get_working_directory()
+
+    # Resolves the paths to the credential files.
+    service_path = working_directory.joinpath("service_credentials.yaml")
+    user_path = working_directory.joinpath("user_credentials.yaml")
+
+    # Aborts with an error if one of the files does not exist
+    if not service_path.exists() or not user_path.exists():
+        message = (
+            f"Unable to resolve the path to the preferred Sun lab server access credentials file, as at least one of "
+            f"the expected files ('service_credentials.yaml' or 'user_credentials.yaml') does not exist in the local "
+            f"Sun lab working directory {working_directory}. Rerun the 'sl-set-working-directory' CLI command to "
+            f"generate the missing files and rerun the command that produced this error."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    # If the caller requires the service account, evaluates the service credentials file.
+    if require_service:
+        credentials: ServerCredentials = ServerCredentials.from_yaml(file_path=service_path)  # type: ignore
+
+        # If the service account is not configured, aborts with an error.
+        if credentials.username == "YourNetID" or credentials.password == "YourPassword":
+            message = (
+                f"The 'service_credentials.yaml' file appears to be unconfigured or contains placeholder credentials. "
+                f"Manually edit the file to include proper access credentials for the Sun lab remote compute server "
+                f"and rerun the command that produced this error."
+            )
+            console.error(message=message, error=ValueError)
+            raise ValueError(message)  # Fallback to appease mypy, should not be reachable
+
+        # If the service account is configured, returns the path to the service credentials file to caller
+        else:
+            message = f"Server access credentials: Resolved. Using the service {credentials.username} account."
+            console.echo(message=message, level=LogLevel.SUCCESS)
+            return service_path
+
+    # Otherwise, evaluates the user credentials file.
+    credentials: ServerCredentials = ServerCredentials.from_yaml(file_path=user_path)  # type: ignore
+
+    # If the user account is not configured, aborts with an error.
+    if credentials.username == "YourNetID" or credentials.password == "YourPassword":
+        message = (
+            f"The 'user_credentials.yaml' file appears to be unconfigured or contains placeholder credentials. "
+            f"Manually edit the file to include proper access credentials for the Sun lab remote compute server and "
+            f"rerun the command that produced this error."
+        )
+        console.error(message=message, error=ValueError)
+        raise ValueError(message)  # Fallback to appease mypy, should not be reachable
+
+    # Otherwise, returns the path to the user credentials file to caller
+    message = f"Server access credentials: Resolved. Using the {credentials.username} account."
+    console.echo(message=message, level=LogLevel.SUCCESS)
+    return user_path

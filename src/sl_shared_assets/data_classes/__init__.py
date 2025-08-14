@@ -14,7 +14,9 @@ from .runtime_data import (
 from .session_data import (
     RawData,
     SessionData,
+    SessionLock,
     SessionTypes,
+    TrackingData,
     ProcessedData,
 )
 from .surgery_data import (
@@ -35,6 +37,9 @@ from .configuration_data import (
     MesoscopeAdditionalFirmware,
     MesoscopeSystemConfiguration,
     MesoscopeExperimentConfiguration,
+    get_working_directory,
+    set_working_directory,
+    get_credentials_file_path,
     get_system_configuration_data,
     set_system_configuration_file,
 )
@@ -61,11 +66,16 @@ __all__ = [
     "RawData",
     "RunTrainingDescriptor",
     "SessionData",
+    "SessionLock",
     "SessionTypes",
     "SubjectData",
     "SurgeryData",
+    "TrackingData",
     "WindowCheckingDescriptor",
     "ZaberPositions",
+    "get_credentials_file_path",
     "get_system_configuration_data",
+    "get_working_directory",
     "set_system_configuration_file",
+    "set_working_directory",
 ]

@@ -20,8 +20,8 @@ from .server import Server
 
 
 class TrackerFileNames(StrEnum):
-    """Defines a set of processing tacker .yaml files supported by various Sun lab data preprocessing, processing, and
-    dataset formation pipelines.
+    """Defines a set of processing tacker .yaml files used by the Sun lab data preprocessing, processing, and dataset
+    formation pipelines to track the progress of the remotely executed pipelines.
 
     This enumeration standardizes the names for all processing tracker files used in the lab. It is designed to be used
     via the get_processing_tracker() function to generate ProcessingTracker instances.
@@ -31,8 +31,10 @@ class TrackerFileNames(StrEnum):
         ProcessingPipeline instance has an associated ProcessingTracker file instance.
     """
 
-    INTEGRITY = "integrity_verification_tracker.yaml"
-    """This file is used to track the state of the data integrity verification pipeline."""
+    MANIFEST = "manifest_generation_tracker.yaml"
+    """This file is used to track the state of the project manifest generation pipeline."""
+    CHECKSUM = "checksum_resolution_tracker.yaml"
+    """This file is used to track the state of the checksum resolution pipeline."""
     PREPARATION = "processing_preparation_tracker.yaml"
     """This file is used to track the state of the data processing preparation pipeline."""
     BEHAVIOR = "behavior_processing_tracker.yaml"
@@ -41,12 +43,12 @@ class TrackerFileNames(StrEnum):
     """This file is used to track the state of the single-day suite2p processing pipeline."""
     VIDEO = "video_processing_tracker.yaml"
     """This file is used to track the state of the video (DeepLabCut) processing pipeline."""
-    MULTIDAY = "multiday_processing_tracker.yaml"
-    """This file is used to track the state of the multiday suite2p processing pipeline."""
+    DATASET = "dataset_marker_tracker.yaml"
+    """This file is used to track the state of the dataset marker resolution pipeline."""
     FORGING = "dataset_forging_tracker.yaml"
     """This file is used to track the state of the dataset creation (forging) pipeline."""
-    ARCHIVE = "data_archiving_tracker.yaml"
-    """This file is used to track the state of the data archiving pipeline."""
+    MULTIDAY = "multiday_processing_tracker.yaml"
+    """This file is used to track the state of the multiday suite2p processing pipeline."""
 
 
 class ProcessingPipelines(StrEnum):
@@ -64,9 +66,14 @@ class ProcessingPipelines(StrEnum):
         lifetime of the Sun lab data on the remote compute server.
     """
 
-    INTEGRITY = "integrity verification"
-    """Integrity verification pipeline. Primarily, it is used to verify that the raw data has been transferred to the 
-    remote storage server from the main acquisition system PC intact."""
+    MANIFEST = "manifest generation"
+    """Project manifest generation pipeline. This pipeline is generally not used in most runtime contexts. It allows 
+    manually regenerating the project manifest .feather file, which is typically only used during testing. All other 
+    pipeline automatically conduct the manifest (re)generation at the end of their runtime."""
+    CHECKSUM = "checksum resolution"
+    """Checksum resolution pipeline. Primarily, it is used to verify that the raw data has been transferred to the 
+    remote storage server from the main acquisition system PC intact. This pipeline is sometimes also used to 
+    regenerate (re-checksum) the data stored on the remote compute server."""
     PREPARATION = "processing preparation"
     """Data processing preparation pipeline. Since the compute server uses a two-volume design with a slow (HDD) storage
     volume and a fast (NVME) working volume, to optimize data processing performance, the data needs to be transferred 
@@ -82,6 +89,10 @@ class ProcessingPipelines(StrEnum):
     VIDEO = "video processing"
     """DeepLabCut (Video) processing pipeline. This pipeline is used to extract animal pose estimation data from the 
     behavior video frames acquired during a single session (day)."""
+    DATASET = "dataset marker resolution"
+    """Dataset marker resolution pipeline. This pipeline is used to switch sessions between data processing and dataset
+    formation modes. Session in the processing mode cannot be integrated into a dataset and sessions in the dataset 
+    formation mode cannot be (re)processed."""
     MULTIDAY = "multi-day suite2p processing"
     """Multi-day suite2p processing (cell tracking) pipeline. This pipeline is used to track cells processed with the 
     single-day suite2p pipelines across multiple days. It is executed for all sessions marked for integration into the 
@@ -90,11 +101,6 @@ class ProcessingPipelines(StrEnum):
     """Dataset creation (forging) pipeline. This pipeline typically runs after the multi-day pipeline. It extracts and 
     integrates the processed data from various sources such as brain activity, behavior, videos, etc., into a unified 
     dataset."""
-    ARCHIVE = "data archiving"
-    """Data archiving pipeline. To conserve the (limited) space on the fast working volume, once the data has been 
-    processed and integrated into a stable dataset, the processed data folder is moved to the storage volume. The 
-    now-redundant raw data folder stored on the fast working volume is deleted (as the storage volume already contains 
-    a copy of raw_data)."""
 
 
 class ProcessingStatus(IntEnum):
