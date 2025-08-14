@@ -92,8 +92,9 @@ sl-prepare-session = "sl_shared_assets.cli:prepare_session_for_processing"
 sl-archive-session = "sl_shared_assets.cli:archive_session_for_storage"
 sl-create-manifest = "sl_shared_assets.cli:generate_project_manifest_file"
 sl-create-server-credentials = "sl_shared_assets.cli:generate_server_credentials_file"
-sl-ascend-tyche = "sl_shared_assets.cli:ascend_tyche_directory"
 sl-start-jupyter = "sl_shared_assets.cli:start_jupyter_server"
+sl-set-working-directory = "sl_forgery.cli:designate_working_directory"
+sl-print-project-data = "sl_forgery.cli:print_project_manifest_data"
 sl-dataset-marker = "sl_shared_assets.cli:resolve_dataset_marker"
 
 # Specifies files that should not be included in the source-code distribution but are also not part of gitignore.
