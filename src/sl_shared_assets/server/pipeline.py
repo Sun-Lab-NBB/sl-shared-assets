@@ -41,8 +41,6 @@ class TrackerFileNames(StrEnum):
     """This file is used to track the state of the single-day suite2p processing pipeline."""
     VIDEO = "video_processing_tracker.yaml"
     """This file is used to track the state of the video (DeepLabCut) processing pipeline."""
-    DATASET = "dataset_marker_tracker.yaml"
-    """This file is used to track the state of the dataset marker resolution (creation or removal) pipeline."""
     MULTIDAY = "multiday_processing_tracker.yaml"
     """This file is used to track the state of the multiday suite2p processing pipeline."""
     FORGING = "dataset_forging_tracker.yaml"
@@ -84,11 +82,6 @@ class ProcessingPipelines(StrEnum):
     VIDEO = "video processing"
     """DeepLabCut (Video) processing pipeline. This pipeline is used to extract animal pose estimation data from the 
     behavior video frames acquired during a single session (day)."""
-    DATASET = "dataset marker resolution"
-    """Dataset marker resolution pipeline. This pipeline is used to resolve (create or remove) the dataset integration 
-    markers for sessions whose data has been processed with all required processing pipelines. The dataset integration 
-    marker both indicates whether the session is ready to be integrated into a dataset and ensures that sessions cannot 
-    be targeted by data processing and dataset integration pipelines at the same time."""
     MULTIDAY = "multi-day suite2p processing"
     """Multi-day suite2p processing (cell tracking) pipeline. This pipeline is used to track cells processed with the 
     single-day suite2p pipelines across multiple days. It is executed for all sessions marked for integration into the 

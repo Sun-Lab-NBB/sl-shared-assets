@@ -5,9 +5,138 @@ from pathlib import Path
 import click
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 
-from .tools import resolve_checksum, resolve_p53_marker, generate_project_manifest
-from .server import Server, JupyterJob, TrackerFileNames, ProcessingTracker, generate_server_credentials
-from .data_classes import SessionData
+from .tools import (
+    ProjectManifest,
+    reset_trackers,
+    archive_session,
+    prepare_session,
+    resolve_checksum,
+    resolve_p53_marker,
+    generate_project_manifest,
+    fetch_remote_project_manifest,
+    generate_remote_project_manifest,
+)
+from .server import (
+    Server,
+    JupyterJob,
+    TrackerFileNames,
+    get_working_directory,
+    set_working_directory,
+    get_credentials_file_path,
+    generate_server_credentials,
+)
+
+
+@click.command()
+@click.option(
+    "-sp",
+    "--session_path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=True,
+    help="The absolute path to the session directory for which to verify or create the data checksum.",
+)
+@click.option(
+    "-pdr",
+    "--processed_data_root",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=False,
+    help=(
+        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
+        "this command, if it is different from raw session's data location."
+    ),
+)
+@click.option(
+    "-id",
+    "--manager_id",
+    type=int,
+    required=True,
+    default=0,
+    show_default=True,
+    help="The unique identifier for the process that manages this runtime.",
+)
+@click.option(
+    "-r",
+    "--recalculate_checksum",
+    is_flag=True,
+    help=(
+        "Determines whether to recalculate and overwrite the checksum stored inside the ax_checksum.txt file of the "
+        "processed session. When the command is called with this flag, it effectively re-checksums the data instead of "
+        "verifying it."
+    ),
+)
+def resolve_session_checksum(
+    session_path: Path,
+    manager_id: int,
+    processed_data_root: Path | None,
+    recalculate_checksum: bool,
+) -> None:
+    """Checks the integrity of the target session's 'raw_data' directory or (re)generates the directory checksum.
+
+    This command assumes that the data has been checksummed during acquisition and contains an ax_checksum.txt file
+    that stores the data checksum. It only works with the 'raw_data' session directory and ignores the 'processed_data'
+    and any other directory. If the command is called with the --recalculate_checksum flag, it instead recalculates and
+    overwrites the checksum stored in the ax_checksum.txt file.
+    """
+
+    resolve_checksum(
+        session_path=session_path,
+        manager_id=manager_id,
+        processed_data_root=processed_data_root,
+        regenerate_checksum=recalculate_checksum,
+    )
+
+
+@click.command()
+@click.option(
+    "-sp",
+    "--session_path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=True,
+    help="The absolute path to the session directory for which to reset the processing trackers.",
+)
+@click.option(
+    "-pdr",
+    "--processed_data_root",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=False,
+    help=(
+        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
+        "this command, if it is different from raw session's data location."
+    ),
+)
+@click.option(
+    "-t",
+    "--tracker",
+    type=str,
+    required=False,
+    help=(
+        "The name fo the processing tracker file to reset. Note, the input name must match one of the options "
+        "available from the TrackerFileNames enumeration. If this argument is not provided, the command resets all "
+        "available trackers."
+    ),
+)
+def reset_session_trackers(
+    session_path: Path,
+    tracker: str | None | tuple[TrackerFileNames, ...],
+    processed_data_root: Path | None,
+) -> None:
+    """Resets the requested processing tracker files for the target session to the initial state.
+
+    This command is primarily intended to be used on remote compute servers to recover unexpectedly aborted pipelines.
+    As part of its runtime, it loops over each requested tracker file and uses the ProcessingTracker.abort() method to
+    reset the trackers to pre-pipeline-runtime states.
+    """
+
+    # Resolves the tracker(s) to target and casts to TrackerFileNames enumeration type.
+    if isinstance(tracker, str):
+        tracker = (TrackerFileNames(tracker),)
+
+    # Resets the target trackers
+    reset_trackers(
+        session_path=session_path,
+        trackers=tracker,
+        processed_data_root=processed_data_root,
+    )
 
 
 @click.command()
@@ -19,29 +148,50 @@ from .data_classes import SessionData
     help="The absolute path to the session directory whose raw data needs to be verified for potential corruption.",
 )
 @click.option(
+    "-pdr",
+    "--processed_data_root",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=False,
+    help=(
+        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
+        "this command, if it is different from raw session's data location."
+    ),
+)
+@click.option(
     "-id",
     "--manager_id",
     type=int,
     required=True,
     default=0,
     show_default=True,
-    help=(
-        "The xxHash-64 hash value that represents the unique identifier for the process that manages this runtime. "
-        "This is primarily used when calling this CLI on remote compute servers to ensure that only a single process "
-        "can execute the CLI at a time."
-    ),
+    help="The unique identifier for the process that manages this runtime.",
 )
+def prepare_session_for_processing(
+    session_path: Path,
+    manager_id: int,
+    processed_data_root: Path | None,
+) -> None:
+    """Prepares the target session data for processing by ensuring that both raw and processed data is stored on the
+    processed data volume (fast drive) of the filesystem.
+
+    This command is primarily intended to run on remote compute servers that use slow HDD volumes to maximize data
+    integrity and fast NVME volumes to maximize data processing speed. For such systems, moving data to fast volumes
+    before processing results in a measurable processing speed increase.
+    """
+    prepare_session(
+        session_path=session_path,
+        manager_id=manager_id,
+        processed_data_root=processed_data_root,
+    )
+
+
+@click.command()
 @click.option(
-    "-c",
-    "--create_processed_directories",
-    is_flag=True,
-    show_default=True,
-    default=False,
-    help=(
-        "Determines whether to create the processed data hierarchy. This flag should be disabled for most runtimes. "
-        "Primarily, it is used by acquisition systems to generate processed data directories on the remote "
-        "compute servers as part of the data preprocessing pipeline."
-    ),
+    "-sp",
+    "--session_path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=True,
+    help="The absolute path to the session directory whose raw data needs to be verified for potential corruption.",
 )
 @click.option(
     "-pdr",
@@ -50,61 +200,35 @@ from .data_classes import SessionData
     required=False,
     help=(
         "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
-        "this command. This argument is used when calling the CLI on the BioHPC server, which uses different data "
-        "volumes for raw and processed data. Note, the input path must point to the root directory, as it will be "
-        "automatically modified to include the project name, the animal id, and the session ID. This argument is only "
-        "used if 'create_processed_directories' flag is True."
+        "this command, if it is different from raw session's data location."
     ),
 )
 @click.option(
-    "-um",
-    "--update_manifest",
-    is_flag=True,
-    help=(
-        "Determines whether to (re)generate the manifest file for the processed session's project. This flag "
-        "should always be enabled when this CLI is executed on the remote compute server(s) to ensure that the "
-        "manifest file always reflects the most actual state of each project."
-    ),
+    "-id",
+    "--manager_id",
+    type=int,
+    required=True,
+    default=0,
+    show_default=True,
+    help="The unique identifier for the process that manages this runtime.",
 )
-def verify_session_integrity(
+def archive_session_for_storage(
     session_path: Path,
     manager_id: int,
-    create_processed_directories: bool,
     processed_data_root: Path | None,
-    update_manifest: bool,
 ) -> None:
-    """Checks the integrity of the target session's raw data (contents of the raw_data directory).
+    """Prepares the target session data for long-term storage by ensuring that both raw and processed data is stored
+    only on the raw data (slow drive) volume.
 
-    This command assumes that the data has been checksummed during acquisition and contains an ax_checksum.txt file
-    that stores the data checksum generated before transferring the data to the long-term storage destination. This
-    function always verified the integrity of the 'raw_data' directory. It does not work with 'processed_data' or any
-    other directories. If the session data was corrupted, the command removes the 'telomere.bin' file, marking the
-    session as 'incomplete' and automatically excluding it from all further automated processing runtimes. If the
-    session data is intact, it generates a 'verified.bin' marker file inside the session's raw_data folder.
-
-    The command is also used by Sun lab data acquisition systems to generate the processed data hierarchy for each
-    processed session. This use case is fully automated and should not be triggered manually by the user.
+    This command is primarily intended to run on remote compute servers that use slow HDD volumes to maximize data
+    integrity and fast NVME volumes to maximize data processing speed. For such systems, all sessions that are no longer
+    actively processed or analyzed should be moved to the slow drive volume for long-term storage.
     """
-    session = Path(session_path)
-    session_data = SessionData.load(session_path=session)
-
-    # Runs the verification process
-    resolve_checksum(
-        session_path=session,
+    archive_session(
+        session_path=session_path,
         manager_id=manager_id,
-        create_processed_data_directory=create_processed_directories,
         processed_data_root=processed_data_root,
-        update_manifest=update_manifest,
     )
-
-    # Checks the outcome of the verification process
-    tracker = ProcessingTracker(file_path=session_data.raw_data.raw_data_path.joinpath(TrackerFileNames.INTEGRITY))
-    if tracker.is_complete:
-        # noinspection PyTypeChecker
-        console.echo(message=f"Session {session.stem} raw data integrity: Verified.", level=LogLevel.SUCCESS)
-    else:
-        # noinspection PyTypeChecker
-        console.echo(message=f"Session {session.stem} raw data integrity: Compromised!", level=LogLevel.ERROR)
 
 
 @click.command()
@@ -113,7 +237,7 @@ def verify_session_integrity(
     "--project_path",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    help="The absolute path to the project directory where raw session data is stored.",
+    help="The absolute path to the project-specific directory where raw session data is stored.",
 )
 @click.option(
     "-pdr",
@@ -121,25 +245,20 @@ def verify_session_integrity(
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=False,
     help=(
-        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
-        "this command. This argument is used when calling the CLI on the BioHPC server, which uses different data "
-        "volumes for raw and processed data. Note, the input path must point to the root directory, as it will be "
-        "automatically modified to include the project name. Note, if the system cannot properly resolve the path to "
-        "the processed data, the generated manifest will indicate that no data processing has been performed for the "
-        "project."
+        "The absolute path to the directory where processed data from all Sun lab projects is stored on the machine "
+        "that runs this command, if different the root directory used to store raw project data."
     ),
 )
 def generate_project_manifest_file(project_path: Path, processed_data_root: Path | None) -> None:
-    """Generates the manifest .feather file that provides information about the data-processing state of all available
-    project sessions.
+    """Generates the manifest .feather file that communicates the current state of the target project's data.
 
     The manifest file is typically used when batch-processing session data on the remote compute server. It contains the
     comprehensive snapshot of the available project's data in a table-compatible format that can also be transferred
-    between machines (as it is cached in a file).
+    between machines as a .feather file.
     """
     generate_project_manifest(
         raw_project_directory=Path(project_path),
-        processed_data_root=Path(processed_data_root) if processed_data_root else None,
+        processed_data_root=processed_data_root,
     )
     # noinspection PyTypeChecker
     console.echo(message=f"Project {Path(project_path).stem} data manifest file: generated.", level=LogLevel.SUCCESS)
@@ -255,27 +374,199 @@ def generate_server_credentials_file(
 
 @click.command()
 @click.option(
-    "-cp",
-    "--credentials_path",
-    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+    "-sp",
+    "--session_path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
+    help="The absolute path to the session directory for which to resolve the dataset integration readiness marker.",
+)
+@click.option(
+    "-pdr",
+    "--processed_data_root",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=False,
     help=(
-        "The absolute path to the server_credentials.yaml file that stores access credentials for the target Sun lab "
-        "server. If necessary, use the 'sl-create-server-credentials' command to generate the file."
+        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
+        "this command, if different from the directory used to store raw data."
+    ),
+)
+@click.option(
+    "-r",
+    "--remove",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Determines whether the command should create or remove the dataset integration marker.",
+)
+def resolve_dataset_marker(
+    session_path: Path,
+    processed_data_root: Path | None,
+    remove: bool,
+) -> None:
+    """Depending on configuration, either creates or removes the p53.bin marker from the target session.
+
+    The p53.bin marker determines whether the session is ready for dataset integration. When the marker exists,
+    processing pipelines are not allowed to work with the session data, ensuring that all processed data remains
+    unchanged. If the marker does not exist, dataset integration pipelines are not allowed to work with the session
+    data, enabling processing pipelines to safely modify the data at any time.
+    """
+    resolve_p53_marker(
+        session_path=session_path,
+        processed_data_root=processed_data_root,
+        remove=remove,
+    )
+
+
+@click.command()
+@click.option(
+    "-d",
+    "--directory",
+    type=click.Path(exists=False, file_okay=False, dir_okay=True, path_type=Path),
+    required=True,
+    help="The absolute path to the directory to use for working with Sun lab data.",
+)
+def designate_working_directory(directory: Path) -> None:
+    """Sets the input directory as the Sun lab working directory, creating any missing directory path components.
+
+    After the directory is configured, all calls to this library use this directory to store the intermediate data
+    required to perform the requested task. This system allows the library to behave consistently across different
+    user machines and runtime contexts.
+    """
+    # Creates the directory if it does not exist
+    ensure_directory_exists(directory)
+
+    # Sets the directory as the local working directory
+    set_working_directory(path=directory)
+
+    console.echo(message=f"Sun lab working directory set to: {directory}.", level=LogLevel.SUCCESS)
+
+
+@click.command()
+@click.option(
+    "-p",
+    "--project",
+    type=str,
+    required=True,
+    help="The name of the project for which to print the manifest data.",
+)
+@click.option(
+    "-a",
+    "--animal",
+    type=str,
+    required=False,
+    help=(
+        "The name of the animal for which to print the manifest data. If not provided, this CLI prints the data for "
+        "all animals that participate in the specified project."
     ),
 )
 @click.option(
     "-n",
-    "--name",
-    type=str,
-    required=True,
+    "--notes",
+    is_flag=True,
     show_default=True,
-    default="jupyter_server",
+    default=False,
     help=(
-        "The descriptive name to be given to the remote Jupyter server job. Primarily, this is used to identify the "
-        "job inside the log files."
+        "Determines whether to print the experimenter note view of the available manifest data. This data view is "
+        "optimized for checking the outcome of each session conducted as part of the target project and, optionally, "
+        "by the specified animal."
     ),
 )
+@click.option(
+    "-s",
+    "--summary",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help=(
+        "Determines whether to print the data processing view of the available manifest data. This view is optimized "
+        "for tracking the data processing state of each session conducted as part of the project."
+    ),
+)
+@click.option(
+    "-u",
+    "--update_manifest",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help=(
+        "Determines whether to fetch the most recent project manifest version stored on the remote server before "
+        "displaying the data. Since the manifest file is cached locally, this option is only required if the project "
+        "data stored on the server has updated since the last call to this CLI."
+    ),
+)
+@click.option(
+    "-r",
+    "--regenerate_manifest",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help=(
+        "Determines whether to regenerate the manifest file on the remote server before fetching it it to the local "
+        "working directory. This flag requires service access privileges and is not recommend for most use cases, as "
+        "all lab pipelines automatically update the manifest file as part of their runtime."
+    ),
+)
+def print_project_manifest_data(
+    project: str,
+    animal: str | None,
+    notes: bool,
+    summary: bool,
+    update_manifest: bool,
+    regenerate_manifest: bool,
+) -> None:
+    if not summary and not notes:
+        message = (
+            f"No data display options were selected when calling the command. Pass either the 'notes' (-n), "
+            f"'summary' (-s), or both flags when calling the command to display the data using the target format."
+        )
+        console.error(message=message, error=ValueError)
+
+    # Resolves the path to the manifest file
+    manifest_path = get_working_directory().joinpath(project, "manifest.feather")
+
+    # If the manifest file does not exist on the local machine, ensures it is fetched from the remove server
+    if not manifest_path.exists() and not regenerate_manifest and not update_manifest:
+        update_manifest = True
+
+    # If requested, fetches the most recent manifest file instance from the remote server to the working directory
+    # before printing the project data. Note, the default is expected to be 'update' as it does not requre service
+    # account credentials.
+    if update_manifest:
+        # Establishes SSH connection to the processing server using the user account credentials.
+        credentials = get_credentials_file_path(require_service=False)
+        server = Server(credentials_path=credentials)
+        fetch_remote_project_manifest(project=project, server=server)
+
+    # Manifest regeneration requires service account credentials and re-creates the manifest before fetching it to the
+    # local machine.
+    elif regenerate_manifest:
+        # Establishes SSH connection to the processing server using the service account credentials.
+        credentials = get_credentials_file_path(require_service=True)
+        server = Server(credentials_path=credentials)
+        generate_remote_project_manifest(project=project, server=server)
+
+    # Loads the manifest file data into memory
+    manifest = ProjectManifest(manifest_file=manifest_path)
+
+    # Ensures that the specified animal exists in the manifest data. Since the manifest is optimized for the Sun lab
+    # data format, it stores animal IDs as integers. To improve the flexibility of this CLI, converts animal IDs to
+    # strings before running the check.
+    if animal is not None and animal not in [str(animal) for animal in manifest.animals]:
+        message = (
+            f"Unable to display the data for the target animal ({animal}), as the animal does not belong to the "
+            f"target project ({project})."
+        )
+        console.error(message=message, error=ValueError)
+
+    # If requested, prints the experimenter note view of the manifest data
+    if notes:
+        manifest.print_notes(animal=animal)
+
+    # If requested, prints the data processing view of the manifest data
+    if summary:
+        manifest.print_summary(animal=animal)
+
+
 @click.option(
     "-e",
     "--environment",
@@ -289,27 +580,13 @@ def generate_server_credentials_file(
     ),
 )
 @click.option(
-    "-d",
-    "--directory",
-    type=click.Path(exists=False, file_okay=True, dir_okay=True, path_type=Path),
-    required=False,
-    help=(
-        "The absolute path to the server directory to use as the root directory for the jupyter session. If not "
-        "provided, this is automatically resolved to user's working directory. Note, during runtime, Jupyter will only "
-        "have access to files stored in or under that root directory."
-    ),
-)
-@click.option(
     "-c",
     "--cores",
     type=int,
     required=True,
     show_default=True,
     default=2,
-    help=(
-        "The number of CPU cores to allocate to the Jupyter server. Note, during the interactive Jupyter runtime, it "
-        "is be impossible to use more than this number of CPU cores."
-    ),
+    help="The number of CPU cores to allocate to the Jupyter server.",
 )
 @click.option(
     "-m",
@@ -318,10 +595,7 @@ def generate_server_credentials_file(
     required=True,
     show_default=True,
     default=32,
-    help=(
-        "The RAM, in Gigabytes, to allocate to the Jupyter server. Note, during the interactive Jupyter runtime, it "
-        "is be impossible to use more than this amount of RAM."
-    ),
+    help="The memory (RAM), in Gigabytes, to allocate to the Jupyter server.",
 )
 @click.option(
     "-t",
@@ -332,9 +606,8 @@ def generate_server_credentials_file(
     default=240,
     help=(
         "The maximum runtime duration for this Jupyter server instance, in minutes. If the server job is still running "
-        "at the end of this time limit, the job will be forcibly terminated by SLURM. Note, to prevent hogging the "
-        "server, make sure this parameter is always set to the smallest feasible period of time you intend to interact "
-        "with the server."
+        "at the end of this time limit, the job will be forcibly terminated by SLURM. To prevent hogging the server, "
+        "make sure this parameter is always set to the smallest feasible period of time."
     ),
 )
 @click.option(
@@ -346,38 +619,36 @@ def generate_server_credentials_file(
     default=0,
     help=(
         "The port to use for the Jupyter server communication on the remote server. Valid port values are from 8888 "
-        "to 9999. Most runtimes should leave this set to the default value (0), which will randomly select one of the "
+        "to 9999. Most runtimes should leave this set to the default value (0), which randomly selects one of the "
         "valid ports. Using random selection minimizes the chances of colliding with other interactive jupyter "
         "sessions."
     ),
 )
-def start_jupyter_server(
-    credentials_path: Path, name: str, environment: str, directory: Path, cores: int, memory: int, time: int, port: int
-) -> None:
+def start_jupyter_server(environment: str, cores: int, memory: int, time: int, port: int) -> None:
     """Starts an interactive Jupyter session on the remote Sun lab server.
 
-    This command should be used to run Jupyter lab and notebooks sessions on the remote Sun lab server. Since all lab
-    data is stored on the server, this allows running light interactive analysis sessions on the same node as the data,
+    This command allows running Jupyter lab and notebook sessions on the remote Sun lab server. Since all lab data is
+    stored on the server, this allows running interactive analysis sessions on the same node as the data,
     while leveraging considerable compute resources of the server.
 
     Calling this command initializes a SLURM session that runs the interactive Jupyter server. Since this server
     directly competes for resources with all other headless jobs running on the server, it is imperative that each
-    jupyter runtime uses only the minimum amount of resources and run-time as necessary. Do not use this command to run
-    heavy data processing pipelines! Instead, consult with library documentation and use the headless Job class.
+    jupyter runtime uses the minimum amount of resources as necessary. Do not use this command to run
+    heavy data processing pipelines! Instead, consult the API documentation for this library and use the headless
+    Job or Pipeline class.
     """
     # Initializes server connection
+    credentials_path = get_credentials_file_path(require_service=False)
     server = Server(credentials_path)
-    job: JupyterJob | None = None
-    try:
-        # If the caller did not provide an explicit notebook directory, defaults to the user's working directory
-        if directory is None:
-            directory = (server.user_working_root,)
 
-        # Launches the specified Jupyter server
+    job: JupyterJob | None = None
+    job_name = f"interactive_jupyter_server"
+    try:
+        # Launches the Jupyter server
         job = server.launch_jupyter_server(
-            job_name=name,
+            job_name=job_name,
             conda_environment=environment,
-            notebook_directory=directory,
+            notebook_directory=server.user_working_root,
             cpus_to_use=cores,
             ram_gb=memory,
             port=port,
@@ -399,72 +670,3 @@ def start_jupyter_server(
 
         # Closes the server connection if it is still open
         server.close()
-
-
-@click.command()
-@click.option(
-    "-sp",
-    "--session_path",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-    required=True,
-    help="The absolute path to the session directory for which to resolve the dataset integration readiness marker.",
-)
-@click.option(
-    "-c",
-    "--create_processed_directories",
-    is_flag=True,
-    show_default=True,
-    default=False,
-    help="Determines whether to create the processed data hierarchy. This flag should be disabled for most runtimes.",
-)
-@click.option(
-    "-pdr",
-    "--processed_data_root",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-    required=False,
-    help=(
-        "The absolute path to the directory where processed data from all projects is stored on the machine that runs "
-        "this command. This argument is used when calling the CLI on the BioHPC server, which uses different data "
-        "volumes for raw and processed data. Note, the input path must point to the root directory, as it will be "
-        "automatically modified to include the project name."
-    ),
-)
-@click.option(
-    "-r",
-    "--remove",
-    is_flag=True,
-    show_default=True,
-    default=False,
-    help="Determines whether the command should create or remove the dataset integration marker.",
-)
-@click.option(
-    "-um",
-    "--update_manifest",
-    is_flag=True,
-    help=(
-        "Determines whether to (re)generate the manifest file for the processed session's project. This flag "
-        "should always be enabled when this CLI is executed on the remote compute server(s) to ensure that the "
-        "manifest file always reflects the most actual state of each project."
-    ),
-)
-def resolve_dataset_marker(
-    session_path: Path,
-    create_processed_directories: bool,
-    processed_data_root: Path | None,
-    remove: bool,
-    update_manifest: bool,
-) -> None:
-    """Depending on configuration, either creates or removes the p53.bin marker from the target session.
-
-    The p53.bin marker determines whether the session is ready for dataset integration. When the marker exists,
-    processing pipelines are not allowed to work with the session data, ensuring that all processed data remains
-    unchanged. If the marker does not exist, dataset integration pipelines are not allowed to work with the session
-    data, enabling processing pipelines to safely modify the data at any time.
-    """
-    resolve_p53_marker(
-        session_path=session_path,
-        create_processed_data_directory=create_processed_directories,
-        processed_data_root=processed_data_root,
-        remove=remove,
-        update_manifest=update_manifest,
-    )

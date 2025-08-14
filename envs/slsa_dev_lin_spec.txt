@@ -1,4 +1,4 @@
-List of packages in environment: "/home/cybermouse/miniforge3/envs/slsa_dev_lin"
+List of packages in environment: "/home/cyberaxolotl/miniforge3/envs/slsa_dev_lin"
 
 https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
 https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-2_gnu.tar.bz2
