@@ -255,12 +255,6 @@ class TrackingData:
     """Stores the path to the root tracking_data directory of the session. This directory stores the .yaml 
     ProcessingTracker files and the .lock FileLock files that jointly ensure that session's data is accessed in a 
     process- and thread-safe way while being processed by multiple different processes and pipelines."""
-    p53_path: Path = Path()
-    """Stores the path to the p53.bin file. This file serves as a lock-in marker that determines whether the session is 
-    in the processing or dataset state. Specifically, if the file does not exist, the session data cannot be integrated 
-    into any dataset, as it may be actively worked on by processing pipelines. Conversely, if the marker exists, 
-    processing pipelines are not allowed to work with the session, as it may be actively integrated into one or more 
-    datasets."""
     session_lock_path: Path = Path()
     """Stores the path to the session_lock.yaml file for the session. This file is used to ensure that only a single 
     manager process has exclusive access to the session's data on the remote compute server. This ensures that multiple 
@@ -278,8 +272,7 @@ class TrackingData:
                 using the following hierarchy: root/project/animal/session_id
         """
         # Generates the managed paths
-        self.tracking_data_path = root_directory_path.joinpath("tracking_data")
-        self.p53_path = self.tracking_data_path.joinpath("p53.bin")
+        self.tracking_data_path = root_directory_path
         self.session_lock_path = self.tracking_data_path.joinpath("session_lock.yaml")
 
     def make_directories(self) -> None:
@@ -340,10 +333,15 @@ class SessionData(YamlConfig):
     Processed data encompasses all data generated from the raw data as part of data processing."""
     source_data: RawData = field(default_factory=lambda: RawData())
     """Stores absolute paths to the same data as the 'raw_data' field, but with all paths resolved relative to the 
-    processed_data root. On systems that use the same root for processed and raw data, the source and raw directories 
+    'processed_data' root. On systems that use the same root for processed and raw data, the source and raw directories 
     are identical. On systems that use different root directories for processed and raw data, the source and raw 
     directories are different. This is used to optimize data processing on the remote compute server by temporarily 
     copying all session data to the fast processed data volume."""
+    archived_data: ProcessedData = field(default_factory=lambda: ProcessedData())
+    """Similar to the 'source_data' field, stores the absolute path to the same data as the 'processed_data' field, but 
+    with all paths resolved relative to the 'raw_data' root. This path is used as part of the session data archiving 
+    process to collect all session data (raw and processed) on the slow 'storage' volume of the remote compute server.
+    """
     tracking_data: TrackingData = field(default_factory=lambda: TrackingData())
     """Stores absolute paths to all directories and files that jointly make the session's tracking data hierarchy. This 
     hierarchy is used during all stages of data processing to track the processing progress and ensure only a single 
@@ -359,6 +357,9 @@ class SessionData(YamlConfig):
 
         if not isinstance(self.source_data, RawData):
             self.raw_data = RawData()
+
+        if not isinstance(self.archived_data, ProcessedData):
+            self.archived_data = ProcessedData()
 
         if not isinstance(self.tracking_data, TrackingData):
             self.raw_data = RawData()
@@ -469,13 +470,18 @@ class SessionData(YamlConfig):
         # Added in version 5.0.0. While source data is not used when the session is created (and is set to the same
         # directory as raw_data), it is created here for completeness.
         source_data = RawData()
-        source_data.resolve_paths(root_directory_path=session_path.joinpath("raw_data"))
+        source_data.resolve_paths(root_directory_path=session_path.joinpath("source_data"))
+
+        # Added in version 5.0.0. While processed data is not used when the session is created (and is set to the same
+        # directory as processed_data), it is created here for completeness.
+        archived_data = ProcessedData()
+        archived_data.resolve_paths(root_directory_path=session_path.joinpath("archived_data"))
 
         # Similar to source_data, tracking data uses the same root as raw_data and is not used during data acquisition.
-        # Tracking data is sued during data processing on the remote compute server(s) to ensure multiple pipelines
-        # can work with session's data without collision.
+        # Tracking data is used during data processing on the remote compute server(s) to ensure multiple pipelines
+        # can work with the session's data without collision.
         tracking_data = TrackingData()
-        tracking_data.resolve_paths(root_directory_path=session_path.joinpath("raw_data"))
+        tracking_data.resolve_paths(root_directory_path=session_path.joinpath("tracking_data"))
 
         # Packages the sections generated above into a SessionData instance
         # noinspection PyArgumentList
@@ -590,15 +596,27 @@ class SessionData(YamlConfig):
                 instance.project_name, instance.animal_id, instance.session_name, "processed_data"
             )
         )
-        instance.processed_data.make_directories()  # Ensures processed data directories exist
 
         # SOURCE DATA
         instance.source_data.resolve_paths(
             root_directory_path=processed_data_root.joinpath(
-                instance.project_name, instance.animal_id, instance.session_name, "raw_data"
+                instance.project_name, instance.animal_id, instance.session_name, "source_data"
             )
         )
         # Note, since source data is populated as part of the 'preparation' runtime, does not make the directories.
+
+        # ARCHIVED DATA
+        instance.archived_data.resolve_paths(
+            root_directory_path=local_root.joinpath(
+                instance.project_name, instance.animal_id, instance.session_name, "archived_data"
+            )
+        )
+        # Similar to source_data, archived data is populated as part of the 'archiving' pipeline, so directories for
+        # this data are not resolved.
+
+        # If there is no archived processed data, ensures that processed data hierarchy exists.
+        if not instance.archived_data.processed_data_path.exists():
+            instance.processed_data.make_directories()  # Ensures processed data directories exist
 
         # TRACKING DATA
         instance.tracking_data.resolve_paths(
@@ -638,6 +656,7 @@ class SessionData(YamlConfig):
         origin.raw_data = None  # type: ignore
         origin.processed_data = None  # type: ignore
         origin.source_data = None  # type: ignore
+        origin.archived_data = None  # type: ignore
         origin.tracking_data = None  # type: ignore
 
         # Converts StringEnum instances to strings
@@ -718,7 +737,8 @@ class SessionLock(YamlConfig):
                 console.error(message=message, error=RuntimeError)
                 raise RuntimeError(message)
 
-            # The lock is free or already owned by this manager, so returns True
+            # The lock is free or already owned by this manager. If the lock is free, locks the session for the current
+            # manager. If it is already owned by this manager, it does nothing.
             self._manager_id = manager_id
             self._save_state()
 

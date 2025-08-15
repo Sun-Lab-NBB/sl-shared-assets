@@ -8,9 +8,9 @@ from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 
 from ..tools import (
     ProjectManifest,
+    archive_session,
     prepare_session,
     resolve_checksum,
-    resolve_p53_marker,
     generate_project_manifest,
     fetch_remote_project_manifest,
     generate_remote_project_manifest,
@@ -33,47 +33,60 @@ def manage() -> None:
 @manage.group("session")
 @click.option(
     "-sp",
-    "--session_path",
+    "--session-path",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    help="The absolute path to the root session directory to process. The root directory must contain the 'raw_data' "
+    help="The absolute path to the root session directory to process. This directory must contain the 'raw_data' "
     "subdirectory.",
 )
 @click.option(
     "-pdr",
-    "--processed_data_root",
+    "--processed-data-root",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=False,
     help=(
         "The absolute path to the directory that stores the processed data from all Sun lab projects, if it is "
-        "different from the root directory of the path provided to the 'session_path' argument."
+        "different from the root directory included in the 'session-path' argument value."
     ),
 )
 @click.option(
     "-id",
-    "--manager_id",
+    "--manager-id",
     type=int,
     required=True,
     default=0,
     show_default=True,
     help="The unique identifier of the process that manages this runtime.",
 )
+@click.option(
+    "-r",
+    "--reset-tracker",
+    is_flag=True,
+    required=False,
+    help=(
+        "Determines whether to forcibly reset the tracker file for the target processing pipeline before "
+        "executing the processing. This flag should only be used in exceptional cases to recover from tracking file "
+        "deadlocks due to improper runtime terminations."
+    ),
+)
 @click.pass_context
-def manage_session(ctx: Any, session_path: Path, processed_data_root: Path | None, manager_id: int) -> None:
+def manage_session(
+    ctx: Any, session_path: Path, processed_data_root: Path | None, manager_id: int, reset_tracker: bool
+) -> None:
     """Exposes commands to manage Sun lab session data.
 
     Commands from this CLI are intended to run on the remote compute server to support data processing, dataset
-    integration, and 'cold' storage of the session's data. The end-user should not use this command block directly in
-    most intended use contexts."""
+    integration, and 'cold' storage of the session's data. Lab members typically do not need to use this command block
+    directly and should instead use the bindings offered by the sl-forgery and sl-experiment libraries."""
     ctx.ensure_object(dict)
     ctx.obj["session_path"] = session_path
     ctx.obj["processed_data_root"] = processed_data_root
     ctx.obj["manager_id"] = manager_id
+    ctx.obj["reset_tracker"] = reset_tracker
 
 
 # noinspection PyUnresolvedReferences
 @manage_session.command("checksum")
-@click.pass_context
 @click.option(
     "-rc",
     "--recalculate-checksum",
@@ -83,18 +96,9 @@ def manage_session(ctx: Any, session_path: Path, processed_data_root: Path | Non
         "the command is called with this flag, it effectively re-checksums the data instead of verifying its integrity."
     ),
 )
-@click.option(
-    "-rt",
-    "--reset-tracker",
-    type=str,
-    required=False,
-    help=(
-        "Determines whether to forcibly reset the processing tracker for the checksum resolution pipeline before "
-        "executing the processing. This flag should only be used to recover from tracking failures and not."
-    ),
-)
-def resolve_session_checksum(ctx: Any, recalculate_checksum: bool, reset_tracker: bool) -> None:
-    """Resolves the 'raw_data' directory integrity checksum.
+@click.pass_context
+def resolve_session_checksum(ctx: Any, recalculate_checksum: bool) -> None:
+    """Resolves the integrity checksum for the 'raw_data' directory.
 
     This command can be used to either verify an existing 'raw_data' directory checksum or generate a new checksum.
     It only works with the 'raw_data' session directory, ignoring all other directories.
@@ -104,6 +108,7 @@ def resolve_session_checksum(ctx: Any, recalculate_checksum: bool, reset_tracker
     session_path = ctx.obj["session_path"]
     processed_data_root = ctx.obj["processed_data_root"]
     manager_id = ctx.obj["manager_id"]
+    reset_tracker = ctx.obj["reset_tracker"]
 
     resolve_checksum(
         session_path=session_path,
@@ -120,55 +125,51 @@ def resolve_session_checksum(ctx: Any, recalculate_checksum: bool, reset_tracker
 def prepare_session_for_processing(
     ctx: Any,
 ) -> None:
-    """Prepares the target session data for processing by ensuring that both raw and processed data is stored on the
-    processed data volume (fast drive) of the filesystem.
+    """Prepares the target session data for processing.
 
-    This command is primarily intended to run on remote compute servers that use slow HDD volumes to maximize data
-    integrity and fast NVME volumes to maximize data processing speed. For such systems, moving data to fast volumes
-    before processing results in a measurable processing speed increase.
+    To do so, ensures that both raw and processed data is stored on the working (NVME) volume of the filesystem. This
+    command is primarily intended to run on remote compute servers that use slow HDD volumes to maximize data
+    integrity and fast NVME volumes to maximize data processing speed. For such systems, moving the data to the fast
+    volume before processing results in a measurable processing speed increase.
     """
     # Extracts shared parameters from context
     session_path = ctx.obj["session_path"]
     processed_data_root = ctx.obj["processed_data_root"]
     manager_id = ctx.obj["manager_id"]
+    reset_tracker = ctx.obj["reset_tracker"]
 
     prepare_session(
         session_path=session_path,
         manager_id=manager_id,
         processed_data_root=processed_data_root,
+        reset_tracker=reset_tracker,
     )
 
 
 # noinspection PyUnresolvedReferences
-@manage_session.command("dataset-marker")
+@manage_session.command("archive")
 @click.pass_context
-@click.option(
-    "-r",
-    "--remove",
-    is_flag=True,
-    show_default=True,
-    default=False,
-    help="Determines whether the command should create or remove the dataset integration marker.",
-)
-def resolve_dataset_marker(
+def archive_session_for_storage(
     ctx: Any,
-    remove: bool,
 ) -> None:
-    """Depending on configuration, either creates or removes the p53.bin marker from the target session.
+    """Prepares the target session data for long-term storage.
 
-    The p53.bin marker determines whether the session is ready for dataset integration. When the marker exists,
-    processing pipelines are not allowed to work with the session data, ensuring that all processed data remains
-    unchanged. If the marker does not exist, dataset integration pipelines are not allowed to work with the session
-    data, enabling processing pipelines to safely modify the data at any time.
+    To do so, ensures that all session data (raw and processed) is stored only on the storage (HDD) volume. This command
+    is primarily intended to run on remote compute servers that use slow HDD volumes to maximize data integrity and fast
+    NVME volumes to maximize data processing speed. For such systems, all sessions that are no longer actively
+    processed or analyzed should be moved to the slow drive volume for long-term storage.
     """
     # Extracts shared parameters from context
     session_path = ctx.obj["session_path"]
     processed_data_root = ctx.obj["processed_data_root"]
+    manager_id = ctx.obj["manager_id"]
+    reset_tracker = ctx.obj["reset_tracker"]
 
-    resolve_p53_marker(
+    archive_session(
         session_path=session_path,
+        manager_id=manager_id,
         processed_data_root=processed_data_root,
-        remove=remove,
+        reset_tracker=reset_tracker,
     )
 
 
@@ -200,7 +201,10 @@ def generate_project_manifest_file(project_path: Path, processed_data_root: Path
     generate_project_manifest(
         raw_project_directory=Path(project_path),
         processed_data_root=processed_data_root,
+        manager_id=1,
+        reset_tracker=False,
     )
+
     # noinspection PyTypeChecker
     console.echo(message=f"Project {Path(project_path).stem} data manifest file: generated.", level=LogLevel.SUCCESS)
 

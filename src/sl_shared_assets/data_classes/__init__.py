@@ -1,6 +1,6 @@
 """This package provides the classes used to store data acquired at all stages of the Sun lab data workflow and to
-configure the pipelines used in the workflow. Many classes in this package are designed to be saved to disk as .yaml
-files and restored from the .yaml files as needed."""
+configure various elements and pipelines making up the overall workflow. Many classes in this package are designed to
+be saved to disk as .yaml files and restored from the .yaml files as needed."""
 
 from .runtime_data import (
     ZaberPositions,

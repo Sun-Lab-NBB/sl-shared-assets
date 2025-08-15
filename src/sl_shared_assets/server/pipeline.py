@@ -43,12 +43,12 @@ class TrackerFileNames(StrEnum):
     """This file is used to track the state of the single-day suite2p processing pipeline."""
     VIDEO = "video_processing_tracker.yaml"
     """This file is used to track the state of the video (DeepLabCut) processing pipeline."""
-    DATASET = "dataset_marker_tracker.yaml"
-    """This file is used to track the state of the dataset marker resolution pipeline."""
     FORGING = "dataset_forging_tracker.yaml"
     """This file is used to track the state of the dataset creation (forging) pipeline."""
     MULTIDAY = "multiday_processing_tracker.yaml"
     """This file is used to track the state of the multiday suite2p processing pipeline."""
+    ARCHIVING = "data_archiving_tracker.yaml"
+    """This file is used to track the state of the data archiving pipeline."""
 
 
 class ProcessingPipelines(StrEnum):
@@ -89,10 +89,6 @@ class ProcessingPipelines(StrEnum):
     VIDEO = "video processing"
     """DeepLabCut (Video) processing pipeline. This pipeline is used to extract animal pose estimation data from the 
     behavior video frames acquired during a single session (day)."""
-    DATASET = "dataset marker resolution"
-    """Dataset marker resolution pipeline. This pipeline is used to switch sessions between data processing and dataset
-    formation modes. Session in the processing mode cannot be integrated into a dataset and sessions in the dataset 
-    formation mode cannot be (re)processed."""
     MULTIDAY = "multi-day suite2p processing"
     """Multi-day suite2p processing (cell tracking) pipeline. This pipeline is used to track cells processed with the 
     single-day suite2p pipelines across multiple days. It is executed for all sessions marked for integration into the 
@@ -101,6 +97,10 @@ class ProcessingPipelines(StrEnum):
     """Dataset creation (forging) pipeline. This pipeline typically runs after the multi-day pipeline. It extracts and 
     integrates the processed data from various sources such as brain activity, behavior, videos, etc., into a unified 
     dataset."""
+    ARCHIVING = "data archiving"
+    """Data archiving pipeline. To conserve the (limited) space on the fast working volume, once the data has been 
+    processed and integrated into a stable dataset, the processed data folder is moved to the storage volume and all 
+    folders under the root session folder on the processed data volume are deleted."""
 
 
 class ProcessingStatus(IntEnum):

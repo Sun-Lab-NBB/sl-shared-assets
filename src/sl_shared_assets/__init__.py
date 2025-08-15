@@ -10,7 +10,6 @@ from ataraxis_base_utilities import console
 from .tools import (
     ProjectManifest,
     delete_directory,
-    resolve_p53_marker,
     transfer_directory,
     generate_project_manifest,
     calculate_directory_checksum,
@@ -110,6 +109,5 @@ __all__ = [
     "get_credentials_file_path",
     "get_system_configuration_data",
     "get_working_directory",
-    "resolve_p53_marker",
     "transfer_directory",
 ]

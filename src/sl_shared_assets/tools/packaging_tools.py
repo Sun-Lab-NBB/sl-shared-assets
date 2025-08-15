@@ -20,14 +20,8 @@ _excluded_files = {
     "ax_checksum.txt",
     "ubiquitin.bin",
     "telomere.bin",
-    "p53.bin",
     "nk.bin",
 }
-
-# Extends the exclusion set to include all tracker .yaml files and their concurrent access .lock files.
-for name in tuple(TrackerFileNames):
-    _excluded_files.add(name)
-    _excluded_files.add(f"{name}.lock")
 
 
 def _calculate_file_checksum(base_directory: Path, file_path: Path) -> tuple[str, bytes]:

@@ -557,8 +557,8 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
     if not path_file.exists():
         message = (
             "Unable to resolve the path to the local system configuration file, as local machine does not have the "
-            "Sun lab data directory. Generate the local configuration file and Sun lab data directory by calling the "
-            "'sl-create-system-config' CLI command and rerun the command that produced this error."
+            "Sun lab data directory. Generate the local configuration file and Sun lab data directory by using the "
+            "appropriate CLI command and rerun the command that produced this error."
         )
         console.error(message=message, error=FileNotFoundError)
 
@@ -570,8 +570,8 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
     if not configuration_file.exists():
         message = (
             "Unable to resolve the path to the local system configuration file, as the file pointed by the path stored "
-            "in Sun lab data directory does not exist. Generate a new local configuration file by calling the "
-            "'sl-create-system-config' CLI command and rerun the command that produced this error."
+            "in Sun lab data directory does not exist. Generate a new local system configuration file by calling the "
+            "appropriate CLI command and rerun the command that produced this error."
         )
         console.error(message=message, error=FileNotFoundError)
 
@@ -667,9 +667,9 @@ def get_working_directory() -> Path:
     if not path_file.exists():
         message = (
             "Unable to resolve the path to the local working directory, as local machine does not have the "
-            "Sun lab data directory. This indicates that the local directory has not been designated. Designate the "
-            "local working directory by calling the 'sl-set-working-directory' CLI command and rerun the command that "
-            "produced this error."
+            "Sun lab data directory. This indicates that the local directory has not been set. Set the "
+            "local working directory by using the appropriate CLI command and rerun the command that produced this "
+            "error."
         )
         console.error(message=message, error=FileNotFoundError)
 
@@ -681,8 +681,8 @@ def get_working_directory() -> Path:
     if not working_directory.exists():
         message = (
             "Unable to resolve the path to the local working directory, as the directory pointed by the path stored "
-            "in Sun lab data directory does not exist. Designate a new working directory by calling the "
-            "'sl-set-working-directory' CLI command and rerun the command that produced this error."
+            "in Sun lab data directory does not exist. Set a new working directory by using the appropriate CLI "
+            "command and rerun the command that produced this error."
         )
         console.error(message=message, error=FileNotFoundError)
 
@@ -722,8 +722,8 @@ def get_credentials_file_path(require_service: bool = False) -> Path:
         message = (
             f"Unable to resolve the path to the preferred Sun lab server access credentials file, as at least one of "
             f"the expected files ('service_credentials.yaml' or 'user_credentials.yaml') does not exist in the local "
-            f"Sun lab working directory {working_directory}. Rerun the 'sl-set-working-directory' CLI command to "
-            f"generate the missing files and rerun the command that produced this error."
+            f"Sun lab working directory {working_directory}. Rerun the directory setup CLI command to generate the "
+            f"missing files and rerun the command that produced this error."
         )
         console.error(message=message, error=FileNotFoundError)
 

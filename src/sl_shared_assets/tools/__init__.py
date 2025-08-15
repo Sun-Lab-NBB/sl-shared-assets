@@ -12,14 +12,15 @@ from .processing_pipelines import (
 )
 from .project_management_tools import (
     ProjectManifest,
+    archive_session,
     prepare_session,
     resolve_checksum,
-    resolve_p53_marker,
     generate_project_manifest,
 )
 
 __all__ = [
     "ProjectManifest",
+    "archive_session",
     "calculate_directory_checksum",
     "compose_remote_processing_pipeline",
     "delete_directory",
@@ -28,6 +29,5 @@ __all__ = [
     "generate_remote_project_manifest",
     "prepare_session",
     "resolve_checksum",
-    "resolve_p53_marker",
     "transfer_directory",
 ]
