@@ -1,7 +1,6 @@
-"""This module provides classes used to configure data acquisition and processing runtimes in the Sun lab. All lab
-projects use assets from this module to configure experiment runtimes and determine how to interact with the
-particular data acquisition and runtime management system (hardware) they run on. Similarly, all lab projects use
-assets from this module to process and analyze the data acquired in the lab."""
+"""This module provides classes used to configure data acquisition and processing runtimes in the Sun lab. The assets
+exposed by this module are used to configure specific hardware components used to acquire data and interface
+with the remote hardware (servers) used to store, process, and analyze data."""
 
 import copy
 from enum import StrEnum
@@ -470,7 +469,8 @@ class MesoscopeSystemConfiguration(YamlConfig):
 
 
 # A dictionary that maps the file names for supported data acquisition systems to their configuration classes. This
-# dictionary always contains all data acquisition systems used in the lab.
+# dictionary always contains all data acquisition systems used in the lab. This dictionary is used by the
+# set_system_configuration_file() to automatically extend its functionality to newly added acquisition systems.
 _supported_configuration_files = {"mesoscope_system_configuration.yaml": MesoscopeSystemConfiguration}
 
 
