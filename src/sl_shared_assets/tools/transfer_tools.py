@@ -15,10 +15,55 @@ from ataraxis_base_utilities import console, ensure_directory_exists
 from .packaging_tools import calculate_directory_checksum
 
 
+def delete_directory(directory_path: Path) -> None:
+    """Removes the input directory and all its subdirectories using parallel processing.
+
+    This function outperforms default approaches like subprocess call with rm -rf and shutil rmtree for directories with
+    a comparably small number of large files. For example, this is the case for the mesoscope frame directories, which
+    are deleted ~6 times faster with this method over sh.rmtree. Potentially, it may also outperform these approaches
+    for all comparatively shallow directories.
+
+    Notes:
+        This function is often combined with the transfer_directory function to remove the source directory after
+        it has been transferred.
+
+    Args:
+        directory_path: The path to the directory to delete.
+    """
+    # Checks if the directory exists and, if not, aborts early
+    if not directory_path.exists():
+        return
+
+    # Builds the list of files and directories inside the input directory using Path
+    files = [p for p in directory_path.iterdir() if p.is_file()]
+    subdirectories = [p for p in directory_path.iterdir() if p.is_dir()]
+
+    # Deletes files in parallel
+    with ThreadPoolExecutor() as executor:
+        list(executor.map(os.unlink, files))  # Forces completion of all tasks
+
+    # Recursively deletes subdirectories
+    for subdir in subdirectories:
+        delete_directory(subdir)
+
+    # Removes the now-empty root directory. Since Windows is sometimes slow to release file handles, adds
+    # an optional delay step to give Windows time to release file handles.
+    max_attempts = 5
+    delay_timer = PrecisionTimer("ms")
+    for attempt in range(max_attempts):
+        # noinspection PyBroadException
+        try:
+            directory_path.rmdir()
+            break  # Breaks early if the call succeeds
+        except Exception:
+            delay_timer.delay_noblock(delay=500, allow_sleep=True)  # For each failed attempt, sleeps for 500 ms
+            continue
+
+
 def _transfer_file(source_file: Path, source_directory: Path, destination_directory: Path) -> None:
     """Copies the input file from the source directory to the destination directory while preserving the file metadata.
 
-    This is a worker method used by the transfer_directory() method to move multiple files in parallel.
+    This worker method is used by the transfer_directory() method to move multiple files in parallel.
 
     Notes:
         If the file is found under a hierarchy of subdirectories inside the input source_directory, that hierarchy will
@@ -34,7 +79,9 @@ def _transfer_file(source_file: Path, source_directory: Path, destination_direct
     shutil.copy2(source_file, dest_file)
 
 
-def transfer_directory(source: Path, destination: Path, num_threads: int = 1, verify_integrity: bool = False) -> None:
+def transfer_directory(
+    source: Path, destination: Path, num_threads: int = 1, verify_integrity: bool = False, remove_source: bool = False
+) -> None:
     """Copies the contents of the input directory tree from source to destination while preserving the folder
     structure.
 
@@ -42,13 +89,11 @@ def transfer_directory(source: Path, destination: Path, num_threads: int = 1, ve
         This method recreates the moved directory hierarchy on the destination if the hierarchy does not exist. This is
         done before copying the files.
 
-        The method executes a multithreading copy operation and does not remove the source data after the copy is
-        complete. This behavior is intended and relies on other modules cleaning up the no-longer source data.
+        The method executes a multithreading copy operation and does not by default remove the source data after the
+        copy is complete.
 
-        If the method is configured to verify transferred data integrity, it reruns the xxHash3-128 checksum calculation
-        and compares the returned checksum to the one stored in the source directory. The method assumes that all input
-        directories contain the 'ax_checksum.txt' file that stores the 'source' directory checksum at the highest level
-        of the input directory tree.
+        If the method is configured to verify transferred data integrity, it generates xxHash-128 checksum of the data
+        before and after the transfer and compares the two checksums to detect data corruption.
 
     Args:
         source: The path to the directory that needs to be moved.
@@ -58,9 +103,9 @@ def transfer_directory(source: Path, destination: Path, num_threads: int = 1, ve
             transfers, setting this number above 1 will likely provide a performance boost. For remote transfers using
             a single TCP / IP socket (such as non-multichannel SMB protocol), the number should be set to 1. Setting
             this value to a number below 1 instructs the function to use all available CPU cores.
-        verify_integrity: Determines whether to perform integrity verification for the transferred files. Note,
-            transfer integrity is generally not a concern for most runtimes and may require considerable processing
-            time. Therefore, it is often preferable to disable this option to optimize method runtime speed.
+        verify_integrity: Determines whether to perform integrity verification for the transferred files.
+        remove_source: Determines whether to remove the source directory and all of its contents after the transfer is
+            complete and optionally verified.
 
     Raises:
         RuntimeError: If the transferred files do not pass the xxHas3-128 checksum integrity verification.
@@ -129,47 +174,11 @@ def transfer_directory(source: Path, destination: Path, num_threads: int = 1, ve
             if not destination_checksum == local_checksum.readline().strip():
                 console.error(message=message, error=RuntimeError)
 
-
-def delete_directory(directory_path: Path) -> None:
-    """Removes the input directory and all its subdirectories using parallel processing.
-
-    This function outperforms default approaches like subprocess call with rm -rf and shutil rmtree for directories with
-    a comparably small number of large files. For example, this is the case for the mesoscope frame directories, which
-    are deleted ~6 times faster with this method over sh.rmtree. Potentially, it may also outperform these approaches
-    for all comparatively shallow directories.
-
-    Notes:
-        This function is often combined with the transfer_directory function to remove the source directory after
-        it has been transferred.
-
-    Args:
-        directory_path: The path to the directory to delete.
-    """
-    # Checks if the directory exists and, if not, aborts early
-    if not directory_path.exists():
-        return
-
-    # Builds the list of files and directories inside the input directory using Path
-    files = [p for p in directory_path.iterdir() if p.is_file()]
-    subdirectories = [p for p in directory_path.iterdir() if p.is_dir()]
-
-    # Deletes files in parallel
-    with ThreadPoolExecutor() as executor:
-        list(executor.map(os.unlink, files))  # Forces completion of all tasks
-
-    # Recursively deletes subdirectories
-    for subdir in subdirectories:
-        delete_directory(subdir)
-
-    # Removes the now-empty root directory. Since Windows is sometimes slow to release file handles, adds
-    # an optional delay step to give Windows time to release file handles.
-    max_attempts = 5
-    delay_timer = PrecisionTimer("ms")
-    for attempt in range(max_attempts):
-        # noinspection PyBroadException
-        try:
-            directory_path.rmdir()
-            break  # Breaks early if the call succeeds
-        except Exception:
-            delay_timer.delay_noblock(delay=500, allow_sleep=True)  # For each failed attempt, sleeps for 500 ms
-            continue
+    # If necessary, removes the transferred directory from the original location.
+    if remove_source:
+        message = (
+            f"Removing the now-redundant source directory {source} and all of its contents following the successful "
+            f"transfer..."
+        )
+        console.echo(message=message)
+        delete_directory(source)

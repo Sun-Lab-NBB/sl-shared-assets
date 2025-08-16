@@ -1,6 +1,6 @@
 """This package provides the classes used to store data acquired at all stages of the Sun lab data workflow and to
-configure the pipelines used in the workflow. Many classes in this package are designed to be saved to disk as .yaml
-files and restored from the .yaml files as needed."""
+configure various elements and pipelines making up the overall workflow. Many classes in this package are designed to
+be saved to disk as .yaml files and restored from the .yaml files as needed."""
 
 from .runtime_data import (
     ZaberPositions,
@@ -14,7 +14,9 @@ from .runtime_data import (
 from .session_data import (
     RawData,
     SessionData,
+    SessionLock,
     SessionTypes,
+    TrackingData,
     ProcessedData,
 )
 from .surgery_data import (
@@ -35,8 +37,11 @@ from .configuration_data import (
     MesoscopeAdditionalFirmware,
     MesoscopeSystemConfiguration,
     MesoscopeExperimentConfiguration,
+    get_working_directory,
+    set_working_directory,
+    get_credentials_file_path,
     get_system_configuration_data,
-    set_system_configuration_file,
+    create_system_configuration_file,
 )
 
 __all__ = [
@@ -61,11 +66,16 @@ __all__ = [
     "RawData",
     "RunTrainingDescriptor",
     "SessionData",
+    "SessionLock",
     "SessionTypes",
     "SubjectData",
     "SurgeryData",
+    "TrackingData",
     "WindowCheckingDescriptor",
     "ZaberPositions",
+    "create_system_configuration_file",
+    "get_credentials_file_path",
     "get_system_configuration_data",
-    "set_system_configuration_file",
+    "get_working_directory",
+    "set_working_directory",
 ]

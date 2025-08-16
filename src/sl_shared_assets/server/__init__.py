@@ -12,13 +12,6 @@ from .pipeline import (
     ProcessingPipelines,
     generate_manager_id,
 )
-from .filesystem import (
-    RemotePaths,
-    get_working_directory,
-    set_working_directory,
-    get_credentials_file_path,
-    get_remote_filesystem_paths,
-)
 
 __all__ = [
     "Job",
@@ -27,14 +20,9 @@ __all__ = [
     "ProcessingPipelines",
     "ProcessingStatus",
     "ProcessingTracker",
-    "RemotePaths",
     "Server",
     "ServerCredentials",
     "TrackerFileNames",
     "generate_manager_id",
     "generate_server_credentials",
-    "get_credentials_file_path",
-    "get_remote_filesystem_paths",
-    "get_working_directory",
-    "set_working_directory",
 ]

@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metdata section. Provides the genral ID information about the project.
 [project]
 name = "sl-shared-assets"
-version = "5.0.0"
+version = "5.0.0rc1"
 description = "Provides data acquisition and processing assets shared between Sun (NeuroAI) lab libraries."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -27,7 +27,7 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     # Intended audience and project topic
     "Intended Audience :: Developers",
-    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering",
     # License
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     # Supported Python Versions
@@ -42,21 +42,21 @@ classifiers = [
 
 # Runtime project dependencies.
 dependencies = [
-    "ataraxis-time==3.0.0",
-    "ataraxis-base-utilities==3.1.0",
-    "ataraxis-data-structures==3.1.1",
-    "numpy==2.2.6",
-    "appdirs==1.4.4",
-    "tqdm==4.67.1",
-    "xxhash==3.5.0",
-    "paramiko==4.0.0",
-    "simple-slurm==0.3.6",
-    "click==8.2.1",
-    "natsort==8.4.0",
-    "polars==1.32.2",
-    "pyarrow==21.0.0",
-    "filelock==3.18.0",
-    "pytz==2025.2",
+    "ataraxis-time>=3,<4",
+    "ataraxis-base-utilities>=3,<4",
+    "ataraxis-data-structures>=3,<4",
+    "numpy>=2,<3",
+    "appdirs>=1,<2",
+    "tqdm>=4,<5",
+    "xxhash>=3,<4",
+    "paramiko>=4,<5",
+    "simple-slurm>=0,<1",
+    "click>=8,<9",
+    "natsort>=8,<9",
+    "polars>=1,<2",
+    "pyarrow>=21,<22",
+    "filelock>=3,<4",
+    "pytz>=2025,<2026",
 ]
 
 [project.urls]
@@ -69,33 +69,25 @@ Documentation = "https://sl-shared-assets-api-docs.netlify.app/"
 # Dependencies that support developing this project.
 dev = [
     # Tox
-    "tox==4.28.4",
-    "uv==0.8.8",
-    "tox-uv==1.27.0",
+    "tox>=4,<5",
+    "uv>=0,<1",
+    "tox-uv>=1,<2",
 
     # Development Automation
-    "ataraxis-automation==6.0.0",
+    "ataraxis-automation>=6.0.1,<7",
 
     # Types
-    "types-appdirs==1.4.3.5",
-    "types-tqdm==4.67.0.20250809",
-    "types-paramiko==4.0.0.20250809",
-    "types-filelock==3.2.7",
-    "types-pytz==2025.2.0.20250809",
+    "types-appdirs>=1,<2",
+    "types-tqdm>=4,<5",
+    "types-paramiko>=4,<5",
+    "types-filelock>=3,<4",
+    "types-pytz>=2025,<2026",
 ]
 
 # Exports CLIs upon library installation into an environment
 [project.scripts]
-sl-resolve-checksum = "sl_shared_assets.cli:resolve_session_checksum"
-sl-reset-trackers = "sl_shared_assets.cli:reset_session_trackers"
-sl-prepare-session = "sl_shared_assets.cli:prepare_session_for_processing"
-sl-archive-session = "sl_shared_assets.cli:archive_session_for_storage"
-sl-create-manifest = "sl_shared_assets.cli:generate_project_manifest_file"
-sl-create-server-credentials = "sl_shared_assets.cli:generate_server_credentials_file"
-sl-start-jupyter = "sl_shared_assets.cli:start_jupyter_server"
-sl-set-working-directory = "sl_forgery.cli:designate_working_directory"
-sl-print-project-data = "sl_forgery.cli:print_project_manifest_data"
-sl-dataset-marker = "sl_shared_assets.cli:resolve_dataset_marker"
+sl-manage = "sl_shared_assets.command_line_interfaces.manage:manage"
+sl-configure = "sl_shared_assets.command_line_interfaces.configure:configure"
 
 # Specifies files that should not be included in the source-code distribution but are also not part of gitignore.
 [tool.hatch.build.targets.sdist]

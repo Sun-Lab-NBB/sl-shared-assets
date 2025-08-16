@@ -1,4 +1,4 @@
-"""This module provides the tools for working with remote compute servers Specifically, the classes from this
+"""This module provides the tools for working with remote compute servers. Specifically, the classes from this
 module establish an API for submitting jobs to the shared data processing cluster (managed via SLURM) and monitoring
 the running job status. All lab processing and analysis pipelines use this interface for accessing shared compute
 resources.
@@ -27,20 +27,22 @@ def generate_server_credentials(
     output_directory: Path,
     username: str,
     password: str,
+    service: bool = False,
     host: str = "cbsuwsun.biopic.cornell.edu",
     storage_root: str = "/local/workdir",
     working_root: str = "/local/storage",
     shared_directory_name: str = "sun_data",
 ) -> None:
-    """Generates a new server_credentials.yaml file under the specified directory, using input information.
+    """Generates a new server access credentials .yaml file under the specified directory, using input information.
 
-    This function provides a convenience interface for generating new BioHPC server credential files. Generally, this is
-    only used when setting up new host-computers or users in the lab.
+    This function provides a convenience interface for generating new server access credential files. Depending on
+    configuration, it either creates user access credentials files or service access credentials files.
 
     Args:
         output_directory: The directory where to save the generated server_credentials.yaml file.
         username: The username to use for server authentication.
         password: The password to use for server authentication.
+        service: Determines whether the generated credentials file stores the data for a user or a service account.
         host: The hostname or IP address of the server to connect to.
         storage_root: The path to the root storage (slow) server directory. Typically, this is the path to the
             top-level (root) directory of the HDD RAID volume.
@@ -50,15 +52,26 @@ def generate_server_credentials(
         shared_directory_name: The name of the shared directory used to store all Sun lab project data on the storage
             and working server volumes.
     """
-    # noinspection PyArgumentList
-    ServerCredentials(
-        username=username,
-        password=password,
-        host=host,
-        storage_root=storage_root,
-        working_root=working_root,
-        shared_directory_name=shared_directory_name,
-    ).to_yaml(file_path=output_directory.joinpath("server_credentials.yaml"))
+    if service:
+        ServerCredentials(
+            username=username,
+            password=password,
+            host=host,
+            storage_root=storage_root,
+            working_root=working_root,
+            shared_directory_name=shared_directory_name,
+        ).to_yaml(file_path=output_directory.joinpath("service_credentials.yaml"))
+        console.echo(message="Service server access credentials file: Created.", level=LogLevel.SUCCESS)
+    else:
+        ServerCredentials(
+            username=username,
+            password=password,
+            host=host,
+            storage_root=storage_root,
+            working_root=working_root,
+            shared_directory_name=shared_directory_name,
+        ).to_yaml(file_path=output_directory.joinpath("user_credentials.yaml"))
+        console.echo(message="User server access credentials file: Created.", level=LogLevel.SUCCESS)
 
 
 @dataclass()
@@ -111,11 +124,11 @@ class ServerCredentials(YamlConfig):
 
 
 class Server:
-    """Encapsulates access to the Sun lab BioHPC processing server.
+    """Encapsulates access to a Sun lab processing server.
 
-    This class provides the API that allows accessing the BioHPC server to create and submit various SLURM-managed jobs
-    to the server. It functions as the central interface used by all processing pipelines in the lab to execute costly
-    data processing on the server.
+    This class provides the API that allows accessing the remote processing server to create and submit various
+    SLURM-managed jobs to the server. It functions as the central interface used by all processing pipelines in the
+    lab to execute costly data processing on the server.
 
     Notes:
         All lab processing pipelines expect the data to be stored on the server and all processing logic to be packaged
@@ -732,3 +745,13 @@ class Server:
     def user(self) -> str:
         """Returns the username used to authenticate with the server."""
         return self._credentials.username
+
+    @property
+    def suite2p_configurations_directory(self) -> Path:
+        """Returns the absolute path to the shared directory that stores all sl-suite2p runtime configuration files."""
+        return self.raw_data_root.joinpath("suite2p_configurations")
+
+    @property
+    def dlc_projects_directory(self) -> Path:
+        """Returns the absolute path to the shared directory that stores all DeepLabCut projects."""
+        return self.raw_data_root.joinpath("deeplabcut_projects")
