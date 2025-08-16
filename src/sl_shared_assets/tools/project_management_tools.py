@@ -122,7 +122,6 @@ def resolve_checksum(
             raw_project_directory=session_data.raw_data.root_path.joinpath(session_data.project_name),
             processed_data_root=processed_data_root,
             manager_id=manager_id,
-            reset_tracker=False,
         )
 
 
@@ -241,7 +240,6 @@ def prepare_session(
             raw_project_directory=session_data.raw_data.root_path.joinpath(session_data.project_name),
             processed_data_root=processed_data_root,
             manager_id=manager_id,
-            reset_tracker=False,
         )
 
 
@@ -351,7 +349,6 @@ def archive_session(
             raw_project_directory=session_data.raw_data.root_path.joinpath(session_data.project_name),
             processed_data_root=processed_data_root,
             manager_id=manager_id,
-            reset_tracker=False,
         )
 
 
@@ -359,7 +356,6 @@ def generate_project_manifest(
     raw_project_directory: Path,
     manager_id: int,
     processed_data_root: Path | None = None,
-    reset_tracker: bool = False,
 ) -> None:
     """Builds and saves the project manifest .feather file under the specified output directory.
 
@@ -377,8 +373,6 @@ def generate_project_manifest(
         manager_id: The unique identifier of the manager process that manages the runtime.
         processed_data_root: The path to the root directory (volume) used to store processed data for all Sun lab
             projects if it is different from the parent of the 'raw_project_directory'.
-        reset_tracker: Determines whether to reset the tracker file before executing the runtime. This allows
-            recovering from deadlocked runtimes, but otherwise should not be used to ensure runtime safety.
     """
 
     if not raw_project_directory.exists():
@@ -432,17 +426,17 @@ def generate_project_manifest(
     # runtimes, the tracker is NOT used to limit the ability of other processes to run the manifest generation. That
     # job is handled to the manifest lock file. Instead, the tracker is used to communicate whether the manifest
     # generation runs as expected or encounters an error.
-    tracker = ProcessingTracker(file_path=raw_project_directory.joinpath(TrackerFileNames.MANIFEST))
+    runtime_tracker = ProcessingTracker(file_path=raw_project_directory.joinpath(TrackerFileNames.MANIFEST))
 
-    # If requested, resets the tracker before carrying out the manifest generation process.
-    if reset_tracker:
-        tracker.abort()
+    # Since the exclusivity of the data manifest generation runtime is enforced through the manifest .lock file, this
+    # runtime always resets the processing tracker file.
+    runtime_tracker.abort()
 
     # Acquires the lock file, ensuring only this specific process can work with the manifest data.
     lock = FileLock(str(manifest_lock))
     with lock.acquire(timeout=20.0):
         # Starts the manifest generation process.
-        tracker.start(manager_id=manager_id)
+        runtime_tracker.start(manager_id=manager_id)
         try:
             # Loops over each session of every animal in the project and extracts session ID information and
             # information about which processing steps have been successfully applied to the session.
@@ -606,11 +600,11 @@ def generate_project_manifest(
             sorted_df.write_ipc(file=manifest_path, compression="lz4")
 
             # The processing is now complete.
-            tracker.stop(manager_id=manager_id)
+            runtime_tracker.stop(manager_id=manager_id)
 
         finally:
             # If the tracker indicates that the processing is still running, the runtime has encountered an error.
-            if tracker.is_running:
+            if runtime_tracker.is_running:
                 tracker.error(manager_id=manager_id)
 
 

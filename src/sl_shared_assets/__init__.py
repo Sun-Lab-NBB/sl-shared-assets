@@ -1,4 +1,4 @@
-"""A Python library that stores assets shared between multiple Sun (NeuroAI) lab data pipelines.
+"""A Python library that provides data acquisition and processing assets shared between Sun (NeuroAI) lab libraries.
 
 See https://github.com/Sun-Lab-NBB/sl-shared-assets for more details.
 API documentation: https://sl-shared-assets-api-docs.netlify.app/
@@ -11,11 +11,7 @@ from .tools import (
     ProjectManifest,
     delete_directory,
     transfer_directory,
-    generate_project_manifest,
     calculate_directory_checksum,
-    fetch_remote_project_manifest,
-    generate_remote_project_manifest,
-    compose_remote_processing_pipeline,
 )
 from .server import (
     Job,
@@ -100,12 +96,8 @@ __all__ = [
     "WindowCheckingDescriptor",
     "ZaberPositions",
     "calculate_directory_checksum",
-    "compose_remote_processing_pipeline",
     "delete_directory",
-    "fetch_remote_project_manifest",
     "generate_manager_id",
-    "generate_project_manifest",
-    "generate_remote_project_manifest",
     "get_credentials_file_path",
     "get_system_configuration_data",
     "get_working_directory",

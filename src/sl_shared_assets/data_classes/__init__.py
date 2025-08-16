@@ -41,7 +41,7 @@ from .configuration_data import (
     set_working_directory,
     get_credentials_file_path,
     get_system_configuration_data,
-    set_system_configuration_file,
+    create_system_configuration_file,
 )
 
 __all__ = [
@@ -73,9 +73,9 @@ __all__ = [
     "TrackingData",
     "WindowCheckingDescriptor",
     "ZaberPositions",
+    "create_system_configuration_file",
     "get_credentials_file_path",
     "get_system_configuration_data",
     "get_working_directory",
-    "set_system_configuration_file",
     "set_working_directory",
 ]

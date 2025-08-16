@@ -4,33 +4,12 @@
 Command Line Interfaces
 =======================
 
-.. automodule:: sl_shared_assets.cli
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-.. click:: sl_shared_assets.cli:verify_session_integrity
-   :prog: sl-verify-session
+.. click:: sl_shared_assets.command_line_interfaces.manage:manage
+   :prog: sl-manage
    :nested: full
 
-.. click:: sl_shared_assets.cli:generate_project_manifest_file
-   :prog: sl-project-manifest
-   :nested: full
-
-.. click:: sl_shared_assets.cli:generate_server_credentials_file
-   :prog: sl-create-server-credentials
-   :nested: full
-
-.. click:: sl_shared_assets.cli:ascend_tyche_directory
-   :prog: sl-ascend-tyche
-   :nested: full
-
-.. click:: sl_shared_assets.cli:start_jupyter_server
-   :prog: sl-start-jupyter
-   :nested: full
-
-.. click:: sl_shared_assets.cli:resolve_dataset_marker
-   :prog: sl-dataset-marker
+.. click:: sl_shared_assets.command_line_interfaces.configure:configure
+   :prog: sl-configure
    :nested: full
 
 Tools
@@ -40,8 +19,8 @@ Tools
    :undoc-members:
    :show-inheritance:
 
-Data and Configuration Classes
-==============================
+Data and Configuration Assets
+=============================
 .. automodule:: sl_shared_assets.data_classes
    :members:
    :undoc-members:

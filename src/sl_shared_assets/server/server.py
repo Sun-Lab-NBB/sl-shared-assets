@@ -27,20 +27,22 @@ def generate_server_credentials(
     output_directory: Path,
     username: str,
     password: str,
+    service: bool = False,
     host: str = "cbsuwsun.biopic.cornell.edu",
     storage_root: str = "/local/workdir",
     working_root: str = "/local/storage",
     shared_directory_name: str = "sun_data",
 ) -> None:
-    """Generates a new server_credentials.yaml file under the specified directory, using input information.
+    """Generates a new server access credentials .yaml file under the specified directory, using input information.
 
-    This function provides a convenience interface for generating new BioHPC server credential files. Generally, this is
-    only used when setting up new host-computers or users in the lab.
+    This function provides a convenience interface for generating new server access credential files. Depending on
+    configuration, it either creates user access credentials files or service access credentials files.
 
     Args:
         output_directory: The directory where to save the generated server_credentials.yaml file.
         username: The username to use for server authentication.
         password: The password to use for server authentication.
+        service: Determines whether the generated credentials file stores the data for a user or a service account.
         host: The hostname or IP address of the server to connect to.
         storage_root: The path to the root storage (slow) server directory. Typically, this is the path to the
             top-level (root) directory of the HDD RAID volume.
@@ -50,15 +52,26 @@ def generate_server_credentials(
         shared_directory_name: The name of the shared directory used to store all Sun lab project data on the storage
             and working server volumes.
     """
-    # noinspection PyArgumentList
-    ServerCredentials(
-        username=username,
-        password=password,
-        host=host,
-        storage_root=storage_root,
-        working_root=working_root,
-        shared_directory_name=shared_directory_name,
-    ).to_yaml(file_path=output_directory.joinpath("server_credentials.yaml"))
+    if service:
+        ServerCredentials(
+            username=username,
+            password=password,
+            host=host,
+            storage_root=storage_root,
+            working_root=working_root,
+            shared_directory_name=shared_directory_name,
+        ).to_yaml(file_path=output_directory.joinpath("service_credentials.yaml"))
+        console.echo(message="Service server access credentials file: Created.", level=LogLevel.SUCCESS)
+    else:
+        ServerCredentials(
+            username=username,
+            password=password,
+            host=host,
+            storage_root=storage_root,
+            working_root=working_root,
+            shared_directory_name=shared_directory_name,
+        ).to_yaml(file_path=output_directory.joinpath("user_credentials.yaml"))
+        console.echo(message="User server access credentials file: Created.", level=LogLevel.SUCCESS)
 
 
 @dataclass()
