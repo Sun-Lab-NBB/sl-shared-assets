@@ -34,7 +34,7 @@ manage the data at all stages of Sun lab data workflow: acquisition, processing,
 - [Authors](#authors)
 - [License](#license)
 - [Acknowledgements](#Acknowledgments)
-- 
+
 ___
 
 ## Dependencies
