@@ -2,6 +2,7 @@ from .tools import (
     ProjectManifest as ProjectManifest,
     delete_directory as delete_directory,
     transfer_directory as transfer_directory,
+    generate_project_manifest as generate_project_manifest,
     calculate_directory_checksum as calculate_directory_checksum,
 )
 from .server import (
@@ -18,6 +19,7 @@ from .data_classes import (
     DrugData as DrugData,
     ImplantData as ImplantData,
     SessionData as SessionData,
+    SessionLock as SessionLock,
     SubjectData as SubjectData,
     SurgeryData as SurgeryData,
     SessionTypes as SessionTypes,
@@ -73,6 +75,7 @@ __all__ = [
     "Server",
     "ServerCredentials",
     "SessionData",
+    "SessionLock",
     "SessionTypes",
     "SubjectData",
     "SurgeryData",
@@ -82,6 +85,7 @@ __all__ = [
     "calculate_directory_checksum",
     "delete_directory",
     "generate_manager_id",
+    "generate_project_manifest",
     "get_credentials_file_path",
     "get_system_configuration_data",
     "get_working_directory",
