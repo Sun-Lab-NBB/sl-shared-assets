@@ -12,6 +12,7 @@ from .tools import (
     delete_directory,
     transfer_directory,
     calculate_directory_checksum,
+    generate_project_manifest
 )
 from .server import (
     Job,
@@ -101,5 +102,6 @@ __all__ = [
     "get_credentials_file_path",
     "get_system_configuration_data",
     "get_working_directory",
+    "generate_project_manifest",
     "transfer_directory",
 ]
