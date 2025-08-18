@@ -169,6 +169,12 @@ class ProcessingTracker(YamlConfig):
     _lock_path: str = field(init=False)
     """Stores the path to the .lock file used to ensure that only a single process can simultaneously access the data 
     stored inside the tracker file."""
+    _job_count: int = 1
+    """Stores the total number of jobs to be executed as part of the tracked pipeline. This is used to 
+    determine when the tracked pipeline is fully complete when tracking intermediate job outcomes."""
+    _completed_jobs: int = 0
+    """Stores the total number of jobs completed by the tracked pipeline. This is used together with the '_job_count' 
+    field to determine when the tracked pipeline is fully complete."""
 
     def __post_init__(self) -> None:
         # Generates the .lock file path for the target tracker .yaml file.
@@ -210,7 +216,7 @@ class ProcessingTracker(YamlConfig):
         original._lock_path = None  # type: ignore
         original.to_yaml(file_path=self.file_path)
 
-    def start(self, manager_id: int) -> None:
+    def start(self, manager_id: int, job_count: int = 1) -> None:
         """Configures the tracker file to indicate that a manager process is currently executing the tracked processing
         runtime.
 
@@ -222,6 +228,10 @@ class ProcessingTracker(YamlConfig):
         Args:
             manager_id: The unique xxHash-64 hash identifier of the manager process which attempts to start the runtime
                 tracked by this tracker file.
+            job_count: The total number of jobs to be executed as part of the tracked pipeline. This is used to make
+                the stop() method properly track the end of the pipeline as a whole, rather than the end of intermediate
+                jobs. Primarily, this is used by multi-job pipelines where all jobs are submitted as part of a single
+                phase and the job completion order cannot be known in-advance.
 
         Raises:
             TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
@@ -253,6 +263,7 @@ class ProcessingTracker(YamlConfig):
             self._manager_id = manager_id
             self._complete = False
             self._encountered_error = False
+            self._job_count = job_count
             self._save_state()
 
     def error(self, manager_id: int) -> None:
@@ -331,12 +342,16 @@ class ProcessingTracker(YamlConfig):
                 console.error(message=message, error=RuntimeError)
                 raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
 
-            # Otherwise, marks the runtime as complete (stopped)
-            self._running = False
-            self._manager_id = -1
-            self._complete = True
-            self._encountered_error = False
-            self._save_state()
+            # Increments completed job tracker
+            self._completed_jobs += 1
+
+            # If the pipeline has completed all required jobs, marks the runtime as complete (stopped)
+            if self._completed_jobs >= self._job_count:
+                self._running = False
+                self._manager_id = -1
+                self._complete = True
+                self._encountered_error = False
+                self._save_state()
 
     def abort(self) -> None:
         """Resets the runtime tracker file to the default state.
