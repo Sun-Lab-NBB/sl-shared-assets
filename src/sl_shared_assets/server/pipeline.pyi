@@ -101,12 +101,14 @@ class ProcessingTracker(YamlConfig):
     _running: bool = ...
     _manager_id: int = ...
     _lock_path: str = field(init=False)
+    _job_count: int = ...
+    _completed_jobs: int = ...
     def __post_init__(self) -> None: ...
     def _load_state(self) -> None:
         """Reads the current processing state from the wrapped .YAML file."""
     def _save_state(self) -> None:
         """Saves the current processing state stored inside instance attributes to the specified .YAML file."""
-    def start(self, manager_id: int) -> None:
+    def start(self, manager_id: int, job_count: int = 1) -> None:
         """Configures the tracker file to indicate that a manager process is currently executing the tracked processing
         runtime.
 
@@ -118,6 +120,10 @@ class ProcessingTracker(YamlConfig):
         Args:
             manager_id: The unique xxHash-64 hash identifier of the manager process which attempts to start the runtime
                 tracked by this tracker file.
+            job_count: The total number of jobs to be executed as part of the tracked pipeline. This is used to make
+                the stop() method properly track the end of the pipeline as a whole, rather than the end of intermediate
+                jobs. Primarily, this is used by multi-job pipelines where all jobs are submitted as part of a single
+                phase and the job completion order cannot be known in-advance.
 
         Raises:
             TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
