@@ -1,6 +1,4 @@
-"""This module provides classes used to configure data acquisition and processing runtimes in the Sun lab. The assets
-exposed by this module are used to configure specific hardware components used to acquire data and interface
-with the remote hardware (servers) used to store, process, and analyze data."""
+"""This module provides classes used to configure data acquisition and processing runtimes in the Sun lab."""
 
 import copy
 from enum import StrEnum
@@ -15,7 +13,7 @@ from ..server import ServerCredentials
 
 
 class AcquisitionSystems(StrEnum):
-    """Defines the set of data acquisition systems used in the Sun lab and supported by all data-related libraries."""
+    """Stores the names for all data acquisition systems currently used in the Sun lab."""
 
     MESOSCOPE_VR = "mesoscope-vr"
     """The Mesoscope-VR data acquisition system. It is built around 2-Photon Random Access Mesoscope (2P-RAM) and 
@@ -24,113 +22,97 @@ class AcquisitionSystems(StrEnum):
 
 @dataclass()
 class ExperimentState:
-    """Encapsulates the information used to set and maintain the desired experiment and system state.
+    """Stores the information used to set and maintain the desired experiment and system state.
 
-    Broadly, each experiment runtime can be conceptualized as a two-state-system. The first is the experiment task,
-    which reflects the behavior goal, the rules for achieving the goal, and the reward for achieving the goal. The
-    second is the data acquisition system state, which is a snapshot of all hardware module states that make up the
-    system that acquires the data and controls the task environment. Overall, the experiment state is about
-    'what the animal is doing', while the system state is about 'what the hardware is doing'.
+    Broadly, each experiment runtime can be conceptualized as a two-state system. The first is the experiment task
+    state, which reflects the behavior goal, the rules for achieving the goal, and the reward for achieving the goal.
+    The second is the data acquisition system state, which is a snapshot of all hardware module states that make up the
+    system that acquires the data and controls the task environment.
 
     Note:
-        This class is acquisition-system-agnostic. It can be used to define the ExperimentConfiguration class for any
-        valid data acquisition system.
+        This class is acquisition-system-agnostic. All data acquisition systems use this class as part of their specific
+        ExperimentConfiguration class instances.
     """
 
     experiment_state_code: int
-    """The integer code of the experiment state. Experiment states do not have a predefined meaning, Instead, each 
-    project is expected to define and follow its own experiment state code mapping. Typically, the experiment state 
-    code is used to denote major experiment stages, such as 'baseline', 'task', 'cooldown', etc. Note, the same 
-    experiment state code can be used by multiple sequential ExperimentState instances to change the system states 
-    while maintaining the same experiment state."""
+    """The integer code of the experiment state. Note, each experiment is expected to define and follow its own 
+    experiment state code mapping. Typically, the experiment state code is used to denote major experiment stages, 
+    such as 'baseline', 'task', 'cooldown', etc. The same experiment state code can be used by multiple sequential 
+    ExperimentState instances to change the data acquisition system states while maintaining the same experiment
+    state."""
     system_state_code: int
-    """One of the supported system state-codes. Note, the meaning of each system state code depends on the specific 
-    data acquisition and experiment control system used by the project. For details on available system-states, see 
-    the sl-experiment library documentation."""
+    """One of the supported data acquisition system state-codes. Note, the meaning of each system state code depends on 
+    the specific data acquisition system used during the experiment."""
     state_duration_s: float
-    """The time, in seconds, to maintain the experiment and system state combination specified by this instance."""
+    """The time, in seconds, to maintain the experiment and system state combination specified by this instance during 
+    runtime."""
     initial_guided_trials: int
-    """The number of trials (laps) at the onset of the experiment state, for which to enable lick guidance. This 
-    determines the number of trials, counting from the onset of the experiment state, for which the animal will receive 
-    water rewards from entering the reward zone. Once the specified number of guided trial passes, the system disables 
-    guidance, requiring the animal to lick in the reward zone to get water rewards."""
+    """The number of trials (laps), counting from the onset of the experiment state, during which the animal should 
+    receive water rewards for entering the reward zone. Once the specified number of guided trials passes, the system 
+    disables guidance, requiring the animal to lick in the reward zone to get rewards."""
     recovery_failed_trial_threshold: int
-    """Specifies the number of failed (non-rewarded) trials (laps), after which the system will re-enable lick guidance 
-    for the 'recovery_guided_trials' number of following trials. Note, engaging the recovery guided trial system 
-    requires the specified number of failed trials to occur sequentially."""
+    """The number of sequentially failed (non-rewarded) trials (laps), after which the system should 
+    re-enable lick guidance for the following 'recovery_guided_trials' number of trials."""
     recovery_guided_trials: int
-    """Specifies the number of trials (laps) for which the system should re-enable lick guidance, when the animal 
+    """The number of trials (laps) for which the system should re-enable lick guidance, when the animal 
     sequentially fails 'failed_trial_threshold' number of trials. This field works similar to the 
     'initial_guided_trials' field, but is triggered by repeated performance failures, rather than experiment state 
-    onset. After the animal runs this many guided trials, the system automatically disables guidance for the following 
-    trials."""
+    onset."""
 
 
 @dataclass()
 class ExperimentTrial:
-    """Encapsulates information about a single experiment trial.
+    """Stores the information about a single experiment trial.
 
-    All Virtual Reality tasks can be broadly conceptualized as repeating motifs (sequences) of wall cues,
-    associated with a specific goal, for which animals receive water rewards. Since some experiments can use multiple
-    trial types as part of the same experiment session, multiple instances of this class can be used to specify
-    supported trial structures and trial parameters for a given experiment.
+    All Virtual Reality (VR) tasks can be broadly conceptualized as repeating motifs (sequences) of VR environment wall
+    cues, associated with a specific goal, for which animals receive water rewards. Each complete motif is typically
+    interpreted as a single experiment trial.
+
+    Notes:
+        Since some experiments use multiple distinct trial types as part of the same experiment session, multiple
+        instances of this class can be used by an ExperimentConfiguration class instance to represent multiple used
+        trial types.
     """
 
     cue_sequence: list[int]
-    """Specifies the sequence of wall cues experienced by the animal while running this trial. Note, the cues must be 
-    specified as integer-codes, where each code has the same meaning as in the 'cue_map' dictionary of the main 
-    ExperimentConfiguration class for that experiment."""
+    """The sequence of Virtual Reality environment wall cues experienced by the animal while running this 
+    trial. Note, the cues must be specified as integer-codes matching the codes used in the 'cue_map' dictionary of the 
+    ExperimentConfiguration class for the experiment."""
     trial_length_cm: float
     """The length of the trial cue sequence in centimeters."""
     trial_reward_size_ul: float
-    """The volume of water, in microliters, to be dispensed when the animal successfully completes the trial task."""
+    """The volume of water, in microliters, dispensed when the animal successfully completes the trial's task."""
     reward_zone_start_cm: float
-    """Specifies the starting boundary of the trial reward zone, in centimeters."""
+    """The starting boundary of the trial reward zone, in centimeters."""
     reward_zone_end_cm: float
-    """Specifies the ending boundary of the trial reward zone, in centimeters."""
+    """The ending boundary of the trial reward zone, in centimeters."""
     guidance_trigger_location_cm: float
-    """Specifies the location of the invisible boundary (wall) with which the animal must collide to elicit automated 
-    water reward during guided trials."""
+    """The location of the invisible boundary (wall) with which the animal must collide to trigger water reward 
+    delivery during guided trials."""
 
 
 # noinspection PyArgumentList
 @dataclass()
 class MesoscopeExperimentConfiguration(YamlConfig):
-    """Stores the configuration of a single experiment runtime that uses the Mesoscope_VR data acquisition system.
+    """Stores the configuration of an experiment runtime that uses the Mesoscope_VR data acquisition system.
 
-    Primarily, this includes the sequence of experiment and system states that define the flow of the experiment
-    runtime and the configuration of various trials supported by the experiment runtime. During runtime, the main
-    runtime control function traverses the sequence of states stored in this class instance start-to-end in the exact
-    order specified by the user. Together with custom Unity projects, which define the task logic (how the system
-    responds to animal interactions with the VR system), this class allows flexibly implementing a wide range of
-    experiments using the Mesoscope-VR system.
-
-    Each project should define one or more experiment configurations and save them as .yaml files inside the project
-    'configuration' folder. The name for each configuration file is defined by the user and is used to identify and load
-    the experiment configuration when the 'sl-experiment' CLI command exposed by the sl-experiment library is executed.
-
-    Notes:
-        This class is designed exclusively for the Mesoscope-VR system. Any other system needs to define a separate
-        ExperimentConfiguration class to specify its experiment runtimes and additional data.
-
-        To create a new experiment configuration, use the 'sl-create-experiment' CLI command.
+    During runtime, the acquisition system executes the sequence of states stored in this class instance. Together with
+    custom Unity projects, which define the task environment and logic, this class allows flexibly implementing a wide
+    range of experiments using the Mesoscope-VR system.
     """
 
     cue_map: dict[int, float] = field(default_factory=lambda: {0: 30.0, 1: 30.0, 2: 30.0, 3: 30.0, 4: 30.0})
-    """A dictionary that maps each integer-code associated with a wall cue used in the Virtual Reality experiment 
-    environment to its length in real-world centimeters. It is used to map each VR cue to the distance the animal needs
+    """Maps each integer-code associated with the experiment's Virtual Reality (VR) environment wall 
+    cue to its length in real-world centimeters. It is used to map each VR cue to the distance the animal needs
     to travel to fully traverse the wall cue region from start to end."""
     cue_offset_cm: float = 10.0
-    """Specifies the positive offset distance, in centimeters, by which the animal's running track is shifted 
-    relative to VR wall cue sequence. Due to how the VR environment is revealed to the animal, most runtimes 
-    need to shift the animal slightly forward relative to the VR cue sequence origin (0), to prevent it from seeing the 
-    area before the first VR wall cue when the task starts and when the animal is teleported to the beginning of the 
-    track. This offset statically shifts the entire track (in centimeters) against the set of VR wall cues used during 
-    runtime. Storing this static offset as part of experiment configuration is crucial for correctly mapping what the 
-    animal sees during runtime to the real-world distance it travels on the running wheel."""
+    """Specifies the offset distance, in centimeters, by which the animal's running track is shifted relative to the 
+    Virtual Reality (VR) environment's wall cue sequence. Due to how the VR environment is displayed to the animal, 
+    most runtimes need to shift the animal slightly forward relative to the VR cue sequence origin (0), to prevent it 
+    from seeing the portion of the environment before the first VR wall cue. This offset statically shifts the entire 
+    track (in centimeters) against the set of VR wall cues used during runtime."""
     unity_scene_name: str = "IvanScene"
-    """The name of the Virtual Reality task (Unity Scene) used during experiment. This is used as an extra security 
-    measure to ensure that Unity game engine is running the correct scene when starting the experiment runtime."""
+    """The name of the Virtual Reality task (Unity Scene) used during experiment."""
     experiment_states: dict[str, ExperimentState] = field(
         default_factory=lambda: {
             "baseline": ExperimentState(
@@ -159,8 +141,9 @@ class MesoscopeExperimentConfiguration(YamlConfig):
             ),
         }
     )
-    """A dictionary that uses human-readable state-names as keys and ExperimentState instances as values. Each 
-    ExperimentState instance represents a phase of the experiment."""
+    """Maps human-readable experiment state names to corresponding ExperimentState instances. Each ExperimentState 
+    instance represents a phase of the experiment. During runtime, the phases are executed in the same order as 
+    specified in this dictionary."""
     trial_structures: dict[str, ExperimentTrial] = field(
         default_factory=lambda: {
             "cyclic_4_cue": ExperimentTrial(
@@ -173,54 +156,53 @@ class MesoscopeExperimentConfiguration(YamlConfig):
             )
         }
     )
-    """A dictionary that uses human-readable trial structure names as keys and ExperimentTrial instances as values. 
-    Each ExperimentTrial instance specifies the Virtual Reality layout and runtime parameters associated with a single 
+    """Maps human-readable trial structure names to corresponding ExperimentTrial instances. Each ExperimentTrial 
+    instance specifies the Virtual Reality (VR) environment layout and task parameters associated with a single 
     type of trials supported by the experiment runtime."""
 
 
 @dataclass()
 class MesoscopePaths:
-    """Stores the filesystem configuration parameters for the Mesoscope-VR data acquisition system."""
+    """Stores the filesystem configuration parameters for the Mesoscope-VR data acquisition system.
+
+    Notes:
+        All directories specified in this instance must be mounted to the local PC's filesystem using an SMB or an
+        equivalent protocol.
+    """
 
     google_credentials_path: Path = Path("/media/Data/Experiments/sl-surgery-log-0f651e492767.json")
     """
-    The path to the locally stored .JSON file that contains the service account credentials used to read and write 
-    Google Sheet data. This is used to access and work with various Google Sheet files used by Sun lab projects, 
-    eliminating the need to manually synchronize the data in various Google sheets and other data files.
+    The absolute path to the locally stored .JSON file that contains the service account credentials used to read and 
+    write Google Sheet data. This is used to access and work with the Google Sheet files used in the Sun lab.
     """
     root_directory: Path = Path("/media/Data/Experiments")
-    """The absolute path to the directory where all projects are stored on the local host-machine (VRPC)."""
+    """The absolute path to the directory where all projects are stored on the main data acquisition system PC."""
     server_storage_directory: Path = Path("/home/cybermouse/server/storage/sun_data")
-    """The absolute path to the directory where the raw data from all projects is stored on the BioHPC server. 
-    This directory should be locally accessible (mounted) using a network sharing protocol, such as SMB."""
+    """The absolute path to the local-filesystem-mounted directory where the raw data from all projects is stored on 
+    the remote compute server."""
     server_working_directory: Path = Path("/home/cybermouse/server/workdir/sun_data")
-    """The absolute path to the directory where the processed data from all projects is stored on the BioHPC 
-    server. This directory should be locally accessible (mounted) using a network sharing protocol, such as SMB."""
+    """The absolute path to the local-filesystem-mounted directory where the processed data from all projects is 
+    stored on the remote compute server."""
     nas_directory: Path = Path("/home/cybermouse/nas/rawdata")
-    """The absolute path to the directory where the raw data from all projects is stored on the Synology NAS. 
-    This directory should be locally accessible (mounted) using a network sharing protocol, such as SMB."""
+    """The absolute path to the local-filesystem-mounted directory where the raw data from all projects is stored on 
+    the NAS (backup long-term storage destination)."""
     mesoscope_directory: Path = Path("/home/cybermouse/scanimage/mesodata")
-    """The absolute path to the root ScanImagePC (mesoscope-connected PC) directory where all mesoscope-acquired data 
-    is aggregated during acquisition runtime. This directory should be locally accessible (mounted) using a network 
-    sharing protocol, such as SMB."""
+    """The absolute path to the root ScanImagePC (mesoscope-connected PC) local-filesystem-mounted directory where all 
+    mesoscope-acquired data is aggregated during acquisition."""
     harvesters_cti_path: Path = Path("/opt/mvIMPACT_Acquire/lib/x86_64/mvGenTLProducer.cti")
     """The path to the GeniCam CTI file used to connect to Harvesters-managed cameras."""
 
 
 @dataclass()
 class MesoscopeSheets:
-    """Stores the IDs of Google Sheets used by the Mesoscope-VR data acquisition system."""
+    """Stores the identifiers for the Google Sheet files used by the Mesoscope-VR data acquisition system."""
 
     surgery_sheet_id: str = ""
-    """The ID of the Google Sheet file that stores information about surgical interventions performed on all animals 
-    participating in each lab project. This log sheet is used to parse and write the surgical intervention data for 
-    each animal into every runtime session raw_data folder, so that the surgery data is always kept together with the 
-    rest of the training and experiment data."""
+    """The ID of the Google Sheet file that stores information about surgical interventions performed on the animals 
+    that participate in data acquisition sessions."""
     water_log_sheet_id: str = ""
-    """The ID of the Google Sheet file that stores information about water restriction (and behavior tracker) 
-    information for all animals participating in the managed project. This is used to synchronize the information 
-    inside the water restriction log with the state of the animal at the end of each training or experiment session.
-    """
+    """The ID of the Google Sheet file that stores information about water restriction and user-interaction for all 
+    animals that participate in data acquisition sessions."""
 
 
 @dataclass()
@@ -236,12 +218,9 @@ class MesoscopeCameras:
     """The index of the right body camera (from animal's perspective) in the list of all available OpenCV-managed
      cameras."""
     face_camera_quantization_parameter: int = 15
-    """The quantization parameter used by the face camera to encode acquired frames as video files. This controls how
-    much data is discarded when encoding each video frame, directly contributing to the encoding speed, resultant video 
-    file size and video quality."""
+    """The quantization parameter used by the face camera to encode acquired frames as video files."""
     body_camera_quantization_parameter: int = 15
-    """SThe quantization parameter used by the left and right body cameras to encode acquired frames as video files.
-    See 'face_camera_quantization_parameter' field for more information on what this parameter does."""
+    """The quantization parameter used by the left and right body cameras to encode acquired frames as video files."""
     display_face_camera_frames: bool = True
     """Determines whether to display the frames grabbed from the face camera during runtime."""
     display_body_camera_frames: bool = True
@@ -259,55 +238,50 @@ class MesoscopeMicroControllers:
     encoder_port: str = "/dev/ttyACM2"
     """The USB port used by the Encoder Microcontroller."""
     debug: bool = False
-    """Determines whether to run the managed acquisition system in the 'debug mode'. This mode should be disabled 
-    during most runtimes. It is used during initial system calibration and testing and prints a lot of generally 
-    redundant information into the terminal."""
+    """Determines whether the acquisition system is running in the 'debug mode'. This mode is used during the initial 
+    system calibration and testing. It should be disabled during all non-testing sessions to maximize system's 
+    runtime performance."""
     minimum_break_strength_g_cm: float = 43.2047
     """The minimum torque applied by the running wheel break in gram centimeter. This is the torque the break delivers 
-    at minimum voltage (break is disabled)."""
+    at minimum operational voltage."""
     maximum_break_strength_g_cm: float = 1152.1246
     """The maximum torque applied by the running wheel break in gram centimeter. This is the torque the break delivers 
-    at maximum voltage (break is fully engaged)."""
+    at maximum operational voltage."""
     wheel_diameter_cm: float = 15.0333
-    """The diameter of the running wheel connected to the break and torque sensor, in centimeters."""
+    """The diameter of the running wheel, in centimeters."""
     lick_threshold_adc: int = 400
     """The threshold voltage, in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC), interpreted 
-    as the animal's tongue contacting the sensor. Note, 12-bit ADC only supports values between 0 and 4095, so setting 
-    the threshold above 4095 will result in no licks being reported to Unity."""
+    as the animal's tongue contacting the sensor."""
     lick_signal_threshold_adc: int = 300
     """The minimum voltage, in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC), reported to the
     PC as a non-zero value. Voltages below this level are interpreted as 'no-lick' noise and are always pulled to 0."""
     lick_delta_threshold_adc: int = 300
     """The minimum absolute difference in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC) for 
-    the change to be reported to the PC. This is used to prevent reporting repeated non-lick or lick readouts to the 
-    PC, conserving communication bandwidth."""
+    the change to be reported to the PC."""
     lick_averaging_pool_size: int = 1
     """The number of lick sensor readouts to average together to produce the final lick sensor readout value. Note, 
     when using a Teensy controller, this number is multiplied by the built-in analog readout averaging (default is 4).
     """
     torque_baseline_voltage_adc: int = 2046
-    """The voltage level, in raw analog units measured by 3.3v Analog-to-Digital-Converter (ADC) at 12-bit resolution 
-    after the AD620 amplifier, that corresponds to no (0) torque readout. Usually, for a 3.3v ADC, this would be 
-    around 2046 (the midpoint, ~1.65 V)."""
+    """The voltage level, in raw analog units measured by a 12-bit Analog-to-Digital-Converter (ADC) after the AD620 
+    amplifier, that corresponds to no torque (0) readout."""
     torque_maximum_voltage_adc: int = 2750
-    """The voltage level, in raw analog units measured by 3.3v Analog-to-Digital-Converter (ADC) at 12-bit resolution 
-    after the AD620 amplifier, that corresponds to the absolute maximum torque detectable by the sensor. At most,
-    this value can be 4095 (~3.3 V)."""
+    """The voltage level, in raw analog units measured by a 12-bit Analog-to-Digital-Converter (ADC) 
+    after the AD620 amplifier, that corresponds to the absolute maximum torque detectable by the sensor."""
     torque_sensor_capacity_g_cm: float = 720.0779
     """The maximum torque detectable by the sensor, in grams centimeter (g cm)."""
     torque_report_cw: bool = True
     """Determines whether the sensor should report torque in the Clockwise (CW) direction. This direction corresponds 
-    to the animal trying to move the wheel backward."""
+    to the animal trying to move forward on the wheel."""
     torque_report_ccw: bool = True
     """Determines whether the sensor should report torque in the Counter-Clockwise (CCW) direction. This direction 
-    corresponds to the animal trying to move the wheel forward."""
+    corresponds to the animal trying to move backward on the wheel."""
     torque_signal_threshold_adc: int = 100
     """The minimum voltage, in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC), reported to the
     PC as a non-zero value. Voltages below this level are interpreted as noise and are always pulled to 0."""
     torque_delta_threshold_adc: int = 70
     """The minimum absolute difference in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC) for 
-    the change to be reported to the PC. This is used to prevent reporting repeated static torque readouts to the 
-    PC, conserving communication bandwidth."""
+    the change to be reported to the PC."""
     torque_averaging_pool_size: int = 1
     """The number of torque sensor readouts to average together to produce the final torque sensor readout value. Note, 
     when using a Teensy controller, this number is multiplied by the built-in analog readout averaging (default is 4).
@@ -323,7 +297,7 @@ class MesoscopeMicroControllers:
     moving forward on the wheel."""
     wheel_encoder_delta_threshold_pulse: int = 15
     """The minimum difference, in encoder pulse counts, between two encoder readouts for the change to be reported to 
-    the PC. This is used to prevent reporting idle readouts and filter out sub-threshold noise."""
+    the PC."""
     wheel_encoder_polling_delay_us: int = 500
     """The delay, in microseconds, between any two successive encoder state readouts."""
     cm_per_unity_unit: float = 10.0
@@ -370,22 +344,15 @@ class MesoscopeAdditionalFirmware:
 
 @dataclass()
 class MesoscopeSystemConfiguration(YamlConfig):
-    """Stores the hardware and filesystem configuration parameters for the Mesoscope-VR data acquisition system used in
-    the Sun lab.
+    """Stores the hardware and filesystem configuration parameters for the Mesoscope-VR data acquisition system.
 
     This class is specifically designed to encapsulate the configuration parameters for the Mesoscope-VR system. It
-    expects the system to be configured according to the specifications available from the sl_experiment repository
-    (https://github.com/Sun-Lab-NBB/sl-experiment) and should be used exclusively by the VRPC machine
+    expects the system to be configured according to the specifications outlined in the sl-experiment repository
+    (https://github.com/Sun-Lab-NBB/sl-experiment) and should be used exclusively on the VRPC machine
     (main Mesoscope-VR PC).
-
-    Notes:
-        Each SystemConfiguration class is uniquely tied to a specific hardware configuration used in the lab. This
-        class will only work with the Mesoscope-VR system. Any other data acquisition and runtime management system in
-        the lab should define its own SystemConfiguration class to specify its own hardware and filesystem configuration
-        parameters.
     """
 
-    name: str = "mesoscope-vr"
+    name: str = str(AcquisitionSystems.MESOSCOPE_VR)
     """Stores the descriptive name of the data acquisition system."""
     paths: MesoscopePaths = field(default_factory=MesoscopePaths)
     """Stores the filesystem configuration parameters for the Mesoscope-VR data acquisition system."""
@@ -435,11 +402,11 @@ class MesoscopeSystemConfiguration(YamlConfig):
             console.error(message=message, error=TypeError)
 
     def save(self, path: Path) -> None:
-        """Saves class instance data to disk as a 'mesoscope_system_configuration.yaml' file.
+        """Saves class instance data to disk as a .yaml file.
 
         This method converts certain class variables to yaml-safe types (for example, Path objects -> strings) and
         saves class data to disk as a .yaml file. The method is intended to be used solely by the
-        set_system_configuration_file() function and should not be called from any other context.
+        create_system_configuration_file() function and should not be called from any other context.
 
         Args:
             path: The path to the .yaml file to save the data to.

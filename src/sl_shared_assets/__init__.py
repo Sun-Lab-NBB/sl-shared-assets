@@ -9,6 +9,8 @@ from ataraxis_base_utilities import console
 
 from .tools import (
     ProjectManifest,
+    acquire_lock,
+    release_lock,
     delete_directory,
     transfer_directory,
     generate_project_manifest,
@@ -98,6 +100,7 @@ __all__ = [
     "TrackerFileNames",
     "WindowCheckingDescriptor",
     "ZaberPositions",
+    "acquire_lock",
     "calculate_directory_checksum",
     "delete_directory",
     "generate_manager_id",
@@ -105,5 +108,6 @@ __all__ = [
     "get_credentials_file_path",
     "get_system_configuration_data",
     "get_working_directory",
+    "release_lock",
     "transfer_directory",
 ]

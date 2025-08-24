@@ -1,7 +1,6 @@
-"""This module provides the tools for working with remote compute servers. Specifically, the classes from this
-module establish an API for submitting jobs to the shared data processing cluster (managed via SLURM) and monitoring
-the running job status. All lab processing and analysis pipelines use this interface for accessing shared compute
-resources.
+"""This module provides the API for submitting jobs to remote compute servers and clusters (managed via SLURM) and
+monitoring the running jobs status. Many Sun lab data workflow pipelines use this interface for accessing shared
+compute resources.
 """
 
 import stat
@@ -33,7 +32,7 @@ def generate_server_credentials(
     working_root: str = "/local/storage",
     shared_directory_name: str = "sun_data",
 ) -> None:
-    """Generates a new server access credentials .yaml file under the specified directory, using input information.
+    """Generates the server access credentials .yaml file under the specified directory, using input information.
 
     This function provides a convenience interface for generating new server access credential files. Depending on
     configuration, it either creates user access credentials files or service access credentials files.
@@ -76,13 +75,7 @@ def generate_server_credentials(
 
 @dataclass()
 class ServerCredentials(YamlConfig):
-    """This class stores the hostname and credentials used to log into the BioHPC cluster to run Sun lab processing
-    pipelines.
-
-    Primarily, this is used as part of the sl-experiment library runtime to start data processing once it is
-    transferred to the BioHPC server during preprocessing. However, the same file can be used together with the Server
-    class API to run any computation jobs on the lab's BioHPC server.
-    """
+    """This class stores the information used to interface with Sun lab's remote compute servers."""
 
     username: str = "YourNetID"
     """The username to use for server authentication."""
@@ -124,16 +117,13 @@ class ServerCredentials(YamlConfig):
 
 
 class Server:
-    """Encapsulates access to a Sun lab processing server.
+    """Establishes and maintains a bidirectional interface that allows working with a remote compute server.
 
-    This class provides the API that allows accessing the remote processing server to create and submit various
-    SLURM-managed jobs to the server. It functions as the central interface used by all processing pipelines in the
-    lab to execute costly data processing on the server.
+    This class provides the API that allows accessing the remote processing server. Primarily, the class is used to
+    submit SLURM-managed jobs to the server and monitor their execution status. It functions as the central interface
+    used by many data workflow pipelines in the lab to execute costly data processing on the server.
 
     Notes:
-        All lab processing pipelines expect the data to be stored on the server and all processing logic to be packaged
-        and installed into dedicated conda environments on the server.
-
         This class assumes that the target server has SLURM job manager installed and accessible to the user whose
         credentials are used to connect to the server as part of this class instantiation.
 
@@ -196,54 +186,6 @@ class Server:
         """If the instance is connected to the server, terminates the connection before the instance is destroyed."""
         self.close()
 
-    def create_job(
-        self,
-        job_name: str,
-        conda_environment: str,
-        cpus_to_use: int = 10,
-        ram_gb: int = 10,
-        time_limit: int = 60,
-    ) -> Job:
-        """Creates and returns a new Job instance.
-
-        Use this method to generate Job objects for all headless jobs that need to be run on the remote server. The
-        generated Job is a precursor that requires further configuration by the user before it can be submitted to the
-        server for execution.
-
-        Args:
-            job_name: The descriptive name of the SLURM job to be created. Primarily, this name is used in terminal
-                printouts to identify the job to human operators.
-            conda_environment: The name of the conda environment to activate on the server before running the job logic.
-                The environment should contain the necessary Python packages and CLIs to support running the job's
-                logic.
-            cpus_to_use: The number of CPUs to use for the job.
-            ram_gb: The amount of RAM to allocate for the job, in Gigabytes.
-            time_limit: The maximum time limit for the job, in minutes. If the job is still running at the end of this
-                time period, it will be forcibly terminated. It is highly advised to always set adequate maximum runtime
-                limits to prevent jobs from hogging the server in case of runtime or algorithm errors.
-
-        Returns:
-            The initialized Job instance pre-filled with SLURM configuration data and conda activation commands. Modify
-            the returned instance with any additional commands as necessary for the job to fulfill its intended
-            purpose. Note, the Job requires submission via submit_job() to be executed by the server.
-        """
-        # Statically configures the working directory to be stored under:
-        # user working root / job_logs / job_name_timestamp
-        timestamp = get_timestamp()
-        working_directory = Path(self.user_working_root.joinpath("job_logs", f"{job_name}_{timestamp}"))
-        self.create_directory(remote_path=working_directory, parents=True)
-
-        return Job(
-            job_name=job_name,
-            output_log=working_directory.joinpath("stdout.txt"),
-            error_log=working_directory.joinpath("stderr.txt"),
-            working_directory=working_directory,
-            conda_environment=conda_environment,
-            cpus_to_use=cpus_to_use,
-            ram_gb=ram_gb,
-            time_limit=time_limit,
-        )
-
     def launch_jupyter_server(
         self,
         job_name: str,
@@ -255,31 +197,24 @@ class Server:
         port: int = 0,
         jupyter_args: str = "",
     ) -> JupyterJob:
-        """Launches a Jupyter notebook server on the target remote Sun lab server.
+        """Launches a remote Jupyter notebook session (server) on the target remote compute server.
 
-        Use this method to run interactive Jupyter sessions on the remote server under SLURM control. Unlike the
-        create_job(), this method automatically submits the job for execution as part of its runtime. Therefore, the
-        returned JupyterJob instance should only be used to query information about how to connect to the remote
-        Jupyter server.
+        This method allows running interactive Jupyter sessions on the remote server under SLURM control.
 
         Args:
-            job_name: The descriptive name of the Jupyter SLURM job to be created. Primarily, this name is used in
-                terminal printouts to identify the job to human operators.
+            job_name: The descriptive name of the Jupyter SLURM job to be created.
             conda_environment: The name of the conda environment to activate on the server before running the job logic.
                 The environment should contain the necessary Python packages and CLIs to support running the job's
                 logic. For Jupyter jobs, this necessarily includes the Jupyter notebook and jupyterlab packages.
             port: The connection port number for the Jupyter server. If set to 0 (default), a random port number between
-                8888 and 9999 will be assigned to this connection to reduce the possibility of colliding with other
+                8888 and 9999 is assigned to this connection to reduce the possibility of colliding with other
                 user sessions.
-            notebook_directory: The directory to use as Jupyter's root. During runtime, Jupyter will only have GUI
-                access to items stored in or under this directory. For most runtimes, this should be set to the user's
-                root data or working directory.
-            cpus_to_use: The number of CPUs to allocate to the Jupyter server. Keep this value as small as possible to
-                avoid interfering with headless data processing jobs.
-            ram_gb: The amount of RAM, in GB, to allocate to the Jupyter server. Keep this value as small as possible to
-                avoid interfering with headless data processing jobs.
-            time_limit: The maximum Jupyter server uptime, in minutes. Set this to the expected duration of your jupyter
-                session.
+            notebook_directory: The root directory where to run the Jupyter notebook. During runtime, the notebook will
+                only have access to items stored under this directory. For most runtimes, this should be set to the
+                user's root working directory.
+            cpus_to_use: The number of CPUs to allocate to the Jupyter server.
+            ram_gb: The amount of RAM, in GB, to allocate to the Jupyter server.
+            time_limit: The maximum Jupyter server uptime, in minutes.
             jupyter_args: Stores additional arguments to pass to jupyter notebook initialization command.
 
         Returns:
@@ -320,27 +255,36 @@ class Server:
         return self.submit_job(job)  # type: ignore[return-value]
 
     def submit_job(self, job: Job | JupyterJob, verbose: bool = True) -> Job | JupyterJob:
-        """Submits the input job to the managed BioHPC server via SLURM job manager.
+        """Submits the input job to the managed remote compute server via the SLURM job manager.
 
-        This method submits various jobs for execution via the SLURM-managed BioHPC cluster. As part of its runtime, the
-        method translates the Job object into the shell script, moves the script to the target working directory on
-        the server, and instructs the server to execute the shell script (via SLURM).
+        This method functions as the entry point for all headless jobs that are executed on the remote compute
+        server.
 
         Args:
-            job: The Job object that contains all job data.
-            verbose: Determines whether to notify the user about non-error states of the job submission task. Typically,
-                this is disabled when batch-submitting jobs (for example, as part of running a processing pipeline) and
-                enabled when submitting single jobs.
+            job: The initialized Job instance that contains remote job's data.
+            verbose: Determines whether to notify the user about non-error states of the job submission process.
 
         Returns:
-            The job object whose 'job_id' attribute had been modified with the job ID if the job was successfully
-            submitted.
+            The job object whose 'job_id' attribute had been modified to include the SLURM-assigned job ID if the job
+            was successfully submitted.
 
         Raises:
-            RuntimeError: If job submission to the server fails.
+            RuntimeError: If the job cannot be submitted to the server for any reason.
         """
         if verbose:
             console.echo(message=f"Submitting '{job.job_name}' job to the remote server {self.host}...")
+
+        # If the Job object already has a job ID, this indicates that the job has already been submitted to the server.
+        # In this case returns it to the caller with no further modifications.
+        if job.job_id is not None:
+            console.echo(
+                message=(
+                    f"The '{job.job_name}' job has already been submitted to the server. No further actions have "
+                    f"been taken as part of this submission cycle."
+                ),
+                level=LogLevel.WARNING
+            )
+            return job
 
         # Generates a temporary shell script on the local machine. Uses tempfile to automatically remove the
         # local script as soon as it is uploaded to the server.
@@ -439,7 +383,7 @@ class Server:
         """Returns True if the job managed by the input Job instance has been completed or terminated its runtime due
         to an error.
 
-        If the job is still running or is waiting inside the execution queue, the method returns False.
+        If the job is still running or queued for runtime, the method returns False.
 
         Args:
             job: The Job object whose status needs to be checked.
@@ -467,9 +411,9 @@ class Server:
     def abort_job(self, job: Job | JupyterJob) -> None:
         """Aborts the target job if it is currently running on the server.
 
-        Use this method to immediately abort running or queued jobs without waiting for the timeout guard. If the job
-        is queued, this method will remove it from the SLURM queue. If the job is already terminated, this method will
-        do nothing.
+        If the job is currently running, this method forcibly terminates its runtime. If the job is queued for
+        execution, this method removes it from the SLURM queue. If the job is already terminated, this method will do
+        nothing.
 
         Args:
             job: The Job object that needs to be aborted.
@@ -597,7 +541,7 @@ class Server:
             sftp.close()
 
     def _recursive_remove(self, sftp: paramiko.SFTPClient, remote_path: Path) -> None:
-        """Recursively removes a directory and all its contents.
+        """Recursively removes the specified remote directory and all its contents.
 
         This worker method is used by the user-facing remove() method to recursively remove non-empty directories.
 
@@ -627,10 +571,7 @@ class Server:
             console.echo(f"Unable to remove the specified directory {remote_path}: {e!s}", level=LogLevel.WARNING)
 
     def create_directory(self, remote_path: Path, parents: bool = True) -> None:
-        """Creates the specified directory tree on the managed remote server via SFTP.
-
-        This method creates directories on the remote server, with options to create parent directories and handle
-        existing directories gracefully.
+        """Creates the specified directory tree on the managed remote server.
 
         Args:
             remote_path: The absolute path to the directory to create on the remote server, relative to the server

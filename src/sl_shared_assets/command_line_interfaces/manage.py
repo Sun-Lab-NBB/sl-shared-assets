@@ -12,6 +12,8 @@ from ..tools import (
     prepare_session,
     resolve_checksum,
     generate_project_manifest,
+    acquire_lock,
+    release_lock
 )
 
 # Ensures that displayed CLICK help messages are formatted according to the lab standard.
@@ -81,6 +83,48 @@ def manage_session(
     ctx.obj["processed_data_root"] = processed_data_root
     ctx.obj["manager_id"] = manager_id
     ctx.obj["reset_tracker"] = reset_tracker
+
+
+@manage_session.command("lock")
+@click.pass_context
+@click.option(
+    "-a",
+    "--acquire",
+    is_flag=True,
+    help=(
+        "Determines whether this command is called to acquire (if this flag is provided) or release (if this flag "
+        "is not provided) the session lock."
+    ),
+)
+def resolve_session_lock(ctx: Any, acquire: bool) -> None:
+    """Acquires or releases the lock for the target session's data.
+
+    This command is used to reversibly toggle the target session's data to only be accessed from the specified
+    manager process. Primarily, this is used on remote compute servers to ensure that the session is processed in a
+    process-safe manner. It should be called at the beginning of each session data processing workflow to lock the
+    session's data and at the end of each processing workflow to unlock the session's data.
+    """
+
+    # Extracts shared parameters from context
+    session_path = ctx.obj["session_path"]
+    processed_data_root = ctx.obj["processed_data_root"]
+    manager_id = ctx.obj["manager_id"]
+    reset_tracker = ctx.obj["reset_tracker"]
+
+    # Depending on configuration, acquired or releases the session data lock.
+    if acquire:
+        acquire_lock(
+            session_path=session_path,
+            manager_id=manager_id,
+            processed_data_root=processed_data_root,
+            reset_lock=reset_tracker,
+        )
+    else:
+        release_lock(
+            session_path=session_path,
+            manager_id=manager_id,
+            processed_data_root=processed_data_root,
+        )
 
 
 # noinspection PyUnresolvedReferences

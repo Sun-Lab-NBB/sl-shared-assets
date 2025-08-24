@@ -1,6 +1,5 @@
 """This package provides the classes and methods used by all Sun lab libraries to work with the data stored on remote
-compute servers, such as the BioHPC server. It provides tools for submitting and monitoring jobs, running complex
-processing pipelines and interactively working with the data via a Jupyter lab server."""
+compute servers."""
 
 from .job import Job, JupyterJob
 from .server import Server, ServerCredentials, generate_server_credentials
