@@ -15,6 +15,7 @@ from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
 
 from .configuration_data import AcquisitionSystems, get_system_configuration_data
+from ..tools.transfer_tools import delete_directory
 
 
 class SessionTypes(StrEnum):
@@ -596,26 +597,53 @@ class SessionData(YamlConfig):
             )
         )
 
-        # SOURCE DATA
-        instance.source_data.resolve_paths(
-            root_directory_path=processed_data_root.joinpath(
-                instance.project_name, instance.animal_id, instance.session_name, "source_data"
+        # If the processed data root is different from the raw data root, resolves the path to the 'source' and
+        # 'archive' data directories. Otherwise, uses the same paths as 'raw' and 'processed' data directories.
+        if processed_data_root != local_root:
+            # SOURCE DATA
+            instance.source_data.resolve_paths(
+                root_directory_path=processed_data_root.joinpath(
+                    instance.project_name, instance.animal_id, instance.session_name, "source_data"
+                )
             )
-        )
-        # Note, since source data is populated as part of the 'preparation' runtime, does not make the directories.
+            # Note, since source data is populated as part of the 'preparation' runtime, does not make the directories.
 
-        # ARCHIVED DATA
-        instance.archived_data.resolve_paths(
-            root_directory_path=local_root.joinpath(
-                instance.project_name, instance.animal_id, instance.session_name, "archived_data"
+            # ARCHIVED DATA
+            instance.archived_data.resolve_paths(
+                root_directory_path=local_root.joinpath(
+                    instance.project_name, instance.animal_id, instance.session_name, "archived_data"
+                )
             )
-        )
+
+            # If the session has been processed with the processed data root previously matching the raw data root,
+            # ensures that there is no 'processed_data' directory on the raw data root. In other words, ensures that
+            # the session data always has only a single copy of the 'processed_data' directory.
+            old_processed_data_path = local_root.joinpath(
+                instance.project_name, instance.animal_id, instance.session_name, "processed_data"
+            )
+            delete_directory(old_processed_data_path)
+
+        else:
+            # SOURCE DATA
+            instance.source_data.resolve_paths(
+                root_directory_path=processed_data_root.joinpath(
+                    instance.project_name, instance.animal_id, instance.session_name, "raw_data"
+                )
+            )
+
+            # ARCHIVED DATA
+            instance.archived_data.resolve_paths(
+                root_directory_path=local_root.joinpath(
+                    instance.project_name, instance.animal_id, instance.session_name, "processed_data"
+                )
+            )
+
         # Similar to source_data, archived data is populated as part of the 'archiving' pipeline, so directories for
         # this data are not resolved.
 
         # If there is no archived processed data, ensures that processed data hierarchy exists.
         if not instance.archived_data.processed_data_path.exists():
-            instance.processed_data.make_directories()  # Ensures processed data directories exist
+            instance.processed_data.make_directories()
 
         # TRACKING DATA
         instance.tracking_data.resolve_paths(
@@ -730,10 +758,11 @@ class SessionLock(YamlConfig):
             # Checks if the session is already locked by another process
             if self._manager_id != -1 and self._manager_id != manager_id:
                 message = (
-                    f"Cannot acquire the session lock for manager process {manager_id}. The {self.file_path.name} "
-                    f"session lock file indicates The lock is currently held by the manager process "
-                    f"{self._manager_id}. Call the command that produced this error with the '--reset_lock' flag "
-                    f"to override this safety feature or wait for the natural lock release."
+                    f"Unable to acquire the {self.file_path.parents[1].name} session's lock for the manager with "
+                    f"id {manager_id}. The lock file indicates that the lock is already held by the process with id "
+                    f"{self._manager_id}, preventing other processes from interfacing with the session lock. Call the "
+                    f"command that produced this error with the '--reset-tracker' flag to override this safety "
+                    f"feature or wait for the lock to be released."
                 )
                 console.error(message=message, error=RuntimeError)
                 raise RuntimeError(message)
@@ -760,9 +789,9 @@ class SessionLock(YamlConfig):
 
             if self._manager_id != manager_id:
                 message = (
-                    f"Unable to release the session lock from the manager with id {manager_id}. The "
-                    f"{self.file_path.name} session lock file indicates that the lock is held by the process with "
-                    f"id {self._manager_id}, preventing other processes from interfacing with the session lock."
+                    f"Unable to release the {self.file_path.parents[1].name} session's lock from the manager with "
+                    f"id {manager_id}. The lock file indicates that the lock is held by the process with id "
+                    f"{self._manager_id}, preventing other processes from interfacing with the session lock."
                 )
                 console.error(message=message, error=RuntimeError)
                 raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
@@ -807,7 +836,8 @@ class SessionLock(YamlConfig):
             self._load_state()
             if self._manager_id != manager_id:
                 message = (
-                    f"Unable to access the session's data from manager process {manager_id} as the session is "
-                    f"currently locked by another manager process with ID {self._manager_id}."
+                    f"Unable to access the {self.file_path.parents[1].name} session's data from manager process "
+                    f"{manager_id}, as the session is currently locked by another manager process with ID "
+                    f"{self._manager_id}."
                 )
                 console.error(message=message, error=ValueError)

@@ -8,12 +8,12 @@ import click
 from ataraxis_base_utilities import LogLevel, console
 
 from ..tools import (
+    acquire_lock,
+    release_lock,
     archive_session,
     prepare_session,
     resolve_checksum,
     generate_project_manifest,
-    acquire_lock,
-    release_lock
 )
 
 # Ensures that displayed CLICK help messages are formatted according to the lab standard.
@@ -85,24 +85,18 @@ def manage_session(
     ctx.obj["reset_tracker"] = reset_tracker
 
 
+# noinspection PyUnresolvedReferences
 @manage_session.command("lock")
 @click.pass_context
-@click.option(
-    "-a",
-    "--acquire",
-    is_flag=True,
-    help=(
-        "Determines whether this command is called to acquire (if this flag is provided) or release (if this flag "
-        "is not provided) the session lock."
-    ),
-)
-def resolve_session_lock(ctx: Any, acquire: bool) -> None:
-    """Acquires or releases the lock for the target session's data.
+def lock_session(ctx: Any) -> None:
+    """Acquires the lock for the target session's data.
 
-    This command is used to reversibly toggle the target session's data to only be accessed from the specified
-    manager process. Primarily, this is used on remote compute servers to ensure that the session is processed in a
-    process-safe manner. It should be called at the beginning of each session data processing workflow to lock the
-    session's data and at the end of each processing workflow to unlock the session's data.
+    This command is used to ensure that the target session's data can only be accessed from the specified manager
+    process. Calling this command is a prerequisite for all other session data management, processing, or dataset
+    formation commands. If this command is called as part of runtime, the 'unlock' command must be called at the end
+    of that runtime to properly release the session's data lock. This command respects the '--reset-tracker' flag of the
+    'session' command group and, if this flag is present, forcibly resets the session lock file before re-acquiring it
+    for the specified manager process.
     """
 
     # Extracts shared parameters from context
@@ -111,20 +105,35 @@ def resolve_session_lock(ctx: Any, acquire: bool) -> None:
     manager_id = ctx.obj["manager_id"]
     reset_tracker = ctx.obj["reset_tracker"]
 
-    # Depending on configuration, acquired or releases the session data lock.
-    if acquire:
-        acquire_lock(
-            session_path=session_path,
-            manager_id=manager_id,
-            processed_data_root=processed_data_root,
-            reset_lock=reset_tracker,
-        )
-    else:
-        release_lock(
-            session_path=session_path,
-            manager_id=manager_id,
-            processed_data_root=processed_data_root,
-        )
+    acquire_lock(
+        session_path=session_path,
+        manager_id=manager_id,
+        processed_data_root=processed_data_root,
+        reset_lock=reset_tracker,
+    )
+
+
+# noinspection PyUnresolvedReferences
+@manage_session.command("unlock")
+@click.pass_context
+def unlock_session(ctx: Any) -> None:
+    """Releases the lock for the target session's data.
+
+    This command is used to reverse the effect of the 'lock' command, allowing other manager processes to work with
+    the session's data. This command can only be called from the same manager process used to acquire the
+    session's data lock.
+    """
+
+    # Extracts shared parameters from context
+    session_path = ctx.obj["session_path"]
+    processed_data_root = ctx.obj["processed_data_root"]
+    manager_id = ctx.obj["manager_id"]
+
+    release_lock(
+        session_path=session_path,
+        manager_id=manager_id,
+        processed_data_root=processed_data_root,
+    )
 
 
 # noinspection PyUnresolvedReferences

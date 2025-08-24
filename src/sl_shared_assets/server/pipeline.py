@@ -256,7 +256,7 @@ class ProcessingTracker(YamlConfig):
         """Configures the tracker file to indicate that the tracked processing pipeline encountered an error and failed
         to complete.
 
-        This method  unlocks the pipeline, allowing other manager processes to interface with the tracked pipeline. It
+        This method unlocks the pipeline, allowing other manager processes to interface with the tracked pipeline. It
         also updates the tracker file to reflect that the pipeline was interrupted due to an error, which is used by the
         manager processes to detect and handle processing failures.
 
@@ -433,8 +433,8 @@ class ProcessingPipeline:
     remote_tracker_path: Path
     """Stores the path to the pipeline's processing tracker .yaml file stored on the remote compute server."""
     local_tracker_path: Path
-    """Stores the path to the pipeline's processing tracker .yaml file on the local machine. The remote file is pulled to 
-    this location when the instance verifies the outcome of the tracked processing pipeline."""
+    """Stores the path to the pipeline's processing tracker .yaml file on the local machine. The remote file is 
+    pulled to this location when the instance verifies the outcome of the tracked processing pipeline."""
     session: str
     """Stores the ID of the session whose data is being processed by the tracked pipeline."""
     animal: str

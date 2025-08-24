@@ -91,8 +91,8 @@ class InjectionData:
     injection_volume_nl: float
     """Stores the volume of substance, in nanoliters, delivered during the injection."""
     injection_code: str
-    """Stores the manufacturer code or internal reference code for the injected substance. This code is used to identify the 
-    substance in additional datasheets and lab ordering documents."""
+    """Stores the manufacturer code or internal reference code for the injected substance. This code is used to 
+    identify the substance in additional datasheets and lab ordering documents."""
     injection_ap_coordinate_mm: float
     """Stores the injection's antero-posterior stereotactic coordinate, in millimeters, relative to bregma."""
     injection_ml_coordinate_mm: float
@@ -134,7 +134,7 @@ class SurgeryData(YamlConfig):
     """Stores the data about the surgical intervention performed on an animal before data acquisition session(s).
 
     Primarily, this class is used to ensure that each data acquisition session contains a copy of the surgical
-    intervention data as a .yaml file. In turn, this improves experimenter's experience during data analysis by
+    intervention data as a .yaml file. In turn, this improves the experimenter's experience during data analysis by
     allowing quickly referencing the surgical intervention data.
     """
 

@@ -1,0 +1,261 @@
+from pathlib import Path
+from dataclasses import field, dataclass
+
+import paramiko
+from _typeshed import Incomplete
+from simple_slurm import Slurm as Slurm
+from paramiko.client import SSHClient
+from ataraxis_data_structures import YamlConfig
+
+from .job import (
+    Job as Job,
+    JupyterJob as JupyterJob,
+)
+
+def generate_server_credentials(
+    output_directory: Path,
+    username: str,
+    password: str,
+    service: bool = False,
+    host: str = "cbsuwsun.biopic.cornell.edu",
+    storage_root: str = "/local/workdir",
+    working_root: str = "/local/storage",
+    shared_directory_name: str = "sun_data",
+) -> None:
+    """Generates the server access credentials .yaml file under the specified directory, using input information.
+
+    This function provides a convenience interface for generating new server access credential files. Depending on
+    configuration, it either creates user access credentials files or service access credentials files.
+
+    Args:
+        output_directory: The directory where to save the generated server_credentials.yaml file.
+        username: The username to use for server authentication.
+        password: The password to use for server authentication.
+        service: Determines whether the generated credentials file stores the data for a user or a service account.
+        host: The hostname or IP address of the server to connect to.
+        storage_root: The path to the root storage (slow) server directory. Typically, this is the path to the
+            top-level (root) directory of the HDD RAID volume.
+        working_root: The path to the root working (fast) server directory. Typically, this is the path to the
+            top-level (root) directory of the NVME RAID volume. If the server uses the same volume for both storage and
+            working directories, enter the same path under both 'storage_root' and 'working_root'.
+        shared_directory_name: The name of the shared directory used to store all Sun lab project data on the storage
+            and working server volumes.
+    """
+@dataclass()
+class ServerCredentials(YamlConfig):
+    """This class stores the information used to interface with Sun lab's remote compute servers."""
+
+    username: str = ...
+    password: str = ...
+    host: str = ...
+    storage_root: str = ...
+    working_root: str = ...
+    shared_directory_name: str = ...
+    raw_data_root: str = field(init=False, default_factory=Incomplete)
+    processed_data_root: str = field(init=False, default_factory=Incomplete)
+    user_data_root: str = field(init=False, default_factory=Incomplete)
+    user_working_root: str = field(init=False, default_factory=Incomplete)
+    def __post_init__(self) -> None:
+        """Statically resolves the paths to end-point directories using provided root directories."""
+
+class Server:
+    """Establishes and maintains a bidirectional interface that allows working with a remote compute server.
+
+    This class provides the API that allows accessing the remote processing server. Primarily, the class is used to
+    submit SLURM-managed jobs to the server and monitor their execution status. It functions as the central interface
+    used by many data workflow pipelines in the lab to execute costly data processing on the server.
+
+    Notes:
+        This class assumes that the target server has SLURM job manager installed and accessible to the user whose
+        credentials are used to connect to the server as part of this class instantiation.
+
+    Args:
+        credentials_path: The path to the locally stored .yaml file that contains the server hostname and access
+            credentials.
+
+    Attributes:
+        _open: Tracks whether the connection to the server is open or not.
+        _client: Stores the initialized SSHClient instance used to interface with the server.
+    """
+
+    _open: bool
+    _credentials: ServerCredentials
+    _client: SSHClient
+    def __init__(self, credentials_path: Path) -> None: ...
+    def __del__(self) -> None:
+        """If the instance is connected to the server, terminates the connection before the instance is destroyed."""
+    def launch_jupyter_server(
+        self,
+        job_name: str,
+        conda_environment: str,
+        notebook_directory: Path,
+        cpus_to_use: int = 2,
+        ram_gb: int = 32,
+        time_limit: int = 240,
+        port: int = 0,
+        jupyter_args: str = "",
+    ) -> JupyterJob:
+        """Launches a remote Jupyter notebook session (server) on the target remote compute server.
+
+        This method allows running interactive Jupyter sessions on the remote server under SLURM control.
+
+        Args:
+            job_name: The descriptive name of the Jupyter SLURM job to be created.
+            conda_environment: The name of the conda environment to activate on the server before running the job logic.
+                The environment should contain the necessary Python packages and CLIs to support running the job's
+                logic. For Jupyter jobs, this necessarily includes the Jupyter notebook and jupyterlab packages.
+            port: The connection port number for the Jupyter server. If set to 0 (default), a random port number between
+                8888 and 9999 is assigned to this connection to reduce the possibility of colliding with other
+                user sessions.
+            notebook_directory: The root directory where to run the Jupyter notebook. During runtime, the notebook will
+                only have access to items stored under this directory. For most runtimes, this should be set to the
+                user's root working directory.
+            cpus_to_use: The number of CPUs to allocate to the Jupyter server.
+            ram_gb: The amount of RAM, in GB, to allocate to the Jupyter server.
+            time_limit: The maximum Jupyter server uptime, in minutes.
+            jupyter_args: Stores additional arguments to pass to jupyter notebook initialization command.
+
+        Returns:
+            The initialized JupyterJob instance that stores information on how to connect to the created Jupyter server.
+            Do NOT re-submit the job to the server, as this is done as part of this method's runtime.
+
+        Raises:
+            TimeoutError: If the target Jupyter server doesn't start within 120 minutes of this method being called.
+            RuntimeError: If the job submission fails for any reason.
+        """
+    def submit_job(self, job: Job | JupyterJob, verbose: bool = True) -> Job | JupyterJob:
+        """Submits the input job to the managed remote compute server via the SLURM job manager.
+
+        This method functions as the entry point for all headless jobs that are executed on the remote compute
+        server.
+
+        Args:
+            job: The initialized Job instance that contains remote job's data.
+            verbose: Determines whether to notify the user about non-error states of the job submission process.
+
+        Returns:
+            The job object whose 'job_id' attribute had been modified to include the SLURM-assigned job ID if the job
+            was successfully submitted.
+
+        Raises:
+            RuntimeError: If the job cannot be submitted to the server for any reason.
+        """
+    def job_complete(self, job: Job | JupyterJob) -> bool:
+        """Returns True if the job managed by the input Job instance has been completed or terminated its runtime due
+        to an error.
+
+        If the job is still running or queued for runtime, the method returns False.
+
+        Args:
+            job: The Job object whose status needs to be checked.
+
+        Raises:
+            ValueError: If the input Job object does not contain a valid job_id, suggesting that it has not been
+                submitted to the server.
+        """
+    def abort_job(self, job: Job | JupyterJob) -> None:
+        """Aborts the target job if it is currently running on the server.
+
+        If the job is currently running, this method forcibly terminates its runtime. If the job is queued for
+        execution, this method removes it from the SLURM queue. If the job is already terminated, this method will do
+        nothing.
+
+        Args:
+            job: The Job object that needs to be aborted.
+        """
+    def pull_file(self, local_file_path: Path, remote_file_path: Path) -> None:
+        """Moves the specified file from the remote server to the local machine.
+
+        Args:
+            local_file_path: The path to the local instance of the file (where to copy the file).
+            remote_file_path: The path to the target file on the remote server (the file to be copied).
+        """
+    def push_file(self, local_file_path: Path, remote_file_path: Path) -> None:
+        """Moves the specified file from the remote server to the local machine.
+
+        Args:
+            local_file_path: The path to the file that needs to be copied to the remote server.
+            remote_file_path: The path to the file on the remote server (where to copy the file).
+        """
+    def pull_directory(self, local_directory_path: Path, remote_directory_path: Path) -> None:
+        """Recursively downloads the entire target directory from the remote server to the local machine.
+
+        Args:
+            local_directory_path: The path to the local directory where the remote directory will be copied.
+            remote_directory_path: The path to the directory on the remote server to be downloaded.
+        """
+    def push_directory(self, local_directory_path: Path, remote_directory_path: Path) -> None:
+        """Recursively uploads the entire target directory from the local machine to the remote server.
+
+        Args:
+            local_directory_path: The path to the local directory to be uploaded.
+            remote_directory_path: The path on the remote server where the directory will be copied.
+        """
+    def remove(self, remote_path: Path, is_dir: bool, recursive: bool = False) -> None:
+        """Removes the specified file or directory from the remote server.
+
+        Args:
+            remote_path: The path to the file or directory on the remote server to be removed.
+            is_dir: Determines whether the input path represents a directory or a file.
+            recursive: If True and is_dir is True, recursively deletes all contents of the directory
+                before removing it. If False, only removes empty directories (standard rmdir behavior).
+        """
+    def _recursive_remove(self, sftp: paramiko.SFTPClient, remote_path: Path) -> None:
+        """Recursively removes the specified remote directory and all its contents.
+
+        This worker method is used by the user-facing remove() method to recursively remove non-empty directories.
+
+        Args:
+            sftp: The SFTP client instance to use for remove operations.
+            remote_path: The path to the remote directory to recursively remove.
+        """
+    def create_directory(self, remote_path: Path, parents: bool = True) -> None:
+        """Creates the specified directory tree on the managed remote server.
+
+        Args:
+            remote_path: The absolute path to the directory to create on the remote server, relative to the server
+                root.
+            parents: Determines whether to create parent directories, if they are missing. Otherwise, if parents do not
+                exist, raises a FileNotFoundError.
+
+        Notes:
+            This method silently assumes that it is fine if the directory already exists and treats it as a successful
+            runtime end-point.
+        """
+    def exists(self, remote_path: Path) -> bool:
+        """Returns True if the target file or directory exists on the remote server."""
+    def close(self) -> None:
+        """Closes the SSH connection to the server.
+
+        This method has to be called before destroying the class instance to ensure proper resource cleanup.
+        """
+    @property
+    def raw_data_root(self) -> Path:
+        """Returns the absolute path to the directory used to store the raw data for all Sun lab projects on the server
+        accessible through this class.
+        """
+    @property
+    def processed_data_root(self) -> Path:
+        """Returns the absolute path to the directory used to store the processed data for all Sun lab projects on the
+        server accessible through this class.
+        """
+    @property
+    def user_data_root(self) -> Path:
+        """Returns the absolute path to the directory used to store user-specific data on the server accessible through
+        this class."""
+    @property
+    def user_working_root(self) -> Path:
+        """Returns the absolute path to the user-specific working (fast) directory on the server accessible through
+        this class."""
+    @property
+    def host(self) -> str:
+        """Returns the hostname or IP address of the server accessible through this class."""
+    @property
+    def user(self) -> str:
+        """Returns the username used to authenticate with the server."""
+    @property
+    def suite2p_configurations_directory(self) -> Path:
+        """Returns the absolute path to the shared directory that stores all sl-suite2p runtime configuration files."""
+    @property
+    def dlc_projects_directory(self) -> Path:
+        """Returns the absolute path to the shared directory that stores all DeepLabCut projects."""

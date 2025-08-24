@@ -1,4 +1,4 @@
-"""This module provides the API for submitting jobs to remote compute servers and clusters (managed via SLURM) and
+"""This module provides the API for submitting jobs to compute servers and clusters (managed via SLURM) and
 monitoring the running jobs status. Many Sun lab data workflow pipelines use this interface for accessing shared
 compute resources.
 """
@@ -282,7 +282,7 @@ class Server:
                     f"The '{job.job_name}' job has already been submitted to the server. No further actions have "
                     f"been taken as part of this submission cycle."
                 ),
-                level=LogLevel.WARNING
+                level=LogLevel.WARNING,
             )
             return job
 
