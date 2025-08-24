@@ -1,6 +1,6 @@
-"""This module provides tools and classes for running complex data processing pipelines on remote compute servers.
-A Pipeline represents a higher unit of abstraction relative to the Job class, often leveraging multiple sequential or
-parallel processing jobs to conduct the required processing."""
+"""This module provides tools used to run complex data processing pipelines on remote compute servers. A processing
+pipeline represents a higher unit of abstraction relative to the Job class, often leveraging multiple sequential or
+parallel jobs to process the data."""
 
 import copy
 from enum import IntEnum, StrEnum
@@ -20,11 +20,8 @@ from .server import Server
 
 
 class TrackerFileNames(StrEnum):
-    """Defines a set of processing tacker .yaml files used by the Sun lab data preprocessing, processing, and dataset
-    formation pipelines to track the progress of the remotely executed pipelines.
-
-    This enumeration standardizes the names for all processing tracker files used in the lab. It is designed to be used
-    via the get_processing_tracker() function to generate ProcessingTracker instances.
+    """Stores the names of the processing tacker .yaml files used by the Sun lab data preprocessing, processing, and
+    dataset formation pipelines to track the pipeline's progress.
 
      Notes:
         The elements in this enumeration match the elements in the ProcessingPipelines enumeration, since each valid
@@ -52,18 +49,14 @@ class TrackerFileNames(StrEnum):
 
 
 class ProcessingPipelines(StrEnum):
-    """Defines the set of processing pipelines currently supported in the Sun lab.
-
-    All processing pipelines currently supported by the lab codebase are defined in this enumeration. Primarily,
-    the elements from this enumeration are used in terminal messages and data logging entries to identify the pipelines
-    to the user.
+    """Stores the names of the data processing pipelines currently used in the lab.
 
     Notes:
-        The elements in this enumeration match the elements in the ProcessingTracker enumeration, since each valid
+        The elements in this enumeration match the elements in the TrackerFileNames enumeration, since each valid
         ProcessingPipeline instance has an associated ProcessingTracker file instance.
 
         The order of pipelines in this enumeration loosely follows the sequence in which they are executed during the
-        lifetime of the Sun lab data on the remote compute server.
+        Sun lab data workflow.
     """
 
     MANIFEST = "manifest generation"
@@ -72,8 +65,8 @@ class ProcessingPipelines(StrEnum):
     pipeline automatically conduct the manifest (re)generation at the end of their runtime."""
     CHECKSUM = "checksum resolution"
     """Checksum resolution pipeline. Primarily, it is used to verify that the raw data has been transferred to the 
-    remote storage server from the main acquisition system PC intact. This pipeline is sometimes also used to 
-    regenerate (re-checksum) the data stored on the remote compute server."""
+    remote storage server from the main acquisition system PC intact. This pipeline is also used to regenerate 
+    (re-checksum) the data stored on the remote compute server."""
     PREPARATION = "processing preparation"
     """Data processing preparation pipeline. Since the compute server uses a two-volume design with a slow (HDD) storage
     volume and a fast (NVME) working volume, to optimize data processing performance, the data needs to be transferred 
@@ -81,8 +74,7 @@ class ProcessingPipelines(StrEnum):
     volume to the working volume."""
     BEHAVIOR = "behavior processing"
     """Behavior processing pipeline. This pipeline is used to process .npz log files to extract animal behavior data 
-    acquired during a single session (day). The processed logs also contain the timestamps use to synchronize behavior 
-    to video and mesoscope frame data, and experiment configuration and task information."""
+    acquired during a single session (day)."""
     SUITE2P = "single-day suite2p processing"
     """Single-day suite2p pipeline. This pipeline is used to extract the cell activity data from 2-photon imaging data 
     acquired during a single session (day)."""
@@ -91,24 +83,22 @@ class ProcessingPipelines(StrEnum):
     behavior video frames acquired during a single session (day)."""
     MULTIDAY = "multi-day suite2p processing"
     """Multi-day suite2p processing (cell tracking) pipeline. This pipeline is used to track cells processed with the 
-    single-day suite2p pipelines across multiple days. It is executed for all sessions marked for integration into the 
-    same dataset as the first step of dataset creation."""
+    single-day suite2p pipelines across multiple days."""
     FORGING = "dataset forging"
     """Dataset creation (forging) pipeline. This pipeline typically runs after the multi-day pipeline. It extracts and 
-    integrates the processed data from various sources such as brain activity, behavior, videos, etc., into a unified 
-    dataset."""
+    integrates the processed data from all sources into a unified dataset."""
     ARCHIVING = "data archiving"
-    """Data archiving pipeline. To conserve the (limited) space on the fast working volume, once the data has been 
-    processed and integrated into a stable dataset, the processed data folder is moved to the storage volume and all 
-    folders under the root session folder on the processed data volume are deleted."""
+    """Data archiving pipeline. To conserve the (limited) space on the remote compute server's fast working volume, 
+    once the data has been processed and integrated into a stable dataset, the processed data folder is moved to the 
+    storage volume. After the data is moved, all folders under the root session folder on the processed data volume are 
+    deleted to free up the processing volume space."""
 
 
 class ProcessingStatus(IntEnum):
     """Maps integer-based processing pipeline status (state) codes to human-readable names.
 
-    This enumeration is used to track and communicate the progress of Sun lab processing pipelines as they are executed
-    by the remote compute server. Specifically, the codes from this enumeration are used by the ProcessingPipeline
-    class to communicate the status of the managed pipelines to external processes.
+    The codes from this enumeration are used by the ProcessingPipeline class to communicate the status of the managed
+    pipelines to manager processes that oversee the execution of each pipeline.
 
     Notes:
         The status codes from this enumeration track the state of the pipeline as a whole, instead of tracking the
@@ -129,41 +119,40 @@ class ProcessingStatus(IntEnum):
 
 @dataclass()
 class ProcessingTracker(YamlConfig):
-    """Wraps the .yaml file that tracks the state of a data processing pipeline and provides tools for communicating the
-    state between multiple processes in a thread-safe manner.
+    """Wraps the .yaml file that tracks the state of a data processing pipeline and provides tools for communicating
+    this state between multiple processes in a thread-safe manner.
 
     This class is used by all data processing pipelines running on the remote compute server(s) to prevent race
-    conditions and ensure that pipelines have exclusive access to the processed data. It is also used to evaluate the
-    status (success / failure) of each pipeline as they are executed by the remote server.
+    conditions. It is also used to evaluate the status (success / failure) of each pipeline as they are executed by the
+    remote server.
 
     Note:
-        In library version 4.0.0 the processing trackers have been refactored to work similar to 'lock' files. That is,
-        when a pipeline starts running on the remote server, its tracker is switched into the 'running' (locked) state
-        until the pipeline completes, aborts, or encounters an error. When the tracker is locked, all modifications to
-        the tracker or processed data have to originate from the same process that started the pipeline that locked the
-        tracker file. This feature supports running complex processing pipelines that use multiple concurrent and / or
-        sequential processing jobs on the remote server.
-
-        This instance frequently refers to a 'manager process' in method documentation. A 'manager process' is the
+        This instance frequently refers to the 'manager process' in method documentation. A 'manager process' is the
         highest-level process that manages the tracked pipeline. When a pipeline runs on remote compute servers, the
         manager process is typically the process running on the non-server machine (user PC) that submits the remote
-        processing jobs to the compute server (via SSH or similar protocol). The worker process(es) that run the
-        processing job(s) on the remote compute servers are NOT considered manager processes.
+        processing jobs to the compute server. The worker process(es) that run the processing job(s) on the remote
+        compute servers are not considered manager processes.
+
+        The processing trackers work similar to 'lock' files. When a pipeline starts running on the remote server, its
+        tracker is switched into the 'running' (locked) state until the pipeline completes, aborts, or encounters an
+        error. When the tracker is locked, all modifications to the tracker have to originate from the same manager
+        process that started the pipeline. This feature supports running complex processing pipelines that use multiple
+        concurrent and / or sequential processing jobs on the remote server.
     """
 
     file_path: Path
     """Stores the path to the .yaml file used to cache the tracker data on disk. The class instance functions as a 
     wrapper around the data stored inside the specified .yaml file."""
     _complete: bool = False
-    """Tracks whether the processing runtime managed by this tracker has finished successfully."""
+    """Tracks whether the processing pipeline managed by this tracker has finished successfully."""
     _encountered_error: bool = False
-    """Tracks whether the processing runtime managed by this tracker has encountered an error and has finished 
+    """Tracks whether the processing pipeline managed by this tracker has encountered an error and has finished 
     unsuccessfully."""
     _running: bool = False
-    """Tracks whether the processing runtime managed by this tracker is currently running."""
+    """Tracks whether the processing pipeline managed by this tracker is currently running."""
     _manager_id: int = -1
     """Stores the xxHash3-64 hash value that represents the unique identifier of the manager process that started the 
-    runtime. The manager process is typically running on a remote control machine (computer) and is used to 
+    pipeline. The manager process is typically running on a remote control machine (computer) and is used to 
     support processing runtimes that are distributed over multiple separate batch jobs on the compute server. This 
     ID should be generated using the 'generate_manager_id()' function exposed by this library."""
     _lock_path: str = field(init=False)
@@ -218,20 +207,17 @@ class ProcessingTracker(YamlConfig):
 
     def start(self, manager_id: int, job_count: int = 1) -> None:
         """Configures the tracker file to indicate that a manager process is currently executing the tracked processing
-        runtime.
+        pipeline.
 
-        Calling this method effectively 'locks' the tracked session and processing runtime combination to only be
-        accessible from the manager process that calls this method. Calling this method for an already running runtime
-        managed by the same process does not have any effect, so it is safe to call this method at the beginning of
-        each processing job that makes up the runtime.
+        Calling this method locks the tracked session and processing pipeline combination to only be accessible from the
+        manager process that calls this method. Calling this method for an already running pipeline managed by the same
+        process does not have any effect, so it is safe to call this method at the beginning of each processing job that
+        makes up the pipeline.
 
         Args:
-            manager_id: The unique xxHash-64 hash identifier of the manager process which attempts to start the runtime
-                tracked by this tracker file.
-            job_count: The total number of jobs to be executed as part of the tracked pipeline. This is used to make
-                the stop() method properly track the end of the pipeline as a whole, rather than the end of intermediate
-                jobs. Primarily, this is used by multi-job pipelines where all jobs are submitted as part of a single
-                phase and the job completion order cannot be known in-advance.
+            manager_id: The unique identifier of the manager process which attempts to start the pipeline tracked by
+                this tracker file.
+            job_count: The total number of jobs to be executed as part of the tracked pipeline.
 
         Raises:
             TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
@@ -242,23 +228,23 @@ class ProcessingTracker(YamlConfig):
             # Loads tracker state from the .yaml file
             self._load_state()
 
-            # If the runtime is already running from a different process, aborts with an error.
+            # If the pipeline is already running from a different process, aborts with an error.
             if self._running and manager_id != self._manager_id:
                 message = (
-                    f"Unable to start the processing runtime from the manager process with id {manager_id}. The "
+                    f"Unable to start the processing pipeline from the manager process with id {manager_id}. The "
                     f"{self.file_path.name} tracker file indicates that the manager process with id {self._manager_id} "
-                    f"is currently executing the tracked runtime. Only a single manager process is allowed to execute "
-                    f"the runtime at the same time."
+                    f"is currently executing the tracked pipeline. Only a single manager process is allowed to execute "
+                    f"the pipeline at the same time."
                 )
                 console.error(message=message, error=RuntimeError)
                 raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
 
-            # Otherwise, if the runtime is already running for the current manager process, returns without modifying
+            # Otherwise, if the pipeline is already running for the current manager process, returns without modifying
             # the tracker data.
             elif self._running and manager_id == self._manager_id:
                 return
 
-            # Otherwise, locks the runtime for the current manager process and updates the cached tracker data
+            # Otherwise, locks the pipeline for the current manager process and updates the cached tracker data
             self._running = True
             self._manager_id = manager_id
             self._complete = False
@@ -267,16 +253,16 @@ class ProcessingTracker(YamlConfig):
             self._save_state()
 
     def error(self, manager_id: int) -> None:
-        """Configures the tracker file to indicate that the tracked processing runtime encountered an error and failed
+        """Configures the tracker file to indicate that the tracked processing pipeline encountered an error and failed
         to complete.
 
-        This method fulfills two main purposes. First, it 'unlocks' the runtime, allowing other manager processes to
-        interface with the tracked runtime. Second, it updates the tracker file to reflect that the runtime was
-        interrupted due to an error, which is used by the manager processes to detect and handle processing failures.
+        This method unlocks the pipeline, allowing other manager processes to interface with the tracked pipeline. It
+        also updates the tracker file to reflect that the pipeline was interrupted due to an error, which is used by the
+        manager processes to detect and handle processing failures.
 
         Args:
-            manager_id: The unique xxHash-64 hash identifier of the manager process which attempts to report that the
-                runtime tracked by this tracker file has encountered an error.
+            manager_id: The unique identifier of the manager process which attempts to report that the pipeline tracked
+                by this tracker file has encountered an error.
 
         Raises:
             TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
@@ -286,22 +272,22 @@ class ProcessingTracker(YamlConfig):
             # Loads tracker state from the .yaml file
             self._load_state()
 
-            # If the runtime is not running, returns without doing anything
+            # If the pipeline is not running, returns without doing anything
             if not self._running:
                 return
 
-            # Ensures that only the active manager process can report runtime errors using the tracker file
+            # Ensures that only the active manager process can report pipeline errors using the tracker file
             if manager_id != self._manager_id:
                 message = (
-                    f"Unable to report that the processing runtime has encountered an error from the manager process "
-                    f"with id {manager_id}. The {self.file_path.name} tracker file indicates that the runtime is "
+                    f"Unable to report that the processing pipeline has encountered an error from the manager process "
+                    f"with id {manager_id}. The {self.file_path.name} tracker file indicates that the pipeline is "
                     f"managed by the process with id {self._manager_id}, preventing other processes from interfacing "
-                    f"with the runtime."
+                    f"with the pipeline."
                 )
                 console.error(message=message, error=RuntimeError)
                 raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
 
-            # Indicates that the runtime aborted with an error
+            # Indicates that the pipeline aborted with an error
             self._running = False
             self._manager_id = -1
             self._complete = False
@@ -309,15 +295,19 @@ class ProcessingTracker(YamlConfig):
             self._save_state()
 
     def stop(self, manager_id: int) -> None:
-        """Configures the tracker file to indicate that the tracked processing runtime has been completed successfully.
+        """Configures the tracker file to indicate that the tracked processing pipeline has been completed successfully.
 
-        This method 'unlocks' the runtime, allowing other manager processes to interface with the tracked runtime. It
-        also configures the tracker file to indicate that the runtime has been completed successfully, which is used
+        This method unlocks the pipeline, allowing other manager processes to interface with the tracked pipeline. It
+        also configures the tracker file to indicate that the pipeline has been completed successfully, which is used
         by the manager processes to detect and handle processing completion.
 
+        Notes:
+            This method tracks how many jobs executed as part of the tracked pipeline have been completed and only
+            marks the pipeline as complete if all it's processing jobs have been completed.
+
         Args:
-            manager_id: The unique xxHash-64 hash identifier of the manager process which attempts to report that the
-                runtime tracked by this tracker file has been completed successfully.
+            manager_id: The unique identifier of the manager process which attempts to report that the pipeline tracked
+                by this tracker file has been completed successfully.
 
         Raises:
             TimeoutError: If the .lock file for the target .YAML file cannot be acquired within the timeout period.
@@ -327,17 +317,17 @@ class ProcessingTracker(YamlConfig):
             # Loads tracker state from the .yaml file
             self._load_state()
 
-            # If the runtime is not running, does not do anything
+            # If the pipeline is not running, does not do anything
             if not self._running:
                 return
 
-            # Ensures that only the active manager process can report runtime completion using the tracker file
+            # Ensures that only the active manager process can report pipeline completion using the tracker file
             if manager_id != self._manager_id:
                 message = (
-                    f"Unable to report that the processing runtime has completed successfully from the manager process "
-                    f"with id {manager_id}. The {self.file_path.name} tracker file indicates that the runtime is "
-                    f"managed by the process with id {self._manager_id}, preventing other processes from interfacing "
-                    f"with the runtime."
+                    f"Unable to report that the processing pipeline has completed successfully from the manager "
+                    f"process with id {manager_id}. The {self.file_path.name} tracker file indicates that the pipeline "
+                    f"is managed by the process with id {self._manager_id}, preventing other processes from "
+                    f"interfacing with the pipeline."
                 )
                 console.error(message=message, error=RuntimeError)
                 raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
@@ -345,7 +335,7 @@ class ProcessingTracker(YamlConfig):
             # Increments completed job tracker
             self._completed_jobs += 1
 
-            # If the pipeline has completed all required jobs, marks the runtime as complete (stopped)
+            # If the pipeline has completed all required jobs, marks the pipeline as complete (stopped)
             if self._completed_jobs >= self._job_count:
                 self._running = False
                 self._manager_id = -1
@@ -354,30 +344,32 @@ class ProcessingTracker(YamlConfig):
                 self._save_state()
 
     def abort(self) -> None:
-        """Resets the runtime tracker file to the default state.
+        """Resets the pipeline tracker file to the default state.
 
-        This method can be used to reset the runtime tracker file, regardless of the current runtime state. Unlike other
-        instance methods, this method can be called from any manager process, even if the runtime is already locked by
-        another process. This method is only intended to be used in the case of emergency to 'unlock' a deadlocked
-        runtime.
+        This method can be used to reset the pipeline tracker file, regardless of the current pipeline state. Unlike
+        other instance methods, this method can be called from any manager process, even if the pipeline is already
+        locked by another process. This method is only intended to be used in the case of emergency to unlock a
+        deadlocked pipeline.
         """
         lock = FileLock(self._lock_path)
         with lock.acquire(timeout=10.0):
             # Loads tracker state from the .yaml file.
             self._load_state()
 
-            # Resets the tracker file to the default state. Note, does not indicate that the runtime completed nor
+            # Resets the tracker file to the default state. Note, does not indicate that the pipeline completed nor
             # that it has encountered an error.
             self._running = False
             self._manager_id = -1
+            self._completed_jobs = 0
+            self._job_count = 1
             self._complete = False
             self._encountered_error = False
             self._save_state()
 
     @property
     def is_complete(self) -> bool:
-        """Returns True if the tracker wrapped by the instance indicates that the processing runtime has been completed
-        successfully and that the runtime is not currently ongoing."""
+        """Returns True if the tracker wrapped by the instance indicates that the processing pipeline has been completed
+        successfully and that the pipeline is not currently ongoing."""
         lock = FileLock(self._lock_path)
         with lock.acquire(timeout=10.0):
             # Loads tracker state from the .yaml file
@@ -386,7 +378,7 @@ class ProcessingTracker(YamlConfig):
 
     @property
     def encountered_error(self) -> bool:
-        """Returns True if the tracker wrapped by the instance indicates that the processing runtime has aborted due
+        """Returns True if the tracker wrapped by the instance indicates that the processing pipeline has aborted due
         to encountering an error."""
         lock = FileLock(self._lock_path)
         with lock.acquire(timeout=10.0):
@@ -396,7 +388,7 @@ class ProcessingTracker(YamlConfig):
 
     @property
     def is_running(self) -> bool:
-        """Returns True if the tracker wrapped by the instance indicates that the processing runtime is currently
+        """Returns True if the tracker wrapped by the instance indicates that the processing pipeline is currently
         ongoing."""
         lock = FileLock(self._lock_path)
         with lock.acquire(timeout=10.0):
@@ -407,19 +399,19 @@ class ProcessingTracker(YamlConfig):
 
 @dataclass()
 class ProcessingPipeline:
-    """Encapsulates access to a processing pipeline running on the remote compute server.
+    """Provides an interface to construct and execute data processing pipelines on the target remote compute server.
 
     This class functions as an interface for all data processing pipelines running on Sun lab compute servers. It is
-    pipeline-type-agnostic and works for all data processing pipelines supported by this library. After instantiation,
-    the class automatically handles all interactions with the server necessary to run the remote processing pipeline and
+    pipeline-type-agnostic and works for all data processing pipelines used in the lab. After instantiation, the class
+    automatically handles all interactions with the server necessary to run the remote processing pipeline and
     verify the runtime outcome via the runtime_cycle() method that has to be called cyclically until the pipeline is
     complete.
 
     Notes:
-        Each pipeline may be executed in one or more stages, each stage using one or more parallel jobs. As such, each
-        pipeline can be seen as an execution graph that sequentially submits batches of jobs to the remote server. The
-        processing graph for each pipeline is fully resolved at the instantiation of this class instance, so each
-        instance contains the necessary data to run the entire processing pipeline.
+        Each pipeline is executed as a series of one or more stages with each stage using one or more parallel jobs.
+        Therefore, each pipeline can be seen as an execution graph that sequentially submits batches of jobs to the
+        remote server. The processing graph for each pipeline is fully resolved at the instantiation of this class, so
+        each instance contains the necessary data to run the entire processing pipeline.
 
         The minimum self-contained unit of the processing pipeline is a single job. Since jobs can depend on the output
         of other jobs, they are organized into stages based on the dependency graph between jobs. Combined with cluster
@@ -431,27 +423,24 @@ class ProcessingPipeline:
     """Stores the name of the processing pipeline managed by this instance. Primarily, this is used to identify the 
     pipeline to the user in terminal messages and logs."""
     server: Server
-    """Stores the reference to the Server object that maintains bidirectional communication with the remote server 
-    running the pipeline."""
+    """Store the reference to the Server object used to interface with the remote server running the pipeline."""
     manager_id: int
-    """The unique identifier for the manager process that constructs and manages the runtime of the tracked pipeline. 
-    This is used to ensure that only a single pipeline instance can work with each session's data at the same time on 
-    the remote server."""
+    """The unique identifier for the manager process that constructs and manages the runtime of the tracked pipeline."""
     jobs: dict[int, tuple[tuple[Job, Path], ...]]
     """Stores the dictionary that maps the pipeline processing stage integer-codes to two-element tuples. Each tuple
-    stores the Job objects and the paths to their remote working directories to be submitted to the server at each 
-    stage."""
+    stores the Job object and the path to its remote working directory to be submitted to the server as part of that 
+    executing that stage."""
     remote_tracker_path: Path
-    """The path to the pipeline's processing tracker .yaml file stored on the remote compute server."""
+    """Stores the path to the pipeline's processing tracker .yaml file stored on the remote compute server."""
     local_tracker_path: Path
-    """The path to the pipeline's processing tracker .yaml file on the local machine. The remote file is pulled to 
-    this location when the instance verifies the outcome of each tracked pipeline's processing stage."""
+    """Stores the path to the pipeline's processing tracker .yaml file on the local machine. The remote file is 
+    pulled to this location when the instance verifies the outcome of the tracked processing pipeline."""
     session: str
-    """The ID of the session whose data is being processed by the tracked pipeline."""
+    """Stores the ID of the session whose data is being processed by the tracked pipeline."""
     animal: str
-    """The ID of the animal whose data is being processed by the tracked pipeline."""
+    """Stores the ID of the animal whose data is being processed by the tracked pipeline."""
     project: str
-    """The name of the project whose data is being processed by the tracked pipeline."""
+    """Stores the name of the project whose data is being processed by the tracked pipeline."""
     keep_job_logs: bool = False
     """Determines whether to keep the logs for the jobs making up the pipeline execution graph or (default) to remove 
     them after pipeline successfully ends its runtime. If the pipeline fails to complete its runtime, the logs are kept 
@@ -566,7 +555,7 @@ class ProcessingPipeline:
 
 
 def generate_manager_id() -> int:
-    """Generates and returns a unique integer identifier that can be used to identify the manager process that calls
+    """Generates and returns a unique integer value that can be used to identify the manager process that calls
     this function.
 
     The identifier is generated based on the current timestamp, accurate to microseconds, and a random number between 1

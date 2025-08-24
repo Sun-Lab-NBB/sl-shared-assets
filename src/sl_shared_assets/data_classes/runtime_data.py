@@ -1,7 +1,5 @@
-"""This module provides classes used to store the training and experiment data acquired by the sl-experiment library.
-Some classes from this library store raw data later processed by Sun lab data processing pipelines. Others are used to
-restore the data acquisition and runtime management system to the same state across training or experiment sessions for
-the same animal.
+"""This module provides classes used by data acquisition systems to store certain types of acquired data. Note,
+different data acquisition session types use different combinations of classes from this module.
 """
 
 from dataclasses import dataclass

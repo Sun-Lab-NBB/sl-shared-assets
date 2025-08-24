@@ -1,9 +1,7 @@
-"""This module contains classes jointly responsible for maintaining the Sun lab project data hierarchy across all
-machines used to acquire, process, and store the data. Every valid experiment or training session conducted in the
-lab generates a specific directory structure. This structure is defined via the ProjectConfiguration and SessionData
-classes, which are also stored as .yaml files inside each session's raw_data and processed_data directories. Jointly,
-these classes contain all necessary information to restore the data hierarchy on any machine. All other Sun lab
-libraries use these classes to work with all lab-generated data."""
+"""This module provides classes jointly responsible for maintaining the Sun lab project data hierarchy across all
+machines used to acquire, process, and store the data. Primarily, classes from this module are used to manage the
+access to the data acquired as part of a single data acquisition session in a thread-safe and location-agnostic
+fashion."""
 
 import copy
 from enum import StrEnum
@@ -17,33 +15,32 @@ from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
 
 from .configuration_data import AcquisitionSystems, get_system_configuration_data
+from ..tools.transfer_tools import delete_directory
 
 
 class SessionTypes(StrEnum):
-    """Defines the set of data acquisition session types supported by various data acquisition systems used in the
-    Sun lab.
+    """Stores the data acquisition session types supported by all data acquisition systems used in the Sun lab.
 
-    A data acquisition session broadly encompasses a recording session carried out to either: acquire experiment data,
-    train the animal for the upcoming experiments, or to assess the quality of surgical or other pre-experiment
-    intervention.
+    A data acquisition session is typically carried out to acquire experiment data, train the animal for the upcoming
+    experiment sessions, or to assess the quality of surgical or other pre-experiment interventions. After acquisition,
+    the session is treated as a uniform package whose components can be accessed via the SessionData class.
 
     Notes:
-        This enumeration does not differentiate between different acquisition systems. Different acquisition systems
-        support different session types and may not be suited for acquiring some of the session types listed in this
-        enumeration.
+        Different acquisition systems support different session types and may not be suited for acquiring some of the
+        session types listed in this enumeration.
     """
 
     LICK_TRAINING = "lick training"
-    """Mesoscope-VR session designed to teach animals to use the water delivery port while being head-fixed."""
+    """A Mesoscope-VR session designed to teach animals to use the water delivery port while being head-fixed."""
     RUN_TRAINING = "run training"
-    """Mesoscope-VR session designed to teach animals how to run on the treadmill while being head-fixed."""
+    """A Mesoscope-VR session designed to teach animals to run on the treadmill while being head-fixed."""
     MESOSCOPE_EXPERIMENT = "mesoscope experiment"
-    """Mesoscope-VR experiment session. The session uses Unity game engine to run experiments in virtual reality task 
-    environments and collects brain activity data using Mesoscope."""
+    """A Mesoscope-VR experiment session. The session uses Unity game engine to run virtual reality tasks and collects 
+    brain activity data using 2-Photon Random Access Mesoscope (2P-RAM)."""
     WINDOW_CHECKING = "window checking"
-    """A special Mesoscope-VR session designed to evaluate the suitability of the given animal to be included into the
-    experiment dataset. Specifically, the session involves using the Mesoscope to check the quality of the cell 
-    activity data."""
+    """A Mesoscope-VR session designed to evaluate the quality of the cranial window implantation procedure and the 
+    suitability of the animal for being imaged with the Mesoscope. The session uses the Mesoscope to assess the quality 
+    of the cell activity data."""
 
 
 @dataclass()
@@ -247,18 +244,18 @@ class ProcessedData:
 class TrackingData:
     """Stores the paths to the directories and files that make up the 'tracking_data' session-specific directory.
 
-    The 'tracking_data' directory was added in version 5.0.0 to store the ProcessingTracker instance data and .lock
-    files for pipelines and tasks used to work with session data after acquisition.
+    This directory was added in version 5.0.0 to store the ProcessingTracker files and .lock files for pipelines and
+    tasks used to work with session's data after acquisition.
     """
 
     tracking_data_path: Path = Path()
     """Stores the path to the root tracking_data directory of the session. This directory stores the .yaml 
     ProcessingTracker files and the .lock FileLock files that jointly ensure that session's data is accessed in a 
-    process- and thread-safe way while being processed by multiple different processes and pipelines."""
+    thread-safe way while being processed by multiple different processes and pipelines."""
     session_lock_path: Path = Path()
-    """Stores the path to the session_lock.yaml file for the session. This file is used to ensure that only a single 
-    manager process has exclusive access to the session's data on the remote compute server. This ensures that multiple 
-    data processing pipelines can safely run for the same session without compromising session data integrity. This 
+    """Stores the path to the session's session_lock.yaml file. This file is used to ensure that only a single 
+    manager process has exclusive access to the session's data on the remote compute server. This allows multiple 
+    data processing pipelines to safely run for the same session without compromising session data integrity. This 
     file is intended to be used through the SessionLock class."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
@@ -289,17 +286,20 @@ class TrackingData:
 class SessionData(YamlConfig):
     """Stores and manages the data layout of a single Sun lab data acquisition session.
 
-    The primary purpose of this class is to maintain the session data structure across all supported destinations and to
-    provide a unified data access interface shared by all Sun lab libraries. The class can be used to either generate a
-    new session or load the layout of an already existing session. When the class is used to create a new session, it
-    generates the new session's name using the current UTC timestamp, accurate to microseconds. This ensures that each
-    session 'name' is unique and preserves the overall session order.
+    The primary purpose of this class is to maintain the session data structure across all supported destinations
+    and to provide a unified data access interface shared by all Sun lab libraries. It is specifically designed for
+    working with the data from a single session, performed by a single animal under the specific project. The class is
+    used to manage both raw and processed data: it follows the data through acquisition, preprocessing, and processing
+    stages of the Sun lab data workflow. This class serves as an entry point for all interactions with the managed
+    session's data.
 
     Notes:
-        This class is specifically designed for working with the data from a single session, performed by a single
-        animal under the specific experiment. The class is used to manage both raw and processed data. It follows the
-        data through acquisition, preprocessing, and processing stages of the Sun lab data workflow. This class serves
-        as an entry point for all interactions with the managed session's data.
+        The class is not designed to be instantiated directly. Instead, use the create() method to generate a new
+        session or load() method to access the data of an already existing session.
+
+        When the class is used to create a new session, it generates the new session's name using the current UTC
+        timestamp, accurate to microseconds. This ensures that each session 'name' is unique and preserves the overall
+        session order.
     """
 
     project_name: str
@@ -370,10 +370,10 @@ class SessionData(YamlConfig):
         project_name: str,
         animal_id: str,
         session_type: SessionTypes | str,
+        python_version: str,
+        sl_experiment_version: str,
         experiment_name: str | None = None,
         session_name: str | None = None,
-        python_version: str = "3.11.13",
-        sl_experiment_version: str = "2.0.0",
     ) -> "SessionData":
         """Creates a new SessionData object and generates the new session's data structure on the local PC.
 
@@ -394,6 +394,10 @@ class SessionData(YamlConfig):
             animal_id: The ID code of the animal participating in the session.
             session_type: The type of the session. Has to be one of the supported session types exposed by the
                 SessionTypes enumeration.
+            python_version: The string that specifies the Python version used to collect session data. Has to be
+                specified using the major.minor.patch version format.
+            sl_experiment_version: The string that specifies the version of the sl-experiment library used to collect
+                session data. Has to be specified using the major.minor.patch version format.
             experiment_name: The name of the experiment executed during the session. This optional argument is only
                 used for experiment sessions. Note! The name passed to this argument has to match the name of the
                 experiment configuration .yaml file.
@@ -401,10 +405,6 @@ class SessionData(YamlConfig):
                 sessions. When provided, the method uses this name instead of generating a new timestamp-based name.
                 This is only used during the 'ascension' runtime to convert old data structures to the modern
                 lab standards.
-            python_version: The string that specifies the Python version used to collect session data. Has to be
-                specified using the major.minor.patch version format.
-            sl_experiment_version: The string that specifies the version of the sl-experiment library used to collect
-                session data. Has to be specified using the major.minor.patch version format.
 
         Returns:
             An initialized SessionData instance that stores the layout of the newly created session's data.
@@ -597,26 +597,53 @@ class SessionData(YamlConfig):
             )
         )
 
-        # SOURCE DATA
-        instance.source_data.resolve_paths(
-            root_directory_path=processed_data_root.joinpath(
-                instance.project_name, instance.animal_id, instance.session_name, "source_data"
+        # If the processed data root is different from the raw data root, resolves the path to the 'source' and
+        # 'archive' data directories. Otherwise, uses the same paths as 'raw' and 'processed' data directories.
+        if processed_data_root != local_root:
+            # SOURCE DATA
+            instance.source_data.resolve_paths(
+                root_directory_path=processed_data_root.joinpath(
+                    instance.project_name, instance.animal_id, instance.session_name, "source_data"
+                )
             )
-        )
-        # Note, since source data is populated as part of the 'preparation' runtime, does not make the directories.
+            # Note, since source data is populated as part of the 'preparation' runtime, does not make the directories.
 
-        # ARCHIVED DATA
-        instance.archived_data.resolve_paths(
-            root_directory_path=local_root.joinpath(
-                instance.project_name, instance.animal_id, instance.session_name, "archived_data"
+            # ARCHIVED DATA
+            instance.archived_data.resolve_paths(
+                root_directory_path=local_root.joinpath(
+                    instance.project_name, instance.animal_id, instance.session_name, "archived_data"
+                )
             )
-        )
+
+            # If the session has been processed with the processed data root previously matching the raw data root,
+            # ensures that there is no 'processed_data' directory on the raw data root. In other words, ensures that
+            # the session data always has only a single copy of the 'processed_data' directory.
+            old_processed_data_path = local_root.joinpath(
+                instance.project_name, instance.animal_id, instance.session_name, "processed_data"
+            )
+            delete_directory(old_processed_data_path)
+
+        else:
+            # SOURCE DATA
+            instance.source_data.resolve_paths(
+                root_directory_path=processed_data_root.joinpath(
+                    instance.project_name, instance.animal_id, instance.session_name, "raw_data"
+                )
+            )
+
+            # ARCHIVED DATA
+            instance.archived_data.resolve_paths(
+                root_directory_path=local_root.joinpath(
+                    instance.project_name, instance.animal_id, instance.session_name, "processed_data"
+                )
+            )
+
         # Similar to source_data, archived data is populated as part of the 'archiving' pipeline, so directories for
         # this data are not resolved.
 
         # If there is no archived processed data, ensures that processed data hierarchy exists.
         if not instance.archived_data.processed_data_path.exists():
-            instance.processed_data.make_directories()  # Ensures processed data directories exist
+            instance.processed_data.make_directories()
 
         # TRACKING DATA
         instance.tracking_data.resolve_paths(
@@ -671,11 +698,13 @@ class SessionData(YamlConfig):
 class SessionLock(YamlConfig):
     """Provides thread-safe session locking to ensure exclusive access during data processing.
 
-    This class manages a lock file that tracks which manager process currently has exclusive access to a session's data.
-    It prevents race conditions when multiple manager processes attempt to modify session data simultaneously.
+    This class manages a lock file that tracks which manager process currently has exclusive access to a data
+    acquisition session's data. It prevents race conditions when multiple manager processes attempt to modify session
+    data simultaneously. Primarily, this class is used on remote compute server(s).
 
-    The lock is identified by a manager process ID, allowing distributed processing across multiple jobs while
-    maintaining data integrity.
+    Notes:
+        The lock owner is identified by a manager process ID, allowing distributed processing across
+        multiple jobs while maintaining data integrity.
     """
 
     file_path: Path
@@ -712,7 +741,7 @@ class SessionLock(YamlConfig):
         original.to_yaml(file_path=self.file_path)
 
     def acquire(self, manager_id: int) -> None:
-        """Acquires the session lock for exclusive access.
+        """Acquires the session access lock.
 
         Args:
             manager_id: The unique identifier of the manager process requesting the lock.
@@ -729,10 +758,11 @@ class SessionLock(YamlConfig):
             # Checks if the session is already locked by another process
             if self._manager_id != -1 and self._manager_id != manager_id:
                 message = (
-                    f"Cannot acquire the session lock for manager process {manager_id}. The {self.file_path.name} "
-                    f"session lock file indicates The lock is currently held by the manager process "
-                    f"{self._manager_id}. Call the command that produced this error with the '--reset_lock' flag "
-                    f"to override this safety feature or wait for the natural lock release."
+                    f"Unable to acquire the {self.file_path.parents[1].name} session's lock for the manager with "
+                    f"id {manager_id}. The lock file indicates that the lock is already held by the process with id "
+                    f"{self._manager_id}, preventing other processes from interfacing with the session lock. Call the "
+                    f"command that produced this error with the '--reset-tracker' flag to override this safety "
+                    f"feature or wait for the lock to be released."
                 )
                 console.error(message=message, error=RuntimeError)
                 raise RuntimeError(message)
@@ -743,7 +773,7 @@ class SessionLock(YamlConfig):
             self._save_state()
 
     def release(self, manager_id: int) -> None:
-        """Releases the session lock.
+        """Releases the session access lock.
 
         Args:
             manager_id: The unique identifier of the manager process releasing the lock.
@@ -759,9 +789,9 @@ class SessionLock(YamlConfig):
 
             if self._manager_id != manager_id:
                 message = (
-                    f"Unable to release the session lock from the manager with id {manager_id}. The "
-                    f"{self.file_path.name} session lock file indicates that the lock is held by the process with "
-                    f"id {self._manager_id}, preventing other processes from interfacing with the session lock."
+                    f"Unable to release the {self.file_path.parents[1].name} session's lock from the manager with "
+                    f"id {manager_id}. The lock file indicates that the lock is held by the process with id "
+                    f"{self._manager_id}, preventing other processes from interfacing with the session lock."
                 )
                 console.error(message=message, error=RuntimeError)
                 raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
@@ -771,10 +801,11 @@ class SessionLock(YamlConfig):
             self._save_state()
 
     def force_release(self) -> None:
-        """Forcibly releases the lock regardless of ownership.
+        """Forcibly releases the session access lock regardless of ownership.
 
-        This method should only be used for emergency recovery of deadlocked sessions. It can be called by any process
-        to unlock the session whose lock is managed by this instance.
+        This method should only be used for emergency recovery from improper processing shutdowns. It can be called by
+        any process to unlock any session, but it does not attempt to terminate the processes that the lock's owner
+        might have deployed to work with the session's data.
 
         Raises:
             TimeoutError: If the .lock file cannot be acquired for a long period of time due to being held by another
@@ -782,32 +813,31 @@ class SessionLock(YamlConfig):
         """
         lock = FileLock(self._lock_path)
         with lock.acquire(timeout=10.0):
+            # Hard reset regardless of the current tracker state
             self._manager_id = -1
             self._save_state()
 
-    @property
-    def is_locked(self) -> bool:
-        """Returns True if the session is currently locked by any process, False otherwise.
+    def check_owner(self, manager_id: int) -> None:
+        """Ensures that the managed session is locked for processing by the specified manager process.
+
+        This method is used by worker functions to ensure it is safe to interact with the session's data. It is designed
+        to abort the runtime with an error if the session's lock file is owned by a different manager process.
+
+        Args:
+            manager_id: The unique identifier of the manager process attempting to access the session's data.
 
         Raises:
             TimeoutError: If the .lock file cannot be acquired for a long period of time due to being held by another
                 process.
+            ValueError: If the lock file is held by a different manager process.
         """
         lock = FileLock(self._lock_path)
         with lock.acquire(timeout=10.0):
             self._load_state()
-            return self._manager_id != -1
-
-    @property
-    def owner(self) -> int | None:
-        """Returns the unique identifier of the manager process that holds the lock if the session is locked or None if
-        the session is unlocked.
-
-        Raises:
-            TimeoutError: If the .lock file cannot be acquired for a long period of time due to being held by another
-                process.
-        """
-        lock = FileLock(self._lock_path)
-        with lock.acquire(timeout=10.0):
-            self._load_state()
-            return self._manager_id if self._manager_id != -1 else None
+            if self._manager_id != manager_id:
+                message = (
+                    f"Unable to access the {self.file_path.parents[1].name} session's data from manager process "
+                    f"{manager_id}, as the session is currently locked by another manager process with ID "
+                    f"{self._manager_id}."
+                )
+                console.error(message=message, error=ValueError)

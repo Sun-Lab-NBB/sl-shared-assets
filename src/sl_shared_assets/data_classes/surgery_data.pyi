@@ -4,7 +4,7 @@ from ataraxis_data_structures import YamlConfig
 
 @dataclass()
 class SubjectData:
-    """Stores the ID information of the surgical intervention's subject (animal)."""
+    """Stores information about the subject of the surgical intervention (animal)."""
 
     id: int
     ear_punch: str
@@ -18,7 +18,7 @@ class SubjectData:
 
 @dataclass()
 class ProcedureData:
-    """Stores the general information about the surgical intervention."""
+    """Stores general information about the surgical intervention."""
 
     surgery_start_us: int
     surgery_end_us: int
@@ -30,9 +30,9 @@ class ProcedureData:
 
 @dataclass
 class ImplantData:
-    """Stores the information about a single implantation procedure performed during the surgical intervention.
+    """Stores information about a single implantation procedure performed during the surgical intervention.
 
-    Multiple ImplantData instances are used at the same time if the surgery involved multiple implants.
+    Multiple ImplantData instances can be used at the same time if the surgery involves multiple implants.
     """
 
     implant: str
@@ -44,9 +44,9 @@ class ImplantData:
 
 @dataclass
 class InjectionData:
-    """Stores the information about a single injection performed during surgical intervention.
+    """Stores information about a single injection performed during the surgical intervention.
 
-    Multiple InjectionData instances are used at the same time if the surgery involved multiple injections.
+    Multiple InjectionData instances can be used at the same time if the surgery involves multiple injections.
     """
 
     injection: str
@@ -59,8 +59,8 @@ class InjectionData:
 
 @dataclass
 class DrugData:
-    """Stores the information about all drugs administered to the subject before, during, and immediately after the
-    surgical intervention.
+    """Stores the information about all medical substances (drugs) administered to the subject before, during, and
+    immediately after the surgical intervention.
     """
 
     lactated_ringers_solution_volume_ml: float
@@ -74,12 +74,11 @@ class DrugData:
 
 @dataclass
 class SurgeryData(YamlConfig):
-    """Stores the data about a single animal surgical intervention.
+    """Stores the data about the surgical intervention performed on an animal before data acquisition session(s).
 
-    This class aggregates other dataclass instances that store specific data about the surgical procedure. Primarily, it
-    is used to save the data as a .yaml file to every session's 'raw_data' directory of each animal used in every lab
-    project. This way, the surgery data is always stored alongside the behavior and brain activity data collected
-    during the session.
+    Primarily, this class is used to ensure that each data acquisition session contains a copy of the surgical
+    intervention data as a .yaml file. In turn, this improves the experimenter's experience during data analysis by
+    allowing quickly referencing the surgical intervention data.
     """
 
     subject: SubjectData

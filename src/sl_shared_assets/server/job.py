@@ -1,10 +1,10 @@
-"""This module provides the core Job class, used as the starting point for all SLURM-managed job executed on lab compute
-server(s). Specifically, the Job class acts as a wrapper around the SLURM configuration and specific logic of each
-job. During runtime, the Server class interacts with input job objects to manage their transfer and execution on the
-remote servers.
+"""This module provides the core Job class, used as the starting point for all SLURM-managed jobs executed on remote
+compute server(s). Specifically, the Job class encapsulates the SLURM configuration and specific logic of each job.
+During runtime, the Server class interacts with input Job objects to manage their transfer and execution on the remote
+compute servers.
 
-Since version 3.0.0, this module also provides the specialized JupyterJob class used to launch remote Jupyter
-notebook servers.
+Since version 3.0.0, this module also provides the specialized JupyterJob class used to launch remote Jupyter notebook
+servers.
 """
 
 import re
@@ -22,8 +22,8 @@ class _JupyterConnectionInfo:
     """Stores the data used to establish the connection with a Jupyter notebook server running under SLURM control on a
     remote Sun lab server.
 
-    More specifically, this class is used to transfer the connection metadata collected on the remote server back to
-    the local machine that requested the server to be established.
+    This class is used to transfer the connection metadata collected on the remote server back to the local machine
+    that requested the server to be established.
     """
 
     compute_node: str
@@ -52,7 +52,8 @@ class Job:
 
     This class provides the API for constructing any server-side job in the Sun lab. Internally, it wraps an instance
     of a Slurm class to package the job data into the format expected by the SLURM job manager. All jobs managed by this
-    class instance should be submitted to an initialized Server class 'submit_job' method to be executed on the server.
+    class instance should be submitted to an initialized Server instance's submit_job() method to be executed on the
+    server.
 
     Notes:
         The initialization method of the class contains the arguments for configuring the SLURM and Conda environments
@@ -61,19 +62,15 @@ class Job:
 
         Each job can be conceptualized as a sequence of shell instructions to execute on the remote compute server. For
         the lab, that means that the bulk of the command consists of calling various CLIs exposed by data processing or
-        analysis pipelines, installed in the Conda environment on the server. Other than that, the job contains commands
-        for activating the target conda environment and, in some cases, doing other preparatory or cleanup work. The
-        source code of a 'remote' job is typically identical to what a human operator would type in a 'local' terminal
-        to run the same job on their PC.
+        analysis pipelines, installed in the calling user's Conda environments on the server. The Job instance also
+        contains commands for activating the target conda environment and, in some cases, doing other preparatory or
+        cleanup work. The source code of a 'remote' job is typically identical to what a human operator would type in a
+        'local' terminal to run the same job on their PC.
 
         A key feature of server-side jobs is that they are executed on virtual machines managed by SLURM. Since the
         server has a lot more compute and memory resources than likely needed by individual jobs, each job typically
         requests a subset of these resources. Upon being executed, SLURM creates an isolated environment with the
         requested resources and runs the job in that environment.
-
-        Since all jobs are expected to use the CLIs from python packages (pre)installed on the BioHPC server, make sure
-        that the target environment is installed and configured before submitting jobs to the server. See notes in
-        ReadMe to learn more about configuring server-side conda environments.
 
     Args:
         job_name: The descriptive name of the SLURM job to be created. Primarily, this name is used in terminal
@@ -145,8 +142,8 @@ class Job:
     def add_command(self, command: str) -> None:
         """Adds the input command string to the end of the managed SLURM job command list.
 
-        This method is a wrapper around simple_slurm's 'add_cmd' method. It is used to iteratively build the shell
-        command sequence of the job.
+        This method is a wrapper around simple-slurm's add_cmd() method. It is used to iteratively build the shell
+        command sequence for the managed job.
 
         Args:
             command: The command string to add to the command list, e.g.: 'python main.py --input 1'.
@@ -159,8 +156,8 @@ class Job:
         """Translates the managed job data into a shell-script-writable string and returns it to caller.
 
         This method is used by the Server class to translate the job into the format that can be submitted to and
-        executed on the remote compute server. Do not call this method manually unless you know what you are doing.
-        The returned string is safe to dump into a .sh (shell script) file and move to the BioHPC server for execution.
+        executed on the remote compute server. The returned string is safe to dump into a .sh (shell script) file and
+        move to the remote compute server for execution.
         """
 
         # Appends the command to clean up (remove) the temporary script file after processing runtime is over
@@ -178,11 +175,11 @@ class Job:
 
 
 class JupyterJob(Job):
-    """Specialized Job instance designed to launch a Jupyter notebook server on SLURM.
+    """Aggregates the data of a specialized job used to launch a Jupyter notebook server under SLURM's control.
 
-    This class extends the base Job class to include Jupyter-specific configuration and commands for starting a
-    notebook server in a SLURM environment. Using this specialized job allows users to set up remote Jupyter servers
-    while still benefitting from SLURM's job management and fair airtime policies.
+    This class extends the base Job class to include specific configuration and commands for starting a Jupyter notebook
+    server in a SLURM environment. Using this specialized job allows users to set up remote Jupyter servers while
+    benefitting from SLURM's job scheduling and resource management policies.
 
     Notes:
         Jupyter servers directly compete for resources with headless data processing jobs. Therefore, it is important
@@ -195,34 +192,28 @@ class JupyterJob(Job):
             data of the job.
         error_log: The absolute path to the .txt file on the processing server, where to store the standard error
             data of the job.
-        working_directory: The absolute path to the directory where temporary job files will be stored. During runtime,
-            classes from this library use that directory to store files such as the job's shell script. All such files
-            are automatically removed from the directory at the end of a non-errors runtime.
-        conda_environment: The name of the conda environment to activate on the server before running the job logic. The
+        working_directory: The absolute path to the directory where to store temporary job files.
+        conda_environment: The name of the conda environment to activate on the server before running the job. The
             environment should contain the necessary Python packages and CLIs to support running the job's logic. For
             Jupyter jobs, this necessarily includes the Jupyter notebook and jupyterlab packages.
-        port: The connection port number for the Jupyter server. Do not change the default value unless you know what
-            you are doing, as the server has most common communication ports closed for security reasons.
-        notebook_directory: The directory to use as Jupyter's root. During runtime, Jupyter will only have access to
-            items stored in or under this directory. For most runtimes, this should be set to the user's root data or
-            working directory.
-        cpus_to_use: The number of CPUs to allocate to the Jupyter server. Keep this value as small as possible to avoid
-            interfering with headless data processing jobs.
-        ram_gb: The amount of RAM, in GB, to allocate to the Jupyter server. Keep this value as small as possible to
-            avoid interfering with headless data processing jobs.
-        time_limit: The maximum Jupyter server uptime, in minutes. Set this to the expected duration of your jupyter
-            session.
-        jupyter_args: Stores additional arguments to pass to jupyter notebook initialization command.
+        port: The connection port to use for the Jupyter server.
+        notebook_directory: The root directory where to run the Jupyter notebook. During runtime, the notebook will
+            only have access to items stored under this directory. For most runtimes, this should be set to the user's
+            root working directory.
+        cpus_to_use: The number of CPUs to allocate to the Jupyter server.
+        ram_gb: The amount of RAM, in GB, to allocate to the Jupyter server.
+        time_limit: The maximum Jupyter server uptime, in minutes.
+        jupyter_args: Stores additional arguments to pass to the jupyter notebook initialization command.
 
     Attributes:
-        port: Stores the connection port of the managed Jupyter server.
-        notebook_dir: Stores the absolute path to the directory used as Jupyter's root, relative to the remote server
-            root.
+        port: Stores the connection port for the managed Jupyter server.
+        notebook_dir: Stores the absolute path to the directory used to run the Jupyter notebook, relative to the
+            remote server root.
         connection_info: Stores the JupyterConnectionInfo instance after the Jupyter server is instantiated.
         host: Stores the hostname of the remote server.
         user: Stores the username used to connect with the remote server.
-        connection_info_file: The absolute path to the file that stores connection information relative to the remote
-            server root.
+        connection_info_file: Stores the absolute path to the file that contains the connection information for the
+            initialized Jupyter session, relative to the remote server root.
         _command: Stores the shell command for launching the Jupyter server.
     """
 
@@ -301,10 +292,12 @@ class JupyterJob(Job):
         self.add_command(jupyter_cmd_str)
 
     def parse_connection_info(self, info_file: Path) -> None:
-        """Parses the connection information file created by the Jupyter job on the server.
+        """Parses the connection information file created by the Jupyter job on the remote server.
 
-        Use this method to parse the connection file fetched from the server to finalize setting up the Jupyter
-        server job.
+        This method is used to finalize the remote Jupyter session initialization by parsing the connection session
+        instructions from the temporary storage file created by the remote Job running on the server. After this
+        method's runtime, the print_connection_info() method can be used to print the connection information to the
+        terminal.
 
         Args:
             info_file: The path to the .txt file generated by the remote server that stores the Jupyter connection
@@ -336,7 +329,7 @@ class JupyterJob(Job):
 
         The SSH command should be used via a separate terminal or subprocess call to establish the secure SSH tunnel to
         the Jupyter server. Once the SSH tunnel is established, the printed localhost url can be used to view the
-        server from the local machine.
+        server from the local machine's browser.
         """
 
         # If connection information is not available, there is nothing to print

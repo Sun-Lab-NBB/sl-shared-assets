@@ -8,23 +8,22 @@ from ataraxis_data_structures import YamlConfig
 from ..server import ServerCredentials as ServerCredentials
 
 class AcquisitionSystems(StrEnum):
-    """Defines the set of data acquisition systems used in the Sun lab and supported by all data-related libraries."""
+    """Stores the names for all data acquisition systems currently used in the Sun lab."""
 
     MESOSCOPE_VR = "mesoscope-vr"
 
 @dataclass()
 class ExperimentState:
-    """Encapsulates the information used to set and maintain the desired experiment and system state.
+    """Stores the information used to set and maintain the desired experiment and system state.
 
-    Broadly, each experiment runtime can be conceptualized as a two-state-system. The first is the experiment task,
-    which reflects the behavior goal, the rules for achieving the goal, and the reward for achieving the goal. The
-    second is the data acquisition system state, which is a snapshot of all hardware module states that make up the
-    system that acquires the data and controls the task environment. Overall, the experiment state is about
-    'what the animal is doing', while the system state is about 'what the hardware is doing'.
+    Broadly, each experiment runtime can be conceptualized as a two-state system. The first is the experiment task
+    state, which reflects the behavior goal, the rules for achieving the goal, and the reward for achieving the goal.
+    The second is the data acquisition system state, which is a snapshot of all hardware module states that make up the
+    system that acquires the data and controls the task environment.
 
     Note:
-        This class is acquisition-system-agnostic. It can be used to define the ExperimentConfiguration class for any
-        valid data acquisition system.
+        This class is acquisition-system-agnostic. All data acquisition systems use this class as part of their specific
+        ExperimentConfiguration class instances.
     """
 
     experiment_state_code: int
@@ -36,12 +35,16 @@ class ExperimentState:
 
 @dataclass()
 class ExperimentTrial:
-    """Encapsulates information about a single experiment trial.
+    """Stores the information about a single experiment trial.
 
-    All Virtual Reality tasks can be broadly conceptualized as repeating motifs (sequences) of wall cues,
-    associated with a specific goal, for which animals receive water rewards. Since some experiments can use multiple
-    trial types as part of the same experiment session, multiple instances of this class can be used to specify
-    supported trial structures and trial parameters for a given experiment.
+    All Virtual Reality (VR) tasks can be broadly conceptualized as repeating motifs (sequences) of VR environment wall
+    cues, associated with a specific goal, for which animals receive water rewards. Each complete motif is typically
+    interpreted as a single experiment trial.
+
+    Notes:
+        Since some experiments use multiple distinct trial types as part of the same experiment session, multiple
+        instances of this class can be used by an ExperimentConfiguration class instance to represent multiple used
+        trial types.
     """
 
     cue_sequence: list[int]
@@ -53,24 +56,11 @@ class ExperimentTrial:
 
 @dataclass()
 class MesoscopeExperimentConfiguration(YamlConfig):
-    """Stores the configuration of a single experiment runtime that uses the Mesoscope_VR data acquisition system.
+    """Stores the configuration of an experiment runtime that uses the Mesoscope_VR data acquisition system.
 
-    Primarily, this includes the sequence of experiment and system states that define the flow of the experiment
-    runtime and the configuration of various trials supported by the experiment runtime. During runtime, the main
-    runtime control function traverses the sequence of states stored in this class instance start-to-end in the exact
-    order specified by the user. Together with custom Unity projects, which define the task logic (how the system
-    responds to animal interactions with the VR system), this class allows flexibly implementing a wide range of
-    experiments using the Mesoscope-VR system.
-
-    Each project should define one or more experiment configurations and save them as .yaml files inside the project
-    'configuration' folder. The name for each configuration file is defined by the user and is used to identify and load
-    the experiment configuration when the 'sl-experiment' CLI command exposed by the sl-experiment library is executed.
-
-    Notes:
-        This class is designed exclusively for the Mesoscope-VR system. Any other system needs to define a separate
-        ExperimentConfiguration class to specify its experiment runtimes and additional data.
-
-        To create a new experiment configuration, use the 'sl-create-experiment' CLI command.
+    During runtime, the acquisition system executes the sequence of states stored in this class instance. Together with
+    custom Unity projects, which define the task environment and logic, this class allows flexibly implementing a wide
+    range of experiments using the Mesoscope-VR system.
     """
 
     cue_map: dict[int, float] = field(default_factory=Incomplete)
@@ -81,7 +71,12 @@ class MesoscopeExperimentConfiguration(YamlConfig):
 
 @dataclass()
 class MesoscopePaths:
-    """Stores the filesystem configuration parameters for the Mesoscope-VR data acquisition system."""
+    """Stores the filesystem configuration parameters for the Mesoscope-VR data acquisition system.
+
+    Notes:
+        All directories specified in this instance must be mounted to the local PC's filesystem using an SMB or an
+        equivalent protocol.
+    """
 
     google_credentials_path: Path = ...
     root_directory: Path = ...
@@ -93,7 +88,7 @@ class MesoscopePaths:
 
 @dataclass()
 class MesoscopeSheets:
-    """Stores the IDs of Google Sheets used by the Mesoscope-VR data acquisition system."""
+    """Stores the identifiers for the Google Sheet files used by the Mesoscope-VR data acquisition system."""
 
     surgery_sheet_id: str = ...
     water_log_sheet_id: str = ...
@@ -157,19 +152,12 @@ class MesoscopeAdditionalFirmware:
 
 @dataclass()
 class MesoscopeSystemConfiguration(YamlConfig):
-    """Stores the hardware and filesystem configuration parameters for the Mesoscope-VR data acquisition system used in
-    the Sun lab.
+    """Stores the hardware and filesystem configuration parameters for the Mesoscope-VR data acquisition system.
 
     This class is specifically designed to encapsulate the configuration parameters for the Mesoscope-VR system. It
-    expects the system to be configured according to the specifications available from the sl_experiment repository
-    (https://github.com/Sun-Lab-NBB/sl-experiment) and should be used exclusively by the VRPC machine
+    expects the system to be configured according to the specifications outlined in the sl-experiment repository
+    (https://github.com/Sun-Lab-NBB/sl-experiment) and should be used exclusively on the VRPC machine
     (main Mesoscope-VR PC).
-
-    Notes:
-        Each SystemConfiguration class is uniquely tied to a specific hardware configuration used in the lab. This
-        class will only work with the Mesoscope-VR system. Any other data acquisition and runtime management system in
-        the lab should define its own SystemConfiguration class to specify its own hardware and filesystem configuration
-        parameters.
     """
 
     name: str = ...
@@ -182,11 +170,11 @@ class MesoscopeSystemConfiguration(YamlConfig):
         """Ensures that variables converted to different types for storage purposes are always set to expected types
         upon class instantiation."""
     def save(self, path: Path) -> None:
-        """Saves class instance data to disk as a 'mesoscope_system_configuration.yaml' file.
+        """Saves class instance data to disk as a .yaml file.
 
         This method converts certain class variables to yaml-safe types (for example, Path objects -> strings) and
         saves class data to disk as a .yaml file. The method is intended to be used solely by the
-        set_system_configuration_file() function and should not be called from any other context.
+        create_system_configuration_file() function and should not be called from any other context.
 
         Args:
             path: The path to the .yaml file to save the data to.

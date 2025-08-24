@@ -1,5 +1,7 @@
 from .tools import (
     ProjectManifest as ProjectManifest,
+    acquire_lock as acquire_lock,
+    release_lock as release_lock,
     delete_directory as delete_directory,
     transfer_directory as transfer_directory,
     generate_project_manifest as generate_project_manifest,
@@ -82,6 +84,7 @@ __all__ = [
     "TrackerFileNames",
     "WindowCheckingDescriptor",
     "ZaberPositions",
+    "acquire_lock",
     "calculate_directory_checksum",
     "delete_directory",
     "generate_manager_id",
@@ -89,5 +92,6 @@ __all__ = [
     "get_credentials_file_path",
     "get_system_configuration_data",
     "get_working_directory",
+    "release_lock",
     "transfer_directory",
 ]

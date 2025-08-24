@@ -21,6 +21,40 @@ from .transfer_tools import (
 )
 from .packaging_tools import calculate_directory_checksum as calculate_directory_checksum
 
+def acquire_lock(
+    session_path: Path, manager_id: int, processed_data_root: Path | None = None, reset_lock: bool = False
+) -> None:
+    """Acquires the target session's data lock for the specified manager process.
+
+    Calling this function locks the target session's data to make it accessible only for the specified manager process.
+
+    Notes:
+        Each time this function is called, the release_lock() function must also be called to release the lock file.
+
+    Args:
+        session_path: The path to the session directory to be locked.
+        manager_id: The unique identifier of the manager process that acquires the lock.
+        reset_lock: Determines whether to reset the lock file before executing the runtime. This allows recovering
+            from deadlocked runtimes, but otherwise should not be used to ensure that the lock performs its intended
+            function of limiting access to session's data.
+        processed_data_root: The path to the root directory used to store the processed data from all Sun lab projects,
+            if different from the 'session_path' root.
+    """
+
+def release_lock(session_path: Path, manager_id: int, processed_data_root: Path | None = None) -> None:
+    """Releases the target session's data lock if it is owned by the specified manager process.
+
+    Calling this function unlocks the session's data, making it possible for other manager processes to acquire the
+    lock and work with the session's data. This step has to be performed by every manager process as part of its
+    shutdown sequence if the manager called the acquire_lock() function.
+
+    Args:
+        session_path: The path to the session directory to be unlocked.
+        manager_id: The unique identifier of the manager process that releases the lock.
+        processed_data_root: The path to the root directory used to store the processed data from all Sun lab projects,
+            if different from the 'session_path' root.
+    """
+
 def resolve_checksum(
     session_path: Path,
     manager_id: int,
@@ -51,7 +85,7 @@ def resolve_checksum(
         reset_tracker: Determines whether to reset the tracker file before executing the runtime. This allows
             recovering from deadlocked runtimes, but otherwise should not be used to ensure runtime safety.
         regenerate_checksum: Determines whether to update the checksum stored in the ax_checksum.txt file before
-            carrying out the verification. In this case, the verification necessarily succeeds and the session's
+            carrying out the verification. In this case, the verification necessarily succeeds, and the session's
             reference checksum is changed to reflect the current state of the session data.
     """
 
@@ -91,10 +125,10 @@ def archive_session(
     Args:
         session_path: The path to the session directory to be processed.
         manager_id: The unique identifier of the manager process that manages the runtime.
-        processed_data_root: The path to the root directory used to store the processed data from all Sun lab projects,
-            if different from the 'session_path' root.
         reset_tracker: Determines whether to reset the tracker file before executing the runtime. This allows
             recovering from deadlocked runtimes, but otherwise should not be used to ensure runtime safety.
+        processed_data_root: The path to the root directory used to store the processed data from all Sun lab projects,
+            if different from the 'session_path' root.
 
     Notes:
         This function inverses the result of running the prepare_session() function.

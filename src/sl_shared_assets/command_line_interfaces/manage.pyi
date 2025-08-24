@@ -5,6 +5,8 @@ import click
 from _typeshed import Incomplete
 
 from ..tools import (
+    acquire_lock as acquire_lock,
+    release_lock as release_lock,
     archive_session as archive_session,
     prepare_session as prepare_session,
     resolve_checksum as resolve_checksum,
@@ -29,6 +31,27 @@ def manage_session(
 
     Commands from this group are used to support data processing and dataset-formation (forging) on remote compute
     servers."""
+
+@click.pass_context
+def lock_session(ctx: Any) -> None:
+    """Acquires the lock for the target session's data.
+
+    This command is used to ensure that the target session's data can only be accessed from the specified manager
+    process. Calling this command is a prerequisite for all other session data management, processing, or dataset
+    formation commands. If this command is called as part of runtime, the 'unlock' command must be called at the end
+    of that runtime to properly release the session's data lock. This command respects the '--reset-tracker' flag of the
+    'session' command group and, if this flag is present, forcibly resets the session lock file before re-acquiring it
+    for the specified manager process.
+    """
+
+@click.pass_context
+def unlock_session(ctx: Any) -> None:
+    """Releases the lock for the target session's data.
+
+    This command is used to reverse the effect of the 'lock' command, allowing other manager processes to work with
+    the session's data. This command can only be called from the same manager process used to acquire the
+    session's data lock.
+    """
 
 @click.pass_context
 def resolve_session_checksum(ctx: Any, recalculate_checksum: bool) -> None:
