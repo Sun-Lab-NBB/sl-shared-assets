@@ -110,4 +110,7 @@ __all__ = [
     "get_working_directory",
     "release_lock",
     "transfer_directory",
+    "ProcessingPipeline",
+    "ProcessingPipelines",
+    "ProcessingStatus",
 ]
