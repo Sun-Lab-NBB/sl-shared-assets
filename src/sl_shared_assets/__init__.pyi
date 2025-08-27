@@ -11,9 +11,12 @@ from .server import (
     Job as Job,
     Server as Server,
     JupyterJob as JupyterJob,
+    ProcessingStatus as ProcessingStatus,
     TrackerFileNames as TrackerFileNames,
     ProcessingTracker as ProcessingTracker,
     ServerCredentials as ServerCredentials,
+    ProcessingPipeline as ProcessingPipeline,
+    ProcessingPipelines as ProcessingPipelines,
     generate_manager_id as generate_manager_id,
 )
 from .data_classes import (
@@ -70,6 +73,9 @@ __all__ = [
     "MesoscopeSystemConfiguration",
     "ProcedureData",
     "ProcessedData",
+    "ProcessingPipeline",
+    "ProcessingPipelines",
+    "ProcessingStatus",
     "ProcessingTracker",
     "ProjectManifest",
     "RawData",

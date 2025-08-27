@@ -86,6 +86,9 @@ __all__ = [
     "MesoscopeSystemConfiguration",
     "ProcedureData",
     "ProcessedData",
+    "ProcessingPipeline",
+    "ProcessingPipelines",
+    "ProcessingStatus",
     "ProcessingTracker",
     "ProjectManifest",
     "RawData",
@@ -110,7 +113,4 @@ __all__ = [
     "get_working_directory",
     "release_lock",
     "transfer_directory",
-    "ProcessingPipeline",
-    "ProcessingPipelines",
-    "ProcessingStatus",
 ]
