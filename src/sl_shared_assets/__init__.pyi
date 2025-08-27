@@ -1,5 +1,4 @@
 from .tools import (
-    ProjectManifest as ProjectManifest,
     acquire_lock as acquire_lock,
     release_lock as release_lock,
     delete_directory as delete_directory,
@@ -77,7 +76,6 @@ __all__ = [
     "ProcessingPipelines",
     "ProcessingStatus",
     "ProcessingTracker",
-    "ProjectManifest",
     "RawData",
     "RunTrainingDescriptor",
     "Server",

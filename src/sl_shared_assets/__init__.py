@@ -8,7 +8,6 @@ Authors: Ivan Kondratyev (Inkaros), Kushaan Gupta, Natalie Yeung
 from ataraxis_base_utilities import console
 
 from .tools import (
-    ProjectManifest,
     acquire_lock,
     release_lock,
     delete_directory,
@@ -90,7 +89,6 @@ __all__ = [
     "ProcessingPipelines",
     "ProcessingStatus",
     "ProcessingTracker",
-    "ProjectManifest",
     "RawData",
     "RunTrainingDescriptor",
     "Server",

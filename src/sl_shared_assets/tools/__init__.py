@@ -4,7 +4,6 @@ integrity of the data. The tools from this package are used by most other data p
 from .transfer_tools import delete_directory, transfer_directory
 from .packaging_tools import calculate_directory_checksum
 from .project_management_tools import (
-    ProjectManifest,
     acquire_lock,
     release_lock,
     archive_session,
@@ -14,7 +13,6 @@ from .project_management_tools import (
 )
 
 __all__ = [
-    "ProjectManifest",
     "acquire_lock",
     "archive_session",
     "calculate_directory_checksum",

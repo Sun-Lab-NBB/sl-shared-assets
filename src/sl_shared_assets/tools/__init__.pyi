@@ -4,7 +4,6 @@ from .transfer_tools import (
 )
 from .packaging_tools import calculate_directory_checksum as calculate_directory_checksum
 from .project_management_tools import (
-    ProjectManifest as ProjectManifest,
     acquire_lock as acquire_lock,
     release_lock as release_lock,
     archive_session as archive_session,
@@ -14,7 +13,6 @@ from .project_management_tools import (
 )
 
 __all__ = [
-    "ProjectManifest",
     "acquire_lock",
     "archive_session",
     "calculate_directory_checksum",
