@@ -37,8 +37,10 @@ def manage() -> None:
     "--session-path",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    help="The absolute path to the root session directory to process. This directory must contain the 'raw_data' "
-    "subdirectory.",
+    help=(
+        "The absolute path to the root session directory to process. This directory must contain the 'raw_data' "
+        "subdirectory."
+    ),
 )
 @click.option(
     "-pdr",
