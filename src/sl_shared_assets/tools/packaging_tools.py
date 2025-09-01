@@ -115,7 +115,7 @@ def calculate_directory_checksum(
         results = []
         if not batch:
             with tqdm(
-                total=len(files), desc=f"Calculating checksum for {Path(*directory.parts[-6:])}", unit="files"
+                total=len(files), desc=f"Calculating checksum for {Path(*directory.parts[-6:])}", unit="file"
             ) as pbar:
                 for future in as_completed(future_to_path):
                     results.append(future.result())
