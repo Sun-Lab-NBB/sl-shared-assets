@@ -15,7 +15,7 @@ from ..data_classes import (
 )
 
 # Ensures that displayed CLICK help messages are formatted according to the lab standard.
-CONTEXT_SETTINGS = dict(max_content_width=120)  # or any width you want
+CONTEXT_SETTINGS = dict(max_content_width=120)
 
 
 @click.group("manage", context_settings=CONTEXT_SETTINGS)
