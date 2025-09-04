@@ -342,6 +342,9 @@ class ProcessingTracker(YamlConfig):
                 self._complete = True
                 self._encountered_error = False
                 self._save_state()
+            else:
+                # Otherwise, updates the completed job counter, but does not change any other state variables.
+                self._save_state()
 
     def abort(self) -> None:
         """Resets the pipeline tracker file to the default state.
@@ -524,11 +527,22 @@ class ProcessingPipeline:
         # to the server.
         elif tracker.is_running:
             self._pipeline_stage += 1
-            self._submit_jobs()
+
+            # If the incremented stage is not a valid stage, the pipeline has actually been aborted and the tracker file
+            # does not properly reflect this state. Sets the internal state tracker appropriately and resets (removes)
+            # the tracker file from the server to prevent deadlocking further runtimes
+            if self._pipeline_stage not in self.jobs.keys():
+                sh.rmtree(self.local_tracker_path.parent)  # Removes local temporary data
+                self.pipeline_status = ProcessingStatus.ABORTED
+                self.server.remove(remote_path=self.remote_tracker_path, is_dir=False)
+            else:
+                # Otherwise, submits the next batch of jobs to the server.
+                self._submit_jobs()
 
         # The final and the rarest state: the pipeline was aborted before it finished the runtime. Generally, this state
         # should not be encountered during most runtimes.
         else:
+            sh.rmtree(self.local_tracker_path.parent)  # Removes local temporary data
             self.pipeline_status = ProcessingStatus.ABORTED
 
     def _submit_jobs(self) -> None:
