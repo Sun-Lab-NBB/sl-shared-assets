@@ -191,6 +191,8 @@ class ProcessingTracker(YamlConfig):
             self._encountered_error = copy.copy(instance._encountered_error)
             self._running = copy.copy(instance._running)
             self._manager_id = copy.copy(instance._manager_id)
+            self._job_count = copy.copy(instance._job_count)
+            self._completed_jobs = copy.copy(instance._completed_jobs)
         else:
             # Otherwise, if the tracker file does not exist, generates a new .yaml file using default instance values
             # and saves it to disk using the specified tracker file path.
@@ -250,6 +252,7 @@ class ProcessingTracker(YamlConfig):
             self._complete = False
             self._encountered_error = False
             self._job_count = job_count
+            self._completed_jobs = 0
             self._save_state()
 
     def error(self, manager_id: int) -> None:
