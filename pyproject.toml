@@ -1,16 +1,16 @@
 # Defines the build system used for the project.
 [build-system]
-requires = ["hatchling==1.27.0"]
+requires = ["hatchling>=1,<2"]
 build-backend = "hatchling.build"
 
 # Project metdata section. Provides the genral ID information about the project.
 [project]
 name = "sl-shared-assets"
-version = "5.1.2"
+version = "6.0.0"
 description = "Provides data acquisition and processing assets shared between Sun (NeuroAI) lab libraries."
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.11"
+requires-python = ">=3.13,<3.14"
 authors = [
     { name = "Ivan Kondratyev" },
     { name = "Kushaan Gupta" },
@@ -31,8 +31,6 @@ classifiers = [
     # License
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     # Supported Python Versions
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     # Supported OS systems
     "Operating System :: OS Independent",
@@ -101,7 +99,7 @@ packages = ["src/sl_shared_assets"]
 [tool.ruff]
 line-length = 120         # The maximum column length is set to 120 for this project.
 indent-width = 4          # Same as black, indents are 4 spaces
-target-version = "py311"  # Targets the lowest supported version of python
+target-version = "py313"  # Targets the lowest supported version of python
 src = ["src"]             # The name of the source directory
 
 # Excludes 'service' .py files, such as the sphinx configuration file, from linting.
