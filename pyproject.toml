@@ -6,11 +6,11 @@ build-backend = "hatchling.build"
 # Project metdata section. Provides the genral ID information about the project.
 [project]
 name = "sl-shared-assets"
-version = "6.0.0rc2"
+version = "6.0.0rc3"
 description = "Provides data acquisition and processing assets shared between Sun (NeuroAI) lab libraries."
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.13,<3.15"
 authors = [
     { name = "Ivan Kondratyev" },
     { name = "Kushaan Gupta" },
@@ -32,6 +32,7 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     # Supported Python Versions
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     # Supported OS systems
     "Operating System :: OS Independent",
     # Typing
@@ -40,9 +41,9 @@ classifiers = [
 
 # Runtime project dependencies.
 dependencies = [
-    "ataraxis-time>=3,<4",
-    "ataraxis-base-utilities>=3,<4",
-    "ataraxis-data-structures>=3,<4",
+    "ataraxis-time>=5,<6",
+    "ataraxis-base-utilities>=5,<6",
+    "ataraxis-data-structures>=5,<6",
     "numpy>=2,<3",
     "appdirs>=1,<2",
     "tqdm>=4,<5",
@@ -50,9 +51,9 @@ dependencies = [
     "paramiko>=4,<5",
     "simple-slurm>=0,<1",
     "click>=8,<9",
-    "natsort>=8,<9",
+    "natsort-rs>=0,<1",
     "polars>=1,<2",
-    "pyarrow>=21,<22",
+    "pyarrow>=22,<23",
     "filelock>=3,<4",
     "pytz>=2025,<2026",
 ]
@@ -72,7 +73,7 @@ dev = [
     "tox-uv>=1,<2",
 
     # Development Automation
-    "ataraxis-automation>=6.0.1,<7",
+    "ataraxis-automation>=7,<8",
 
     # Types
     "types-appdirs>=1,<2",
@@ -80,6 +81,7 @@ dev = [
     "types-paramiko>=4,<5",
     "types-filelock>=3,<4",
     "types-pytz>=2025,<2026",
+    "types-xxhash>=3,<4",
 ]
 
 # Exports CLIs upon library installation into an environment

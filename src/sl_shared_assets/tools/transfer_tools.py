@@ -56,7 +56,7 @@ def delete_directory(directory_path: Path) -> None:
             directory_path.rmdir()
             break  # Breaks early if the call succeeds
         except Exception:
-            delay_timer.delay_noblock(delay=500, allow_sleep=True)  # For each failed attempt, sleeps for 500 ms
+            delay_timer.delay(block=False, delay=500, allow_sleep=True)  # For each failed attempt, sleeps for 500 ms
             continue
 
 

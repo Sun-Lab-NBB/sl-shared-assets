@@ -448,7 +448,7 @@ def generate_project_manifest(
         )
         console.error(message=message, error=FileNotFoundError)
 
-    # Precreates the 'manifest' dictionary structure
+    # Pre-creates the 'manifest' dictionary structure
     manifest: dict[str, list[str | bool | datetime | int]] = {
         "animal": [],  # Animal IDs.
         "session": [],  # Session names.
