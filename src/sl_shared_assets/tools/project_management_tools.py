@@ -1,5 +1,6 @@
 """This module provides tools for managing the data of any Sun lab project. Tools from this module are primarily used
-to support data processing pipelines that make up the Sun lab data workflow and run on the remote compute server."""
+to support data processing pipelines that make up the Sun lab data workflow and run on the remote compute server.
+"""
 
 from pathlib import Path
 from datetime import datetime
@@ -42,7 +43,6 @@ def acquire_lock(
         processed_data_root: The path to the root directory used to store the processed data from all Sun lab projects,
             if different from the 'session_path' root.
     """
-
     # Resolves the session directory hierarchy
     session = SessionData.load(session_path=session_path, processed_data_root=processed_data_root)
 
@@ -70,7 +70,6 @@ def release_lock(session_path: Path, manager_id: int, processed_data_root: Path 
         processed_data_root: The path to the root directory used to store the processed data from all Sun lab projects,
             if different from the 'session_path' root.
     """
-
     # Resolves the session directory hierarchy
     session = SessionData.load(session_path=session_path, processed_data_root=processed_data_root)
 
@@ -112,7 +111,6 @@ def resolve_checksum(
             carrying out the verification. In this case, the verification necessarily succeeds, and the session's
             reference checksum is changed to reflect the current state of the session data.
     """
-
     # Loads session data layout. If configured to do so, also creates the processed data hierarchy
     session_data = SessionData.load(
         session_path=session_path,
@@ -245,7 +243,7 @@ def prepare_session(
         # specified by the 'source_data'.
         if session_data.raw_data.root_path != session_data.source_data.root_path:
             console.echo(
-                message=f"Copying the 'raw_data' directory to the working volume as the 'source_data' directory...",
+                message="Copying the 'raw_data' directory to the working volume as the 'source_data' directory...",
                 level=LogLevel.INFO,
             )
             transfer_directory(
@@ -264,8 +262,8 @@ def prepare_session(
         ):
             console.echo(
                 message=(
-                    f"Transferring the 'archived_data' directory to the working volume as the 'processed_data' "
-                    f"directory..."
+                    "Transferring the 'archived_data' directory to the working volume as the 'processed_data' "
+                    "directory..."
                 ),
                 level=LogLevel.INFO,
             )
@@ -367,8 +365,8 @@ def archive_session(
         ):
             console.echo(
                 message=(
-                    f"Transferring (archiving) the 'processed_data' directory to the storage volume as the "
-                    f"'archived_data' directory..."
+                    "Transferring (archiving) the 'processed_data' directory to the storage volume as the "
+                    "'archived_data' directory..."
                 ),
                 level=LogLevel.INFO,
             )
@@ -383,7 +381,7 @@ def archive_session(
         # Also ensures that the 'source_data' folder is removed from the working volume.
         if session_data.raw_data.root_path != session_data.source_data.root_path:
             console.echo(
-                message=f"Removing the redundant 'source_data' directory from the working volume...",
+                message="Removing the redundant 'source_data' directory from the working volume...",
                 level=LogLevel.INFO,
             )
             delete_directory(session_data.source_data.raw_data_path)
@@ -429,7 +427,6 @@ def generate_project_manifest(
         processed_data_root: The path to the root directory (volume) used to store processed data for all Sun lab
             projects if it is different from the parent of the 'raw_project_directory'.
     """
-
     if not raw_project_directory.exists():
         message = (
             f"Unable to generate the project manifest file for the requested project {raw_project_directory.stem}. "
@@ -620,7 +617,7 @@ def generate_project_manifest(
             # If all animal IDs are integer-convertible, stores them as numbers to promote proper sorting.
             # Otherwise, stores them as strings. The latter options are primarily kept for compatibility with Tyche
             # data.
-            animal_type: type[pl.UInt64] | type[pl.String]
+            animal_type: type[pl.UInt64 | pl.String]
             if all([str(animal).isdigit() for animal in manifest["animal"]]):
                 # Converts all strings to integers
                 manifest["animal"] = [int(animal) for animal in manifest["animal"]]  # type: ignore

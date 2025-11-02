@@ -1,6 +1,6 @@
-"""This module provides classes used to configure data acquisition and processing runtimes in the Sun lab."""
+"""This module provides the classes used to configure data acquisition and processing runtimes in the Sun lab."""
 
-import copy
+from copy import deepcopy
 from enum import StrEnum
 from pathlib import Path
 from dataclasses import field, dataclass
@@ -13,79 +13,52 @@ from ..server import ServerCredentials
 
 
 class AcquisitionSystems(StrEnum):
-    """Stores the names for all data acquisition systems currently used in the Sun lab."""
+    """Defines the data acquisition systems currently used in the Sun lab."""
 
     MESOSCOPE_VR = "mesoscope-vr"
-    """The Mesoscope-VR data acquisition system. It is built around 2-Photon Random Access Mesoscope (2P-RAM) and 
-    relies on Unity-backed virtual reality task-environments to conduct experiments."""
+    """The Mesoscope-VR data acquisition system. It is built around the 2-Photon Random Access Mesoscope (2P-RAM) and 
+    relies on Virtual Reality (VR) task-environments that use the Unity game engine to conduct experiments."""
 
 
 @dataclass()
-class ExperimentState:
-    """Stores the information used to set and maintain the desired experiment and system state.
-
-    Broadly, each experiment runtime can be conceptualized as a two-state system. The first is the experiment task
-    state, which reflects the behavior goal, the rules for achieving the goal, and the reward for achieving the goal.
-    The second is the data acquisition system state, which is a snapshot of all hardware module states that make up the
-    system that acquires the data and controls the task environment.
-
-    Note:
-        This class is acquisition-system-agnostic. All data acquisition systems use this class as part of their specific
-        ExperimentConfiguration class instances.
-    """
+class MesoscopeExperimentState:
+    """Stores the information used to set and maintain the desired experiment and data acquisition system state."""
 
     experiment_state_code: int
-    """The integer code of the experiment state. Note, each experiment is expected to define and follow its own 
-    experiment state code mapping. Typically, the experiment state code is used to denote major experiment stages, 
-    such as 'baseline', 'task', 'cooldown', etc. The same experiment state code can be used by multiple sequential 
-    ExperimentState instances to change the data acquisition system states while maintaining the same experiment
-    state."""
+    """The unique identifier code of the experiment state."""
     system_state_code: int
-    """One of the supported data acquisition system state-codes. Note, the meaning of each system state code depends on 
-    the specific data acquisition system used during the experiment."""
+    """The data acquisition system's state (configuration snapshot) code associated with the experiment state."""
     state_duration_s: float
-    """The time, in seconds, to maintain the experiment and system state combination specified by this instance during 
-    runtime."""
+    """The time, in seconds, to maintain the experiment state while executing the experiment."""
     initial_guided_trials: int
-    """The number of trials (laps), counting from the onset of the experiment state, during which the animal should 
-    receive water rewards for entering the reward zone. Once the specified number of guided trials passes, the system 
-    disables guidance, requiring the animal to lick in the reward zone to get rewards."""
+    """The number of trials after the onset of the experiment state that must use the guided mode."""
     recovery_failed_trial_threshold: int
-    """The number of sequentially failed (non-rewarded) trials (laps), after which the system should 
-    re-enable lick guidance for the following 'recovery_guided_trials' number of trials."""
+    """The number of sequentially failed trials after which to enable the 'recovery' guided mode."""
     recovery_guided_trials: int
-    """The number of trials (laps) for which the system should re-enable lick guidance, when the animal 
-    sequentially fails 'failed_trial_threshold' number of trials. This field works similar to the 
-    'initial_guided_trials' field, but is triggered by repeated performance failures, rather than experiment state 
-    onset."""
+    """The number of guided trials to use in the 'recovery' guided mode."""
 
 
 @dataclass()
-class ExperimentTrial:
+class MesoscopeExperimentTrial:
     """Stores the information about a single experiment trial.
 
-    All Virtual Reality (VR) tasks can be broadly conceptualized as repeating motifs (sequences) of VR environment wall
-    cues, associated with a specific goal, for which animals receive water rewards. Each complete motif is typically
-    interpreted as a single experiment trial.
-
     Notes:
-        Since some experiments use multiple distinct trial types as part of the same experiment session, multiple
-        instances of this class can be used by an ExperimentConfiguration class instance to represent multiple used
-        trial types.
+        Multiple instances of this class can be used by a MesoscopeExperimentConfiguration instance to represent
+        multiple trial types used as part of the same experiment.
     """
 
     cue_sequence: list[int]
-    """The sequence of Virtual Reality environment wall cues experienced by the animal while running this 
-    trial. Note, the cues must be specified as integer-codes matching the codes used in the 'cue_map' dictionary of the 
-    ExperimentConfiguration class for the experiment."""
+    """The sequence of Virtual Reality environment wall cues experienced by the animal while running the 
+    trial. The cues must be specified as integer-codes matching the codes used in the 'cue_map' dictionary of the 
+    experiment's MesoscopeExperimentConfiguration instance."""
     trial_length_cm: float
     """The length of the trial cue sequence in centimeters."""
     trial_reward_size_ul: float
     """The volume of water, in microliters, dispensed when the animal successfully completes the trial's task."""
     reward_zone_start_cm: float
-    """The starting boundary of the trial reward zone, in centimeters."""
+    """The position of the trial reward zone starting boundary, in centimeters."""
     reward_zone_end_cm: float
-    """The ending boundary of the trial reward zone, in centimeters."""
+    """The position of the trial reward zone ending boundary, in centimeters."""
     guidance_trigger_location_cm: float
     """The location of the invisible boundary (wall) with which the animal must collide to trigger water reward 
     delivery during guided trials."""
@@ -94,28 +67,19 @@ class ExperimentTrial:
 # noinspection PyArgumentList
 @dataclass()
 class MesoscopeExperimentConfiguration(YamlConfig):
-    """Stores the configuration of an experiment runtime that uses the Mesoscope_VR data acquisition system.
-
-    During runtime, the acquisition system executes the sequence of states stored in this class instance. Together with
-    custom Unity projects, which define the task environment and logic, this class allows flexibly implementing a wide
-    range of experiments using the Mesoscope-VR system.
-    """
+    """Stores the configuration of an experiment session that uses the Mesoscope_VR data acquisition system."""
 
     cue_map: dict[int, float] = field(default_factory=lambda: {0: 30.0, 1: 30.0, 2: 30.0, 3: 30.0, 4: 30.0})
     """Maps each integer-code associated with the experiment's Virtual Reality (VR) environment wall 
-    cue to its length in real-world centimeters. It is used to map each VR cue to the distance the animal needs
-    to travel to fully traverse the wall cue region from start to end."""
+    cue to its length in centimeters."""
     cue_offset_cm: float = 10.0
-    """Specifies the offset distance, in centimeters, by which the animal's running track is shifted relative to the 
-    Virtual Reality (VR) environment's wall cue sequence. Due to how the VR environment is displayed to the animal, 
-    most runtimes need to shift the animal slightly forward relative to the VR cue sequence origin (0), to prevent it 
-    from seeing the portion of the environment before the first VR wall cue. This offset statically shifts the entire 
-    track (in centimeters) against the set of VR wall cues used during runtime."""
+    """Specifies the animal's starting position at the onset of the experiment relative to the Virtual Reality (VR) 
+    environment's cue sequence origin, in centimeters."""
     unity_scene_name: str = "IvanScene"
-    """The name of the Virtual Reality task (Unity Scene) used during experiment."""
-    experiment_states: dict[str, ExperimentState] = field(
+    """The name of the Virtual Reality task (Unity Scene) used during the experiment."""
+    experiment_states: dict[str, MesoscopeExperimentState] = field(
         default_factory=lambda: {
-            "baseline": ExperimentState(
+            "baseline": MesoscopeExperimentState(
                 experiment_state_code=1,
                 system_state_code=1,
                 state_duration_s=30,
@@ -123,7 +87,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
                 recovery_failed_trial_threshold=0,
                 recovery_guided_trials=0,
             ),
-            "experiment": ExperimentState(
+            "experiment": MesoscopeExperimentState(
                 experiment_state_code=2,
                 system_state_code=2,
                 state_duration_s=120,
@@ -131,7 +95,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
                 recovery_failed_trial_threshold=6,
                 recovery_guided_trials=3,
             ),
-            "cooldown": ExperimentState(
+            "cooldown": MesoscopeExperimentState(
                 experiment_state_code=3,
                 system_state_code=1,
                 state_duration_s=15,
@@ -141,12 +105,11 @@ class MesoscopeExperimentConfiguration(YamlConfig):
             ),
         }
     )
-    """Maps human-readable experiment state names to corresponding ExperimentState instances. Each ExperimentState 
-    instance represents a phase of the experiment. During runtime, the phases are executed in the same order as 
-    specified in this dictionary."""
-    trial_structures: dict[str, ExperimentTrial] = field(
+    """Defines the experiment's flow by specifying the sequence of experiment and data acquisition system states 
+    executed during runtime."""
+    trial_structures: dict[str, MesoscopeExperimentTrial] = field(
         default_factory=lambda: {
-            "cyclic_4_cue": ExperimentTrial(
+            "cyclic_4_cue": MesoscopeExperimentTrial(
                 cue_sequence=[1, 0, 2, 0, 3, 0, 4, 0],
                 trial_length_cm=240.0,
                 trial_reward_size_ul=5.0,
@@ -156,19 +119,13 @@ class MesoscopeExperimentConfiguration(YamlConfig):
             )
         }
     )
-    """Maps human-readable trial structure names to corresponding ExperimentTrial instances. Each ExperimentTrial 
-    instance specifies the Virtual Reality (VR) environment layout and task parameters associated with a single 
-    type of trials supported by the experiment runtime."""
+    """Defines experiment's structure by specifying the types of trials used by the phases (states) of the 
+    experiment."""
 
 
 @dataclass()
 class MesoscopePaths:
-    """Stores the filesystem configuration parameters for the Mesoscope-VR data acquisition system.
-
-    Notes:
-        All directories specified in this instance must be mounted to the local PC's filesystem using an SMB or an
-        equivalent protocol.
-    """
+    """Stores the filesystem configuration parameters for the Mesoscope-VR data acquisition system."""
 
     google_credentials_path: Path = Path("/media/Data/Experiments/sl-surgery-log-0f651e492767.json")
     """
@@ -177,20 +134,15 @@ class MesoscopePaths:
     """
     root_directory: Path = Path("/media/Data/Experiments")
     """The absolute path to the directory where all projects are stored on the main data acquisition system PC."""
-    server_storage_directory: Path = Path("/home/cybermouse/server/storage/sun_data")
+    server_directory: Path = Path("/home/cybermouse/server/storage/sun_data")
     """The absolute path to the local-filesystem-mounted directory where the raw data from all projects is stored on 
     the remote compute server."""
-    server_working_directory: Path = Path("/home/cybermouse/server/workdir/sun_data")
-    """The absolute path to the local-filesystem-mounted directory where the processed data from all projects is 
-    stored on the remote compute server."""
     nas_directory: Path = Path("/home/cybermouse/nas/rawdata")
     """The absolute path to the local-filesystem-mounted directory where the raw data from all projects is stored on 
     the NAS (backup long-term storage destination)."""
     mesoscope_directory: Path = Path("/home/cybermouse/scanimage/mesodata")
     """The absolute path to the root ScanImagePC (mesoscope-connected PC) local-filesystem-mounted directory where all 
     mesoscope-acquired data is aggregated during acquisition."""
-    harvesters_cti_path: Path = Path("/opt/mvIMPACT_Acquire/lib/x86_64/mvGenTLProducer.cti")
-    """The path to the GeniCam CTI file used to connect to Harvesters-managed cameras."""
 
 
 @dataclass()
@@ -211,20 +163,18 @@ class MesoscopeCameras:
 
     face_camera_index: int = 0
     """The index of the face camera in the list of all available Harvester-managed cameras."""
-    left_camera_index: int = 0
-    """The index of the left body camera (from animal's perspective) in the list of all available OpenCV-managed 
-    cameras."""
-    right_camera_index: int = 2
-    """The index of the right body camera (from animal's perspective) in the list of all available OpenCV-managed
-     cameras."""
-    face_camera_quantization_parameter: int = 15
+    body_camera_index: int = 1
+    """The index of the body camera in the list of all available Harvester-managed cameras."""
+    face_camera_quantization: int = 15
     """The quantization parameter used by the face camera to encode acquired frames as video files."""
-    body_camera_quantization_parameter: int = 15
-    """The quantization parameter used by the left and right body cameras to encode acquired frames as video files."""
-    display_face_camera_frames: bool = True
-    """Determines whether to display the frames grabbed from the face camera during runtime."""
-    display_body_camera_frames: bool = True
-    """Determines whether to display the frames grabbed from the left and right body cameras during runtime."""
+    face_camera_preset: int = 5
+    """The encoding speed preset used by the face camera to encode acquired frames as video files. Must be one of the 
+    valid members of the EncoderSpeedPresets enumeration from the ataraxis-video-system library."""
+    body_camera_quantization: int = 15
+    """The quantization parameter used by the body camera to encode acquired frames as video files."""
+    body_camera_preset: int = 5
+    """The encoding speed preset used by the body camera to encode acquired frames as video files. Must be one of the 
+    valid members of the EncoderSpeedPresets enumeration from the ataraxis-video-system library."""
 
 
 @dataclass()
@@ -367,12 +317,12 @@ class MesoscopeSystemConfiguration(YamlConfig):
 
     def __post_init__(self) -> None:
         """Ensures that variables converted to different types for storage purposes are always set to expected types
-        upon class instantiation."""
-
+        upon class instantiation.
+        """
         # Converts all paths loaded as strings to Path objects used inside the library
         self.paths.google_credentials_path = Path(self.paths.google_credentials_path)
         self.paths.root_directory = Path(self.paths.root_directory)
-        self.paths.server_storage_directory = Path(self.paths.server_storage_directory)
+        self.paths.server_directory = Path(self.paths.server_directory)
         self.paths.server_working_directory = Path(self.paths.server_working_directory)
         self.paths.nas_directory = Path(self.paths.nas_directory)
         self.paths.mesoscope_directory = Path(self.paths.mesoscope_directory)
@@ -411,15 +361,14 @@ class MesoscopeSystemConfiguration(YamlConfig):
         Args:
             path: The path to the .yaml file to save the data to.
         """
-
         # Copies instance data to prevent it from being modified by reference when executing the steps below
-        original = copy.deepcopy(self)
+        original = deepcopy(self)
 
         # Converts all Path objects to strings before dumping the data, as .yaml encoder does not properly recognize
         # Path objects
         original.paths.google_credentials_path = str(original.paths.google_credentials_path)  # type: ignore
         original.paths.root_directory = str(original.paths.root_directory)  # type: ignore
-        original.paths.server_storage_directory = str(original.paths.server_storage_directory)  # type: ignore
+        original.paths.server_directory = str(original.paths.server_directory)  # type: ignore
         original.paths.server_working_directory = str(original.paths.server_working_directory)  # type: ignore
         original.paths.nas_directory = str(original.paths.nas_directory)  # type: ignore
         original.paths.mesoscope_directory = str(original.paths.mesoscope_directory)  # type: ignore
@@ -455,7 +404,6 @@ def set_working_directory(path: Path) -> None:
     Args:
         path: The path to the directory to set as the local Sun lab working directory.
     """
-
     # If the directory specified by the 'path' does not exist, generates the specified directory tree. As part of this
     # process, also generate the precursor server_credentials.yaml file to use for accessing the remote server used to
     # store project data.
@@ -560,7 +508,6 @@ def get_credentials_file_path(service: bool = False) -> Path:
             in the local Sun lab working directory.
         ValueError: If both credential files exist, but the requested credentials file is not configured.
     """
-
     # Gets the path to the local working directory.
     working_directory = get_working_directory()
 
@@ -587,45 +534,43 @@ def get_credentials_file_path(service: bool = False) -> Path:
         # If the service account is not configured, aborts with an error.
         if credentials.username == "YourNetID" or credentials.password == "YourPassword":
             message = (
-                f"The 'service_credentials.yaml' file appears to be unconfigured or contains placeholder credentials. "
-                f"Use the 'sl-configure server -s' CLI command to reconfigure the server credentials file."
+                "The 'service_credentials.yaml' file appears to be unconfigured or contains placeholder credentials. "
+                "Use the 'sl-configure server -s' CLI command to reconfigure the server credentials file."
             )
             console.error(message=message, error=ValueError)
             raise ValueError(message)  # Fallback to appease mypy, should not be reachable
 
         # If the service account is configured, returns the path to the service credentials file to caller
-        else:
-            message = f"Server access credentials: Resolved. Using the service {credentials.username} account."
-            console.echo(message=message, level=LogLevel.SUCCESS)
-            return service_path
-
-    else:
-        if not user_path.exists():
-            message = (
-                f"Unable to locate the 'user_credentials.yaml' file in the Sun lab working directory {user_path}. Call "
-                f"the 'sl-configure server' CLI command to create the user server access credentials file. Note, "
-                f"all users need to have a valid user credentials file to work with the data stored on the remote "
-                f"server."
-            )
-            console.error(message=message, error=FileNotFoundError)
-            raise FileNotFoundError(message)  # Fallback to appease mypy, should not be reachable
-
-        # Otherwise, evaluates the user credentials file.
-        credentials: ServerCredentials = ServerCredentials.from_yaml(file_path=user_path)  # type: ignore
-
-        # If the user account is not configured, aborts with an error.
-        if credentials.username == "YourNetID" or credentials.password == "YourPassword":
-            message = (
-                f"The 'user_credentials.yaml' file appears to be unconfigured or contains placeholder credentials. "
-                f"Use the 'sl-configure server' CLI command to reconfigure the server credentials file."
-            )
-            console.error(message=message, error=ValueError)
-            raise ValueError(message)  # Fallback to appease mypy, should not be reachable
-
-        # Otherwise, returns the path to the user credentials file to caller
-        message = f"Server access credentials: Resolved. Using the {credentials.username} account."
+        message = f"Server access credentials: Resolved. Using the service {credentials.username} account."
         console.echo(message=message, level=LogLevel.SUCCESS)
-        return user_path
+        return service_path
+
+    if not user_path.exists():
+        message = (
+            f"Unable to locate the 'user_credentials.yaml' file in the Sun lab working directory {user_path}. Call "
+            f"the 'sl-configure server' CLI command to create the user server access credentials file. Note, "
+            f"all users need to have a valid user credentials file to work with the data stored on the remote "
+            f"server."
+        )
+        console.error(message=message, error=FileNotFoundError)
+        raise FileNotFoundError(message)  # Fallback to appease mypy, should not be reachable
+
+    # Otherwise, evaluates the user credentials file.
+    credentials: ServerCredentials = ServerCredentials.from_yaml(file_path=user_path)  # type: ignore
+
+    # If the user account is not configured, aborts with an error.
+    if credentials.username == "YourNetID" or credentials.password == "YourPassword":
+        message = (
+            "The 'user_credentials.yaml' file appears to be unconfigured or contains placeholder credentials. "
+            "Use the 'sl-configure server' CLI command to reconfigure the server credentials file."
+        )
+        console.error(message=message, error=ValueError)
+        raise ValueError(message)  # Fallback to appease mypy, should not be reachable
+
+    # Otherwise, returns the path to the user credentials file to caller
+    message = f"Server access credentials: Resolved. Using the {credentials.username} account."
+    console.echo(message=message, level=LogLevel.SUCCESS)
+    return user_path
 
 
 # Maps supported file names to configuration classes. This is used when loading the configuration data into memory.
@@ -655,7 +600,6 @@ def create_system_configuration_file(system: AcquisitionSystems | str) -> None:
     Raises:
         ValueError: If the input acquisition system name (type) is not recognized.
     """
-
     # Resolves the path to the local Sun lab working directory.
     directory = get_working_directory()
 
@@ -705,7 +649,6 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
     Raises:
         FileNotFoundError: If the local machine does not have a valid data acquisition system configuration file.
     """
-
     # Resolves the path to the local Sun lab working directory.
     directory = get_working_directory()
 

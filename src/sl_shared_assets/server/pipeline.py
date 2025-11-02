@@ -1,6 +1,7 @@
 """This module provides tools used to run complex data processing pipelines on remote compute servers. A processing
 pipeline represents a higher unit of abstraction relative to the Job class, often leveraging multiple sequential or
-parallel jobs to process the data."""
+parallel jobs to process the data.
+"""
 
 import copy
 from enum import IntEnum, StrEnum
@@ -23,7 +24,7 @@ class TrackerFileNames(StrEnum):
     """Stores the names of the processing tacker .yaml files used by the Sun lab data preprocessing, processing, and
     dataset formation pipelines to track the pipeline's progress.
 
-     Notes:
+    Notes:
         The elements in this enumeration match the elements in the ProcessingPipelines enumeration, since each valid
         ProcessingPipeline instance has an associated ProcessingTracker file instance.
     """
@@ -243,7 +244,7 @@ class ProcessingTracker(YamlConfig):
 
             # Otherwise, if the pipeline is already running for the current manager process, returns without modifying
             # the tracker data.
-            elif self._running and manager_id == self._manager_id:
+            if self._running and manager_id == self._manager_id:
                 return
 
             # Otherwise, locks the pipeline for the current manager process and updates the cached tracker data
@@ -375,7 +376,8 @@ class ProcessingTracker(YamlConfig):
     @property
     def is_complete(self) -> bool:
         """Returns True if the tracker wrapped by the instance indicates that the processing pipeline has been completed
-        successfully and that the pipeline is not currently ongoing."""
+        successfully and that the pipeline is not currently ongoing.
+        """
         lock = FileLock(self._lock_path)
         with lock.acquire(timeout=10.0):
             # Loads tracker state from the .yaml file
@@ -385,7 +387,8 @@ class ProcessingTracker(YamlConfig):
     @property
     def encountered_error(self) -> bool:
         """Returns True if the tracker wrapped by the instance indicates that the processing pipeline has aborted due
-        to encountering an error."""
+        to encountering an error.
+        """
         lock = FileLock(self._lock_path)
         with lock.acquire(timeout=10.0):
             # Loads tracker state from the .yaml file
@@ -395,7 +398,8 @@ class ProcessingTracker(YamlConfig):
     @property
     def is_running(self) -> bool:
         """Returns True if the tracker wrapped by the instance indicates that the processing pipeline is currently
-        ongoing."""
+        ongoing.
+        """
         lock = FileLock(self._lock_path)
         with lock.acquire(timeout=10.0):
             # Loads tracker state from the .yaml file
@@ -460,7 +464,6 @@ class ProcessingPipeline:
 
     def __post_init__(self) -> None:
         """Carries out the necessary filesystem setup tasks to support pipeline execution."""
-
         # Ensures that the input processing tracker file name is supported.
         if self.pipeline_type not in tuple(ProcessingPipelines):
             message = (
@@ -486,7 +489,6 @@ class ProcessingPipeline:
             the final status of the pipeline (success or failure), the manager process should access the
             'status' instance property.
         """
-
         # This clause is executed the first time the method is called for the newly initialized pipeline tracker
         # instance. It submits the first batch of processing jobs (first stage) to the remote server. For one-stage
         # pipelines, this is the only time when pipeline jobs are submitted to the server.

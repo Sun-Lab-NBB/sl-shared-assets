@@ -1,7 +1,8 @@
 """This module provides classes jointly responsible for maintaining the Sun lab project data hierarchy across all
 machines used to acquire, process, and store the data. Primarily, classes from this module are used to manage the
 access to the data acquired as part of a single data acquisition session in a thread-safe and location-agnostic
-fashion."""
+fashion.
+"""
 
 import copy
 from enum import StrEnum
@@ -145,7 +146,6 @@ class RawData:
             root_directory_path: The path to the top-level directory of the session. Typically, this path is assembled
                 using the following hierarchy: root/project/animal/session_id
         """
-
         # Generates the managed paths
         self.raw_data_path = root_directory_path
         self.camera_data_path = self.raw_data_path.joinpath("camera_data")
@@ -234,7 +234,6 @@ class ProcessedData:
         This method is called each time the (wrapper) SessionData class is instantiated and allowed to generate
         missing data directories.
         """
-
         ensure_directory_exists(self.processed_data_path)
         ensure_directory_exists(self.camera_data_path)
         ensure_directory_exists(self.behavior_data_path)
@@ -278,7 +277,6 @@ class TrackingData:
         This method is called each time the (wrapper) SessionData class is instantiated and allowed to generate
         missing data directories.
         """
-
         ensure_directory_exists(self.tracking_data_path)
 
 
@@ -409,7 +407,6 @@ class SessionData(YamlConfig):
         Returns:
             An initialized SessionData instance that stores the layout of the newly created session's data.
         """
-
         # Need to convert to tuple to support Python 3.11
         if session_type not in tuple(SessionTypes):
             message = (
@@ -672,7 +669,6 @@ class SessionData(YamlConfig):
         data processing. The method is intended to only be used by the SessionData instance itself during its
         create() method runtime.
         """
-
         # Generates a copy of the original class to avoid modifying the instance that will be used for further
         # processing
         origin = copy.deepcopy(self)

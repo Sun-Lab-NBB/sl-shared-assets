@@ -1,5 +1,6 @@
 """This module provides the Command-Line Interface (CLI) for configuring major components of the Sun lab data
-workflow."""
+workflow.
+"""
 
 from pathlib import Path
 
@@ -21,7 +22,8 @@ CONTEXT_SETTINGS = dict(max_content_width=120)
 @click.group("manage", context_settings=CONTEXT_SETTINGS)
 def configure() -> None:
     """This Command-Line Interface (CLI) allows configuring major components of the Sun lab data acquisition,
-    processing, and analysis workflow, such as acquisition systems and compute server(s)."""
+    processing, and analysis workflow, such as acquisition systems and compute server(s).
+    """
 
 
 @configure.command("directory")
@@ -133,7 +135,6 @@ def generate_server_credentials_file(
     Depending on the configuration, this command generates either the 'user_credentials.yaml' or
     'service_credentials.yaml' file.
     """
-
     # Resolves the path to the local Sun lab working directory.
     output_directory = get_working_directory()
 
@@ -169,5 +170,4 @@ def generate_system_configuration_file(system: AcquisitionSystems) -> None:
     the acquisition runtime if the system uses multiple machines (PCs). Once the system configuration .yaml file is
     created via this command, edit the file to modify the acquisition system configuration at any time.
     """
-
     create_system_configuration_file(system=system)

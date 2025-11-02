@@ -1,6 +1,4 @@
-"""This module provides tools for moving the data between destinations within or across machines (PCs). All methods in
-this module expect that the destinations and sources are mounted on the host-machine file-system via the SMB or an
-equivalent protocol.
+"""This module provides the assets for moving the data between destinations available on the host-machine's filesystem.
 """
 
 import os
@@ -16,16 +14,7 @@ from .packaging_tools import calculate_directory_checksum
 
 
 def delete_directory(directory_path: Path) -> None:
-    """Removes the input directory and all its subdirectories using parallel processing.
-
-    This function outperforms default approaches like subprocess call with rm -rf and shutil rmtree for directories with
-    a comparably small number of large files. For example, this is the case for the mesoscope frame directories, which
-    are deleted ~6 times faster with this method over sh.rmtree. Potentially, it may also outperform these approaches
-    for all comparatively shallow directories.
-
-    Notes:
-        This function is often combined with the transfer_directory function to remove the source directory after
-        it has been transferred.
+    """Deletes the target directory and all its subdirectories using parallel processing.
 
     Args:
         directory_path: The path to the directory to delete.
@@ -50,7 +39,7 @@ def delete_directory(directory_path: Path) -> None:
     # an optional delay step to give Windows time to release file handles.
     max_attempts = 5
     delay_timer = PrecisionTimer("ms")
-    for attempt in range(max_attempts):
+    for _ in range(max_attempts):
         # noinspection PyBroadException
         try:
             directory_path.rmdir()
@@ -80,32 +69,34 @@ def _transfer_file(source_file: Path, source_directory: Path, destination_direct
 
 
 def transfer_directory(
-    source: Path, destination: Path, num_threads: int = 1, verify_integrity: bool = False, remove_source: bool = False
+    source: Path,
+    destination: Path,
+    num_threads: int = 1,
+    *,
+    verify_integrity: bool = False,
+    remove_source: bool = False,
 ) -> None:
-    """Copies the contents of the input directory tree from source to destination while preserving the folder
-    structure.
+    """Copies the contents of the input source directory to the destination directory while preserving the underlying
+    directory hierarchy.
 
     Notes:
         This method recreates the moved directory hierarchy on the destination if the hierarchy does not exist. This is
         done before copying the files.
 
-        The method executes a multithreading copy operation and does not by default remove the source data after the
+        The method executes a multithreaded copy operation and does not by default remove the source data after the
         copy is complete.
 
-        If the method is configured to verify transferred data integrity, it generates xxHash-128 checksum of the data
-        before and after the transfer and compares the two checksums to detect data corruption.
+        If the method is configured to verify the transferred data's integrity, it generates an xxHash-128 checksum of
+        the data before and after the transfer and compares the two checksums to detect data corruption.
 
     Args:
-        source: The path to the directory that needs to be moved.
+        source: The path to the directory to be transferred.
         destination: The path to the destination directory where to move the contents of the source directory.
-        num_threads: The number of threads to use for parallel file transfer. This number should be set depending on the
-            type of transfer (local or remote) and is not guaranteed to provide improved transfer performance. For local
-            transfers, setting this number above 1 will likely provide a performance boost. For remote transfers using
-            a single TCP / IP socket (such as non-multichannel SMB protocol), the number should be set to 1. Setting
-            this value to a number below 1 instructs the function to use all available CPU cores.
+        num_threads: The number of threads to use for the parallel file transfer. Setting this value to a number below
+            1 instructs the function to use all available CPU threads.
         verify_integrity: Determines whether to perform integrity verification for the transferred files.
-        remove_source: Determines whether to remove the source directory and all of its contents after the transfer is
-            complete and optionally verified.
+        remove_source: Determines whether to remove the source directory after the transfer is complete and
+            (optionally) verified.
 
     Raises:
         RuntimeError: If the transferred files do not pass the xxHas3-128 checksum integrity verification.
@@ -117,10 +108,7 @@ def transfer_directory(
     # If the number of threads is less than 1, interprets this as a directive to use all available CPU cores.
     if num_threads < 1:
         cpu_count = os.cpu_count()
-        if cpu_count is not None:
-            num_threads = cpu_count
-        else:
-            num_threads = 1
+        num_threads = cpu_count if cpu_count is not None else 1
 
     # If transfer integrity verification is enabled, but the source directory does not contain the 'ax_checksum.txt'
     # file, checksums the directory before the transfer operation.
@@ -171,7 +159,7 @@ def transfer_directory(
                 f"Checksum mismatch detected when transferring {Path(*source.parts[-6:])} to "
                 f"{Path(*destination.parts[-6:])}! The data was likely corrupted in transmission."
             )
-            if not destination_checksum == local_checksum.readline().strip():
+            if destination_checksum != local_checksum.readline().strip():
                 console.error(message=message, error=RuntimeError)
 
     # If necessary, removes the transferred directory from the original location.

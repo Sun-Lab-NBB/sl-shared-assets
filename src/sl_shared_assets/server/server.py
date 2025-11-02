@@ -12,7 +12,6 @@ from dataclasses import field, dataclass
 import paramiko
 
 # noinspection PyProtectedMember
-from simple_slurm import Slurm  # type: ignore
 from ataraxis_time import PrecisionTimer
 from paramiko.client import SSHClient
 from ataraxis_base_utilities import LogLevel, console
@@ -106,7 +105,6 @@ class ServerCredentials(YamlConfig):
 
     def __post_init__(self) -> None:
         """Statically resolves the paths to end-point directories using provided root directories."""
-
         # Shared Sun Lab directories statically use 'sun_data' root names
         self.raw_data_root = str(Path(self.storage_root).joinpath(self.shared_directory_name))
         self.processed_data_root = str(Path(self.working_root).joinpath(self.shared_directory_name))
@@ -225,7 +223,6 @@ class Server:
             TimeoutError: If the target Jupyter server doesn't start within 120 minutes of this method being called.
             RuntimeError: If the job submission fails for any reason.
         """
-
         # Statically configures the working directory to be stored under:
         # user working root / job_logs / job_name_timestamp
         timestamp = get_timestamp()
@@ -392,7 +389,6 @@ class Server:
             ValueError: If the input Job object does not contain a valid job_id, suggesting that it has not been
                 submitted to the server.
         """
-
         if job.job_id is None:
             message = (
                 f"The input Job object for the job {job.job_name} does not contain a valid job_id. This indicates that "
@@ -405,8 +401,7 @@ class Server:
 
         if job.job_id not in self._client.exec_command(f"squeue -j {job.job_id}")[1].read().decode().strip():
             return True
-        else:
-            return False
+        return False
 
     def abort_job(self, job: Job | JupyterJob) -> None:
         """Aborts the target job if it is currently running on the server.
@@ -418,7 +413,6 @@ class Server:
         Args:
             job: The Job object that needs to be aborted.
         """
-
         # Sends the 'scancel' command to the server targeting the specific Job via ID, unless the job is already
         # complete
         if not self.job_complete(job):
@@ -628,7 +622,6 @@ class Server:
 
     def exists(self, remote_path: Path) -> bool:
         """Returns True if the target file or directory exists on the remote server."""
-
         sftp = self._client.open_sftp()
         try:
             # Checks if the target file or directory exists by trying to 'stat' it
@@ -668,13 +661,15 @@ class Server:
     @property
     def user_data_root(self) -> Path:
         """Returns the absolute path to the directory used to store user-specific data on the server accessible through
-        this class."""
+        this class.
+        """
         return Path(self._credentials.user_data_root)
 
     @property
     def user_working_root(self) -> Path:
         """Returns the absolute path to the user-specific working (fast) directory on the server accessible through
-        this class."""
+        this class.
+        """
         return Path(self._credentials.user_working_root)
 
     @property

@@ -1,5 +1,6 @@
 """This module provides the Command-Line Interfaces (CLIs) for managing Sun lab sessions and projects. Most of these
-CLIs are intended to run on the remote compute server and should not be used by end-users directly."""
+CLIs are intended to run on the remote compute server and should not be used by end-users directly.
+"""
 
 from typing import Any
 from pathlib import Path
@@ -79,7 +80,8 @@ def manage_session(
     """This group provides commands for managing the data of a Sun lab data acquisition session.
 
     Commands from this group are used to support data processing and dataset-formation (forging) on remote compute
-    servers."""
+    servers.
+    """
     ctx.ensure_object(dict)
     ctx.obj["session_path"] = session_path
     ctx.obj["processed_data_root"] = processed_data_root
@@ -100,7 +102,6 @@ def lock_session(ctx: Any) -> None:
     'session' command group and, if this flag is present, forcibly resets the session lock file before re-acquiring it
     for the specified manager process.
     """
-
     # Extracts shared parameters from context
     session_path = ctx.obj["session_path"]
     processed_data_root = ctx.obj["processed_data_root"]
@@ -125,7 +126,6 @@ def unlock_session(ctx: Any) -> None:
     the session's data. This command can only be called from the same manager process used to acquire the
     session's data lock.
     """
-
     # Extracts shared parameters from context
     session_path = ctx.obj["session_path"]
     processed_data_root = ctx.obj["processed_data_root"]
@@ -159,7 +159,6 @@ def resolve_session_checksum(ctx: Any, recalculate_checksum: bool) -> None:
     integrity of the session's data as it is transferred from data acquisition systems to long-term storage
     destinations.
     """
-
     # Extracts shared parameters from context
     session_path = ctx.obj["session_path"]
     processed_data_root = ctx.obj["processed_data_root"]
@@ -251,7 +250,8 @@ def manage_project(ctx: Any, project_path: Path, processed_data_root: Path | Non
     """This group provides commands for managing the data of a Sun lab project.
 
     Commands from this group are used to support all interactions with the data stored on the Sun lab remote compute
-    server(s)."""
+    server(s).
+    """
     ctx.ensure_object(dict)
     ctx.obj["project_path"] = project_path
     ctx.obj["processed_data_root"] = processed_data_root

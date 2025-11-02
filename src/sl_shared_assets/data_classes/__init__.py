@@ -1,6 +1,7 @@
 """This package provides the classes used to store data acquired in the Sun lab and to configure all elements and
 pipelines making up the lab's data workflow. Many classes from this package are designed to be saved to disk as .yaml
-files and restored from the .yaml files as needed."""
+files and restored from the .yaml files as needed.
+"""
 
 from .runtime_data import (
     ZaberPositions,
@@ -29,8 +30,8 @@ from .surgery_data import (
 )
 from .configuration_data import (
     MesoscopePaths,
-    ExperimentState,
-    ExperimentTrial,
+    MesoscopeExperimentState,
+    MesoscopeExperimentTrial,
     MesoscopeCameras,
     AcquisitionSystems,
     MesoscopeMicroControllers,
@@ -47,8 +48,8 @@ from .configuration_data import (
 __all__ = [
     "AcquisitionSystems",
     "DrugData",
-    "ExperimentState",
-    "ExperimentTrial",
+    "MesoscopeExperimentState",
+    "MesoscopeExperimentTrial",
     "ImplantData",
     "InjectionData",
     "LickTrainingDescriptor",

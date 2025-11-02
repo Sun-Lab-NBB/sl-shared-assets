@@ -112,6 +112,15 @@ lint.select = ["ALL"]
 
 # General ignore directives
 lint.ignore = [
+    "W291",  # Conflicts with docstring formatting
+    "TID252",  # Relative imports are important for the correct asset management in this library
+    "BLE001", # Catching b lind excepts is required for some library functionalities
+    "ANN401",  # While suboptimal, ANY is a helpful type when used with caution
+    "C901",  # Sometimes complex functions are necessary
+    "PLR0913",  # Sometimes complex functions are necessary
+    "PLR0912",  # Sometimes complex functions are necessary
+    "PLR0915",  # Sometimes complex type defenitions are necessary
+    "PLR0911", # Sometimes complex return graphs are necessary
     "COM812", # Conflicts with the formatter
     "ISC001", # Conflicts with the formatter
     "PT001", # https://github.com/astral-sh/ruff/issues/8796#issuecomment-182590771
@@ -174,3 +183,15 @@ source = ["src/", ".tox/*/lib/python*/site-packages/"]
 # Same as above, specifies the output directory for the coverage .html report
 [tool.coverage.html]
 directory = "reports/coverage_html"
+
+# Specifies additional ignore directives
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "def __del__",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+]

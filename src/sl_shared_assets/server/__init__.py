@@ -1,5 +1,6 @@
 """This package provides the classes and methods used by all Sun lab libraries to work with the data stored on remote
-compute servers."""
+compute servers.
+"""
 
 from .job import Job, JupyterJob
 from .server import Server, ServerCredentials, generate_server_credentials
