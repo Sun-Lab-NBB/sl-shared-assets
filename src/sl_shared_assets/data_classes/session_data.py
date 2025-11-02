@@ -424,10 +424,10 @@ class SessionData(YamlConfig):
         acquisition_system = get_system_configuration_data()
 
         # Constructs the root session directory path
-        session_path = acquisition_system.paths.root_directory.joinpath(project_name, animal_id, session_name)
+        session_path = acquisition_system.filesystem.root_directory.joinpath(project_name, animal_id, session_name)
 
         # Prevents creating new sessions for non-existent projects.
-        if not acquisition_system.paths.root_directory.joinpath(project_name).exists():
+        if not acquisition_system.filesystem.root_directory.joinpath(project_name).exists():
             message = (
                 f"Unable to create the session directory hierarchy for the session {session_name} of the animal "
                 f"'{animal_id}' and project '{project_name}'. The project does not exist on the local machine (PC). "
@@ -441,7 +441,7 @@ class SessionData(YamlConfig):
         while session_path.exists():
             counter += 1
             new_session_name = f"{session_name}_{counter}"
-            session_path = acquisition_system.paths.root_directory.joinpath(project_name, animal_id, new_session_name)
+            session_path = acquisition_system.filesystem.root_directory.joinpath(project_name, animal_id, new_session_name)
 
         # If a conflict is detected and resolved, warns the user about the resolved conflict.
         if counter > 0:
@@ -508,7 +508,7 @@ class SessionData(YamlConfig):
 
         if experiment_name is not None:
             # Copies the experiment_configuration.yaml file to the session's folder
-            experiment_configuration_path = acquisition_system.paths.root_directory.joinpath(
+            experiment_configuration_path = acquisition_system.filesystem.root_directory.joinpath(
                 project_name, "configuration", f"{experiment_name}.yaml"
             )
             sh.copy2(experiment_configuration_path, instance.raw_data.experiment_configuration_path)

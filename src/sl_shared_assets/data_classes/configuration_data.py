@@ -69,97 +69,58 @@ class MesoscopeExperimentTrial:
 class MesoscopeExperimentConfiguration(YamlConfig):
     """Stores the configuration of an experiment session that uses the Mesoscope_VR data acquisition system."""
 
-    cue_map: dict[int, float] = field(default_factory=lambda: {0: 30.0, 1: 30.0, 2: 30.0, 3: 30.0, 4: 30.0})
+    cue_map: dict[int, float]
     """Maps each integer-code associated with the experiment's Virtual Reality (VR) environment wall 
     cue to its length in centimeters."""
-    cue_offset_cm: float = 10.0
-    """Specifies the animal's starting position at the onset of the experiment relative to the Virtual Reality (VR) 
-    environment's cue sequence origin, in centimeters."""
-    unity_scene_name: str = "IvanScene"
+    cue_offset_cm: float
+    """Specifies the offset of the animal's starting position relative to the Virtual Reality (VR) environment's cue 
+    sequence origin, in centimeters."""
+    unity_scene_name: str
     """The name of the Virtual Reality task (Unity Scene) used during the experiment."""
-    experiment_states: dict[str, MesoscopeExperimentState] = field(
-        default_factory=lambda: {
-            "baseline": MesoscopeExperimentState(
-                experiment_state_code=1,
-                system_state_code=1,
-                state_duration_s=30,
-                initial_guided_trials=0,
-                recovery_failed_trial_threshold=0,
-                recovery_guided_trials=0,
-            ),
-            "experiment": MesoscopeExperimentState(
-                experiment_state_code=2,
-                system_state_code=2,
-                state_duration_s=120,
-                initial_guided_trials=3,
-                recovery_failed_trial_threshold=6,
-                recovery_guided_trials=3,
-            ),
-            "cooldown": MesoscopeExperimentState(
-                experiment_state_code=3,
-                system_state_code=1,
-                state_duration_s=15,
-                initial_guided_trials=1000000,
-                recovery_failed_trial_threshold=0,
-                recovery_guided_trials=0,
-            ),
-        }
-    )
+    experiment_states: dict[str, MesoscopeExperimentState]
     """Defines the experiment's flow by specifying the sequence of experiment and data acquisition system states 
     executed during runtime."""
-    trial_structures: dict[str, MesoscopeExperimentTrial] = field(
-        default_factory=lambda: {
-            "cyclic_4_cue": MesoscopeExperimentTrial(
-                cue_sequence=[1, 0, 2, 0, 3, 0, 4, 0],
-                trial_length_cm=240.0,
-                trial_reward_size_ul=5.0,
-                reward_zone_start_cm=208.0,
-                reward_zone_end_cm=222.0,
-                guidance_trigger_location_cm=208.0,
-            )
-        }
-    )
+    trial_structures: dict[str, MesoscopeExperimentTrial]
     """Defines experiment's structure by specifying the types of trials used by the phases (states) of the 
     experiment."""
 
 
 @dataclass()
-class MesoscopePaths:
-    """Stores the filesystem configuration parameters for the Mesoscope-VR data acquisition system."""
-
-    google_credentials_path: Path = Path("/media/Data/Experiments/sl-surgery-log-0f651e492767.json")
-    """
-    The absolute path to the locally stored .JSON file that contains the service account credentials used to read and 
-    write Google Sheet data. This is used to access and work with the Google Sheet files used in the Sun lab.
-    """
-    root_directory: Path = Path("/media/Data/Experiments")
+class MesoscopeFileSystem:
+    """Stores the filesystem configuration of the Mesoscope-VR data acquisition system."""
+    root_directory: Path = Path()
     """The absolute path to the directory where all projects are stored on the main data acquisition system PC."""
-    server_directory: Path = Path("/home/cybermouse/server/storage/sun_data")
-    """The absolute path to the local-filesystem-mounted directory where the raw data from all projects is stored on 
-    the remote compute server."""
-    nas_directory: Path = Path("/home/cybermouse/nas/rawdata")
-    """The absolute path to the local-filesystem-mounted directory where the raw data from all projects is stored on 
-    the NAS (backup long-term storage destination)."""
-    mesoscope_directory: Path = Path("/home/cybermouse/scanimage/mesodata")
-    """The absolute path to the root ScanImagePC (mesoscope-connected PC) local-filesystem-mounted directory where all 
-    mesoscope-acquired data is aggregated during acquisition."""
+    server_directory: Path = Path()
+    """The absolute path to the local-filesystem-mounted directory where all projects are stored on the remote compute 
+    server's storage volume."""
+    nas_directory: Path = Path()
+    """The absolute path to the local-filesystem-mounted directory where all projects are stored on the NAS backup 
+    storage volume."""
+    mesoscope_directory: Path = Path()
+    """The absolute path to the local-filesystem-mounted directory where all Mesoscope-acquired data is aggregated 
+    during acquisition by the PC that manages the Mesoscope during runtime."""
 
 
 @dataclass()
-class MesoscopeSheets:
-    """Stores the identifiers for the Google Sheet files used by the Mesoscope-VR data acquisition system."""
+class MesoscopeGoogleSheets:
+    """Stores the identifiers and access credentials for the Google Sheets used by the Mesoscope-VR data
+    acquisition system."""
 
+    google_credentials_path: Path = Path()
+    """The absolute path to the .JSON file that contains the credentials of the service account used to access and work 
+    with the Google Sheets used in the Sun lab.
+    """
     surgery_sheet_id: str = ""
-    """The ID of the Google Sheet file that stores information about surgical interventions performed on the animals 
+    """The identifier of the Google Sheet that stores information about surgical interventions performed on the animals 
     that participate in data acquisition sessions."""
     water_log_sheet_id: str = ""
-    """The ID of the Google Sheet file that stores information about water restriction and user-interaction for all 
+    """The identifier of the Google Sheet that stores information about water restriction and handling for all 
     animals that participate in data acquisition sessions."""
 
 
 @dataclass()
 class MesoscopeCameras:
-    """Stores the configuration parameters for the cameras used by the Mesoscope-VR system to record behavior videos."""
+    """Stores the video camera configuration of the Mesoscope-VR data acquisition system."""
 
     face_camera_index: int = 0
     """The index of the face camera in the list of all available Harvester-managed cameras."""
@@ -179,7 +140,7 @@ class MesoscopeCameras:
 
 @dataclass()
 class MesoscopeMicroControllers:
-    """Stores the configuration parameters for the microcontrollers used by the Mesoscope-VR system."""
+    """Stores the microcontroller configuration of the Mesoscope-VR data acquisition system."""
 
     actor_port: str = "/dev/ttyACM0"
     """The USB port used by the Actor Microcontroller."""
@@ -188,30 +149,25 @@ class MesoscopeMicroControllers:
     encoder_port: str = "/dev/ttyACM2"
     """The USB port used by the Encoder Microcontroller."""
     debug: bool = False
-    """Determines whether the acquisition system is running in the 'debug mode'. This mode is used during the initial 
-    system calibration and testing. It should be disabled during all non-testing sessions to maximize system's 
-    runtime performance."""
-    minimum_break_strength_g_cm: float = 43.2047
-    """The minimum torque applied by the running wheel break in gram centimeter. This is the torque the break delivers 
-    at minimum operational voltage."""
-    maximum_break_strength_g_cm: float = 1152.1246
-    """The maximum torque applied by the running wheel break in gram centimeter. This is the torque the break delivers 
-    at maximum operational voltage."""
+    """Determines whether the acquisition system is running in the 'debug' mode. This mode should be disabled for all 
+    production runtimes."""
+    minimum_brake_strength_g_cm: float = 43.2047
+    """The torque applied by the running wheel brake at the minimum operational voltage, in gram centimeter."""
+    maximum_brake_strength_g_cm: float = 1152.1246
+    """The torque applied by the running wheel brake at the maximum operational voltage, in gram centimeter."""
     wheel_diameter_cm: float = 15.0333
     """The diameter of the running wheel, in centimeters."""
-    lick_threshold_adc: int = 400
+    lick_threshold_adc: int = 600
     """The threshold voltage, in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC), interpreted 
-    as the animal's tongue contacting the sensor."""
+    as the animal's tongue contacting the lick sensor."""
     lick_signal_threshold_adc: int = 300
     """The minimum voltage, in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC), reported to the
-    PC as a non-zero value. Voltages below this level are interpreted as 'no-lick' noise and are always pulled to 0."""
+    PC as a non-zero value. Voltages below this level are interpreted as 'no-lick' noise and are pulled to 0."""
     lick_delta_threshold_adc: int = 300
-    """The minimum absolute difference in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC) for 
-    the change to be reported to the PC."""
-    lick_averaging_pool_size: int = 1
-    """The number of lick sensor readouts to average together to produce the final lick sensor readout value. Note, 
-    when using a Teensy controller, this number is multiplied by the built-in analog readout averaging (default is 4).
-    """
+    """The minimum absolute difference between two consecutive lick sensor readouts, in raw analog units recorded by a 
+    12-bit Analog-to-Digital-Converter (ADC), for the change to be reported to the PC."""
+    lick_averaging_pool_size: int = 2
+    """The number of lick sensor readouts to average together to produce the final lick sensor readout value."""
     torque_baseline_voltage_adc: int = 2046
     """The voltage level, in raw analog units measured by a 12-bit Analog-to-Digital-Converter (ADC) after the AD620 
     amplifier, that corresponds to no torque (0) readout."""
@@ -221,71 +177,58 @@ class MesoscopeMicroControllers:
     torque_sensor_capacity_g_cm: float = 720.0779
     """The maximum torque detectable by the sensor, in grams centimeter (g cm)."""
     torque_report_cw: bool = True
-    """Determines whether the sensor should report torque in the Clockwise (CW) direction. This direction corresponds 
-    to the animal trying to move forward on the wheel."""
+    """Determines whether the torque sensor should report torques in the Clockwise (CW) direction."""
     torque_report_ccw: bool = True
-    """Determines whether the sensor should report torque in the Counter-Clockwise (CCW) direction. This direction 
-    corresponds to the animal trying to move backward on the wheel."""
+    """Determines whether the sensor should report torque in the Counter-Clockwise (CCW) direction."""
     torque_signal_threshold_adc: int = 100
     """The minimum voltage, in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC), reported to the
-    PC as a non-zero value. Voltages below this level are interpreted as noise and are always pulled to 0."""
+    PC as a non-zero value. Voltages below this level are interpreted as noise and are pulled to 0."""
     torque_delta_threshold_adc: int = 70
-    """The minimum absolute difference in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC) for 
-    the change to be reported to the PC."""
-    torque_averaging_pool_size: int = 1
-    """The number of torque sensor readouts to average together to produce the final torque sensor readout value. Note, 
-    when using a Teensy controller, this number is multiplied by the built-in analog readout averaging (default is 4).
-    """
+    """The minimum absolute difference between two consecutive torque sensor readouts, in raw analog units recorded by 
+    a 12-bit Analog-to-Digital-Converter (ADC), for the change to be reported to the PC."""
+    torque_averaging_pool_size: int = 4
+    """The number of torque sensor readouts to average together to produce the final torque sensor readout value."""
     wheel_encoder_ppr: int = 8192
-    """The resolution of the managed quadrature encoder, in Pulses Per Revolution (PPR). This is the number of 
-    quadrature pulses the encoder emits per full 360-degree rotation."""
+    """The resolution of the wheel's quadrature encoder, in Pulses Per Revolution (PPR)."""
     wheel_encoder_report_cw: bool = False
-    """Determines whether to report encoder rotation in the CW (negative) direction. This corresponds to the animal 
-    moving backward on the wheel."""
+    """Determines whether the encoder should report rotation in the Clockwise (CW) direction."""
     wheel_encoder_report_ccw: bool = True
-    """Determines whether to report encoder rotation in the CCW (positive) direction. This corresponds to the animal 
-    moving forward on the wheel."""
+    """Determines whether the encoder should report rotation in the CounterClockwise (CCW) direction."""
     wheel_encoder_delta_threshold_pulse: int = 15
-    """The minimum difference, in encoder pulse counts, between two encoder readouts for the change to be reported to 
-    the PC."""
+    """The minimum absolute difference between two consecutive encoder readouts, in encoder pulse counts, for the 
+    change to be reported to the PC."""
     wheel_encoder_polling_delay_us: int = 500
-    """The delay, in microseconds, between any two successive encoder state readouts."""
+    """The delay, in microseconds, between consecutive encoder state readouts."""
     cm_per_unity_unit: float = 10.0
-    """The length of each Unity 'unit' in real-world centimeters recorded by the running wheel encoder."""
+    """The length of each Virtual Reality (VR) environment's distance 'unit' (Unity unit) in real-world centimeters."""
     screen_trigger_pulse_duration_ms: int = 500
-    """The duration of the HIGH phase of the TTL pulse used to toggle the VR screens between ON and OFF states."""
+    """The duration, in milliseconds, of the TTL pulse used to toggle the VR screen power state."""
     auditory_tone_duration_ms: int = 300
-    """The time, in milliseconds, to sound the auditory tone when water rewards are delivered to the animal."""
+    """The duration, in milliseconds, of the auditory tone emitted when water rewards are delivered to the animal."""
     valve_calibration_pulse_count: int = 200
-    """The number of times to cycle opening and closing (pulsing) the valve during each calibration runtime. This 
-    determines how many reward deliveries are used at each calibrated time-interval to produce the average dispensed 
-    water volume readout used to calibrate the valve."""
+    """The number of times to pulse the valve during each calibration runtime."""
     sensor_polling_delay_ms: int = 1
-    """The delay, in milliseconds, between any two successive readouts of any sensor other than the encoder. Note, the 
-    encoder uses a dedicated parameter, as the encoder needs to be sampled at a higher frequency than all other sensors.
-    """
+    """The delay, in milliseconds, between any two successive readouts of any sensor other than the encoder."""
     valve_calibration_data: dict[int | float, int | float] | tuple[tuple[int | float, int | float], ...] = (
         (15000, 1.10),
         (30000, 3.00),
         (45000, 6.25),
         (60000, 10.90),
     )
-    """A tuple of tuples that maps water delivery solenoid valve open times, in microseconds, to the dispensed volume 
-    of water, in microliters. During training and experiment runtimes, this data is used by the ValveModule to translate
-    the requested reward volumes into times the valve needs to be open to deliver the desired volume of water.
-    """
+    """Maps water delivery solenoid valve open times, in microseconds, to the dispensed volumes of water, in 
+    microliters."""
 
 
 @dataclass()
-class MesoscopeAdditionalFirmware:
-    """Stores the configuration parameters for all firmware and hardware components not assembled in the Sun lab."""
+class MesoscopeExternalAssets:
+    """Stores third-party asset configuration of the Mesoscope-VR data acquisition system."""
 
     headbar_port: str = "/dev/ttyUSB0"
-    """The USB port used by the HeadBar Zaber motor controllers (devices)."""
+    """The USB port used by the HeadBar Zaber motor controllers."""
     lickport_port: str = "/dev/ttyUSB1"
-    """The USB port used by the LickPort Zaber motor controllers (devices)."""
+    """The USB port used by the LickPort Zaber motor controllers."""
     wheel_port: str = "/dev/ttyUSB2"
-    """The USB port used by the (running) Wheel Zaber motor controllers (devices)."""
+    """The USB port used by the Wheel Zaber motor controllers."""
     unity_ip: str = "127.0.0.1"
     """The IP address of the MQTT broker used to communicate with the Unity game engine."""
     unity_port: int = 1883
@@ -294,41 +237,33 @@ class MesoscopeAdditionalFirmware:
 
 @dataclass()
 class MesoscopeSystemConfiguration(YamlConfig):
-    """Stores the hardware and filesystem configuration parameters for the Mesoscope-VR data acquisition system.
-
-    This class is specifically designed to encapsulate the configuration parameters for the Mesoscope-VR system. It
-    expects the system to be configured according to the specifications outlined in the sl-experiment repository
-    (https://github.com/Sun-Lab-NBB/sl-experiment) and should be used exclusively on the VRPC machine
-    (main Mesoscope-VR PC).
+    """Defines the hardware and software configuration for all assets used by the Mesoscope-VR data acquisition system.
     """
 
     name: str = str(AcquisitionSystems.MESOSCOPE_VR)
-    """Stores the descriptive name of the data acquisition system."""
-    paths: MesoscopePaths = field(default_factory=MesoscopePaths)
-    """Stores the filesystem configuration parameters for the Mesoscope-VR data acquisition system."""
-    sheets: MesoscopeSheets = field(default_factory=MesoscopeSheets)
-    """Stores the IDs of Google Sheets used by the Mesoscope-VR data acquisition system."""
+    """The descriptive name of the data acquisition system."""
+    filesystem: MesoscopeFileSystem = field(default_factory=MesoscopeFileSystem)
+    """Stores the filesystem configuration."""
+    sheets: MesoscopeGoogleSheets = field(default_factory=MesoscopeGoogleSheets)
+    """Stores the identifiers and access credentials for the Google Sheets."""
     cameras: MesoscopeCameras = field(default_factory=MesoscopeCameras)
-    """Stores the configuration parameters for the cameras used by the Mesoscope-VR system to record behavior videos."""
+    """Stores the video cameras configuration."""
     microcontrollers: MesoscopeMicroControllers = field(default_factory=MesoscopeMicroControllers)
-    """Stores the configuration parameters for the microcontrollers used by the Mesoscope-VR system."""
-    additional_firmware: MesoscopeAdditionalFirmware = field(default_factory=MesoscopeAdditionalFirmware)
-    """Stores the configuration parameters for all firmware and hardware components not assembled in the Sun lab."""
+    """Stores the microcontrollers configuration."""
+    assets: MesoscopeExternalAssets = field(default_factory=MesoscopeExternalAssets)
+    """Stores the third-party hardware and firmware assets configuration."""
 
     def __post_init__(self) -> None:
-        """Ensures that variables converted to different types for storage purposes are always set to expected types
-        upon class instantiation.
-        """
-        # Converts all paths loaded as strings to Path objects used inside the library
-        self.paths.google_credentials_path = Path(self.paths.google_credentials_path)
-        self.paths.root_directory = Path(self.paths.root_directory)
-        self.paths.server_directory = Path(self.paths.server_directory)
-        self.paths.server_working_directory = Path(self.paths.server_working_directory)
-        self.paths.nas_directory = Path(self.paths.nas_directory)
-        self.paths.mesoscope_directory = Path(self.paths.mesoscope_directory)
-        self.paths.harvesters_cti_path = Path(self.paths.harvesters_cti_path)
+        """Ensures that all instance assets are stored as the expected types."""
 
-        # Converts valve_calibration data from a dictionary to a tuple of tuples format
+        # Restores Path objects from strings.
+        self.sheets.google_credentials_path = Path(self.sheets.google_credentials_path)
+        self.filesystem.root_directory = Path(self.filesystem.root_directory)
+        self.filesystem.server_directory = Path(self.filesystem.server_directory)
+        self.filesystem.nas_directory = Path(self.filesystem.nas_directory)
+        self.filesystem.mesoscope_directory = Path(self.filesystem.mesoscope_directory)
+
+        # Converts valve_calibration data from a dictionary to a tuple of tuples.
         if not isinstance(self.microcontrollers.valve_calibration_data, tuple):
             self.microcontrollers.valve_calibration_data = tuple(
                 (k, v) for k, v in self.microcontrollers.valve_calibration_data.items()
@@ -352,27 +287,20 @@ class MesoscopeSystemConfiguration(YamlConfig):
             console.error(message=message, error=TypeError)
 
     def save(self, path: Path) -> None:
-        """Saves class instance data to disk as a .yaml file.
-
-        This method converts certain class variables to yaml-safe types (for example, Path objects -> strings) and
-        saves class data to disk as a .yaml file. The method is intended to be used solely by the
-        create_system_configuration_file() function and should not be called from any other context.
+        """Saves the instance's data to disk as a .YAML file.
 
         Args:
-            path: The path to the .yaml file to save the data to.
+            path: The path to the .YAML file to save the data to.
         """
         # Copies instance data to prevent it from being modified by reference when executing the steps below
         original = deepcopy(self)
 
-        # Converts all Path objects to strings before dumping the data, as .yaml encoder does not properly recognize
-        # Path objects
-        original.paths.google_credentials_path = str(original.paths.google_credentials_path)  # type: ignore
-        original.paths.root_directory = str(original.paths.root_directory)  # type: ignore
-        original.paths.server_directory = str(original.paths.server_directory)  # type: ignore
-        original.paths.server_working_directory = str(original.paths.server_working_directory)  # type: ignore
-        original.paths.nas_directory = str(original.paths.nas_directory)  # type: ignore
-        original.paths.mesoscope_directory = str(original.paths.mesoscope_directory)  # type: ignore
-        original.paths.harvesters_cti_path = str(original.paths.harvesters_cti_path)  # type: ignore
+        # Converts all Path objects to strings before dumping the data, as .YAML encoder does not recognize Path objects
+        original.sheets.google_credentials_path = str(original.sheets.google_credentials_path)
+        original.filesystem.root_directory = str(original.filesystem.root_directory)
+        original.filesystem.server_directory = str(original.filesystem.server_directory)
+        original.filesystem.nas_directory = str(original.filesystem.nas_directory)
+        original.filesystem.mesoscope_directory = str(original.filesystem.mesoscope_directory)
 
         # Converts valve calibration data into dictionary format
         if isinstance(original.microcontrollers.valve_calibration_data, tuple):
@@ -387,19 +315,10 @@ class MesoscopeSystemConfiguration(YamlConfig):
 def set_working_directory(path: Path) -> None:
     """Sets the specified directory as the Sun lab working directory for the local machine (PC).
 
-    This function is used as the first step for configuring any machine to work with the data stored on the remote
-    compute server(s). All lab libraries use this directory for caching configuration data and runtime working
-    (intermediate) data.
-
     Notes:
-        The path to the working directory is stored inside the user's data directory so that all Sun lab libraries can
-        automatically access and use the same working directory.
+        This function caches the path to the working directory to the user's data directory.
 
-        If the input path does not point to an existing directory, the function will automatically generate the
-        requested directory.
-
-        After setting up the working directory, the user should use other commands from the 'sl-configure' CLI to
-        generate the remote compute server access credentials and / or acquisition system configuration files.
+        If the input path does not point to an existing directory, the function creates the requested directory.
 
     Args:
         path: The path to the directory to set as the local Sun lab working directory.
@@ -428,36 +347,15 @@ def set_working_directory(path: Path) -> None:
     with path_file.open("w") as f:
         f.write(str(path))
 
-    if not path.joinpath("user_credentials.yaml").exists():
-        message = (
-            f"Unable to locate the 'user_credentials.yaml' file in the Sun lab working directory {path}. Call the "
-            f"'sl-configure server' CLI command to create the user server access credentials file. Note, all users "
-            f"need to have a valid user credentials file to work with the data stored on the remote server."
-        )
-        console.echo(message=message, level=LogLevel.WARNING)
-
-    if not path.joinpath("service_credentials.yaml").exists():
-        message = (
-            f"Unable to locate the 'service_credentials.yaml' file in the Sun lab working directory {path}. If you "
-            f"intend to work with the remote compute server in the 'service' mode, use the 'sl-configure server -s' "
-            f"CLI command to create the service server access credentials file. Note, most lab users should skip this "
-            f"step, all intended interactions with teh server can be carried out via the user access mode."
-        )
-        console.echo(message=message, level=LogLevel.WARNING)
-
 
 def get_working_directory() -> Path:
     """Resolves and returns the path to the local Sun lab working directory.
-
-    This service function is primarily used when working with Sun lab data stored on remote compute server(s) to
-    establish local working directories for various jobs and pipelines.
 
     Returns:
         The path to the local working directory.
 
     Raises:
-        FileNotFoundError: If the local machine does not have the Sun lab data directory, or the local working
-            directory does not exist (has not been configured).
+        FileNotFoundError: If the local working directory for the local machine has not been configured.
     """
     # Uses appdirs to locate the user data directory and resolve the path to the configuration file
     app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
@@ -529,7 +427,7 @@ def get_credentials_file_path(service: bool = False) -> Path:
             console.error(message=message, error=FileNotFoundError)
             raise FileNotFoundError(message)  # Fallback to appease mypy, should not be reachable
 
-        credentials: ServerCredentials = ServerCredentials.from_yaml(file_path=service_path)  # type: ignore
+        credentials: ServerCredentials = ServerCredentials.from_yaml(file_path=service_path)  
 
         # If the service account is not configured, aborts with an error.
         if credentials.username == "YourNetID" or credentials.password == "YourPassword":
@@ -556,7 +454,7 @@ def get_credentials_file_path(service: bool = False) -> Path:
         raise FileNotFoundError(message)  # Fallback to appease mypy, should not be reachable
 
     # Otherwise, evaluates the user credentials file.
-    credentials: ServerCredentials = ServerCredentials.from_yaml(file_path=user_path)  # type: ignore
+    credentials: ServerCredentials = ServerCredentials.from_yaml(file_path=user_path)  
 
     # If the user account is not configured, aborts with an error.
     if credentials.username == "YourNetID" or credentials.password == "YourPassword":
@@ -683,4 +581,4 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
 
     # Loads and return the configuration data
     configuration_class = _supported_configuration_files[file_name]
-    return configuration_class.from_yaml(file_path=configuration_file)  # type: ignore
+    return configuration_class.from_yaml(file_path=configuration_file)  

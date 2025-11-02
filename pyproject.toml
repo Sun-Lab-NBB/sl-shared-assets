@@ -55,7 +55,6 @@ dependencies = [
     "polars>=1,<2",
     "pyarrow>=22,<23",
     "filelock>=3,<4",
-    "pytz>=2025,<2026",
 ]
 
 [project.urls]
@@ -80,7 +79,6 @@ dev = [
     "types-tqdm>=4,<5",
     "types-paramiko>=4,<5",
     "types-filelock>=3,<4",
-    "types-pytz>=2025,<2026",
     "types-xxhash>=3,<4",
 ]
 

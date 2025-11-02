@@ -19,7 +19,7 @@ from ..data_classes import (
 CONTEXT_SETTINGS = dict(max_content_width=120)
 
 
-@click.group("manage", context_settings=CONTEXT_SETTINGS)
+@click.group("configure", context_settings=CONTEXT_SETTINGS)
 def configure() -> None:
     """This Command-Line Interface (CLI) allows configuring major components of the Sun lab data acquisition,
     processing, and analysis workflow, such as acquisition systems and compute server(s).

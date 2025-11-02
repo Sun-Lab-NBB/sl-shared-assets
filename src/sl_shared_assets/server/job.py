@@ -13,7 +13,7 @@ import datetime
 from dataclasses import dataclass
 
 # noinspection PyProtectedMember
-from simple_slurm import Slurm  # type: ignore
+from simple_slurm import Slurm
 from ataraxis_base_utilities import LogLevel, console
 
 
