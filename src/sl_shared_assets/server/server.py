@@ -19,6 +19,7 @@ from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
 
 from .job import Job, JupyterJob
+from ..data_classes.configuration_data import get_working_directory
 
 
 def generate_server_credentials(
@@ -70,6 +71,83 @@ def generate_server_credentials(
             shared_directory_name=shared_directory_name,
         ).to_yaml(file_path=output_directory.joinpath("user_credentials.yaml"))
         console.echo(message="User server access credentials file: Created.", level=LogLevel.SUCCESS)
+
+
+def get_credentials_file_path(service: bool = False) -> Path:
+    """Resolves and returns the path to the requested .YAML file that stores the remote compute server's access
+    credentials.
+
+    Depending on the configuration, either returns the path to the 'user_credentials.yaml' file (default) or the
+    'service_credentials.yaml' file.
+
+    Args:
+        service: Determines whether this function must evaluate and return the path to the
+            'service_credentials.yaml' file (if true) or the 'user_credentials.yaml' file (if false).
+
+    Raises:
+        FileNotFoundError: If either the requested credentials file does not exist in the local Sun lab working
+            directory.
+        ValueError: If the requested credentials file exists, but is not properly configured.
+    """
+    # Gets the path to the local working directory.
+    working_directory = get_working_directory()
+
+    # Resolves the paths to the credential files.
+    service_path = working_directory.joinpath("service_credentials.yaml")
+    user_path = working_directory.joinpath("user_credentials.yaml")
+
+    # If the caller requires the service account, evaluates the service credentials file.
+    if service:
+        # Ensures that the credentials' file exists.
+        if not service_path.exists():
+            message = (
+                f"Unable to locate the 'service_credentials.yaml' file in the Sun lab working directory "
+                f"{service_path}. Call the 'sl-configure server -s' CLI command to create the service server access "
+                f"credentials file."
+            )
+            console.error(message=message, error=FileNotFoundError)
+            raise FileNotFoundError(message)  # Fallback to appease mypy, should not be reachable
+
+        credentials: ServerCredentials = ServerCredentials.from_yaml(file_path=service_path)
+
+        # If the service account is not configured, aborts with an error.
+        if credentials.username == "YourNetID" or credentials.password == "YourPassword":
+            message = (
+                "The 'service_credentials.yaml' file appears to be unconfigured or contains placeholder credentials. "
+                "Call the 'sl-configure server -s' CLI command to reconfigure the server credentials file."
+            )
+            console.error(message=message, error=ValueError)
+            raise ValueError(message)  # Fallback to appease mypy, should not be reachable
+
+        # If the service account is configured, returns the path to the service credentials file to caller
+        message = f"Server access credentials: Resolved. Using the service {credentials.username} account."
+        console.echo(message=message, level=LogLevel.SUCCESS)
+        return service_path
+
+    if not user_path.exists():
+        message = (
+            f"Unable to locate the 'user_credentials.yaml' file in the Sun lab working directory {user_path}. Call "
+            f"the 'sl-configure server' CLI command to create the user server access credentials file."
+        )
+        console.error(message=message, error=FileNotFoundError)
+        raise FileNotFoundError(message)  # Fallback to appease mypy, should not be reachable
+
+    # Otherwise, evaluates the user credentials file.
+    credentials: ServerCredentials = ServerCredentials.from_yaml(file_path=user_path)
+
+    # If the user account is not configured, aborts with an error.
+    if credentials.username == "YourNetID" or credentials.password == "YourPassword":
+        message = (
+            "The 'user_credentials.yaml' file appears to be unconfigured or contains placeholder credentials. "
+            "Call the 'sl-configure server' CLI command to reconfigure the server credentials file."
+        )
+        console.error(message=message, error=ValueError)
+        raise ValueError(message)  # Fallback to appease mypy, should not be reachable
+
+    # Otherwise, returns the path to the user credentials file to caller
+    message = f"Server access credentials: Resolved. Using the {credentials.username} account."
+    console.echo(message=message, level=LogLevel.SUCCESS)
+    return user_path
 
 
 @dataclass()

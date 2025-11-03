@@ -268,7 +268,7 @@ def test_transfer_directory_with_existing_checksum(sample_directory_structure, t
     destination = tmp_path / "dest_existing_checksum"
 
     # Pre-creates checksum
-    calculate_directory_checksum(directory=source, batch=False, save_checksum=True)
+    calculate_directory_checksum(directory=source, progress=False, save_checksum=True)
     assert (source / "ax_checksum.txt").exists()
 
     # Performs transfer with verification
@@ -593,15 +593,17 @@ def test_calculate_directory_checksum_multiprocessing(sample_directory_structure
 
 
 @pytest.mark.xdist_group(name="group2")
-@pytest.mark.parametrize("batch", [True, False])
-def test_calculate_directory_checksum_batch_mode(sample_directory_structure, batch):
-    """Verifies that batch mode produces identical checksums (only affects progress display).
+@pytest.mark.parametrize("progress", [True, False])
+def test_calculate_directory_checksum_progress_mode(sample_directory_structure, progress):
+    """Verifies that progress mode produces identical checksums (only affects progress display).
 
     Args:
         sample_directory_structure: Fixture providing a sample directory structure.
-        batch: Whether to use batch mode.
+        progress: Whether to enable progress tracking.
     """
-    checksum = calculate_directory_checksum(directory=sample_directory_structure, batch=batch, save_checksum=False)
+    checksum = calculate_directory_checksum(
+        directory=sample_directory_structure, progress=progress, save_checksum=False
+    )
 
     # Verifies checksum is valid
     assert isinstance(checksum, str)

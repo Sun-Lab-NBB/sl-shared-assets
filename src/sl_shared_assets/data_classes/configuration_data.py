@@ -1,4 +1,4 @@
-"""This module provides the classes used to configure data acquisition and processing runtimes in the Sun lab."""
+"""This module provides the assets used to configure data acquisition and processing runtimes in the Sun lab."""
 
 from copy import deepcopy
 from enum import StrEnum
@@ -9,20 +9,18 @@ import appdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 
-from ..server import ServerCredentials
-
 
 class AcquisitionSystems(StrEnum):
     """Defines the data acquisition systems currently used in the Sun lab."""
 
     MESOSCOPE_VR = "mesoscope-vr"
-    """The Mesoscope-VR data acquisition system. It is built around the 2-Photon Random Access Mesoscope (2P-RAM) and 
-    relies on Virtual Reality (VR) task-environments that use the Unity game engine to conduct experiments."""
+    """This system is built around the 2-Photon Random Access Mesoscope (2P-RAM) and relies on Virtual Reality (VR) 
+    environments running in Unity game engine to conduct experiments."""
 
 
 @dataclass()
 class MesoscopeExperimentState:
-    """Stores the information used to set and maintain the desired experiment and data acquisition system state."""
+    """Defines the structure and runtime parameters of an experiment state."""
 
     experiment_state_code: int
     """The unique identifier code of the experiment state."""
@@ -40,12 +38,7 @@ class MesoscopeExperimentState:
 
 @dataclass()
 class MesoscopeExperimentTrial:
-    """Stores the information about a single experiment trial.
-
-    Notes:
-        Multiple instances of this class can be used by a MesoscopeExperimentConfiguration instance to represent
-        multiple trial types used as part of the same experiment.
-    """
+    """Defines the structure and task parameters of an experiment trial."""
 
     cue_sequence: list[int]
     """The sequence of Virtual Reality environment wall cues experienced by the animal while running the 
@@ -67,7 +60,7 @@ class MesoscopeExperimentTrial:
 # noinspection PyArgumentList
 @dataclass()
 class MesoscopeExperimentConfiguration(YamlConfig):
-    """Stores the configuration of an experiment session that uses the Mesoscope_VR data acquisition system."""
+    """Defines an experiment session that uses the Mesoscope_VR data acquisition system."""
 
     cue_map: dict[int, float]
     """Maps each integer-code associated with the experiment's Virtual Reality (VR) environment wall 
@@ -88,6 +81,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
 @dataclass()
 class MesoscopeFileSystem:
     """Stores the filesystem configuration of the Mesoscope-VR data acquisition system."""
+
     root_directory: Path = Path()
     """The absolute path to the directory where all projects are stored on the main data acquisition system PC."""
     server_directory: Path = Path()
@@ -104,7 +98,8 @@ class MesoscopeFileSystem:
 @dataclass()
 class MesoscopeGoogleSheets:
     """Stores the identifiers and access credentials for the Google Sheets used by the Mesoscope-VR data
-    acquisition system."""
+    acquisition system.
+    """
 
     google_credentials_path: Path = Path()
     """The absolute path to the .JSON file that contains the credentials of the service account used to access and work 
@@ -221,7 +216,7 @@ class MesoscopeMicroControllers:
 
 @dataclass()
 class MesoscopeExternalAssets:
-    """Stores third-party asset configuration of the Mesoscope-VR data acquisition system."""
+    """Stores the third-party asset configuration of the Mesoscope-VR data acquisition system."""
 
     headbar_port: str = "/dev/ttyUSB0"
     """The USB port used by the HeadBar Zaber motor controllers."""
@@ -237,8 +232,7 @@ class MesoscopeExternalAssets:
 
 @dataclass()
 class MesoscopeSystemConfiguration(YamlConfig):
-    """Defines the hardware and software configuration for all assets used by the Mesoscope-VR data acquisition system.
-    """
+    """Defines the hardware and software asset configuration for the Mesoscope-VR data acquisition system."""
 
     name: str = str(AcquisitionSystems.MESOSCOPE_VR)
     """The descriptive name of the data acquisition system."""
@@ -255,7 +249,6 @@ class MesoscopeSystemConfiguration(YamlConfig):
 
     def __post_init__(self) -> None:
         """Ensures that all instance assets are stored as the expected types."""
-
         # Restores Path objects from strings.
         self.sheets.google_credentials_path = Path(self.sheets.google_credentials_path)
         self.filesystem.root_directory = Path(self.filesystem.root_directory)
@@ -271,9 +264,10 @@ class MesoscopeSystemConfiguration(YamlConfig):
 
         # Verifies the contents of the valve calibration data loaded from the config file.
         valve_calibration_data = self.microcontrollers.valve_calibration_data
+        element_count = 2
         if not all(
             isinstance(item, tuple)
-            and len(item) == 2
+            and len(item) == element_count
             and isinstance(item[0], (int | float))
             and isinstance(item[1], (int | float))
             for item in valve_calibration_data
@@ -304,9 +298,7 @@ class MesoscopeSystemConfiguration(YamlConfig):
 
         # Converts valve calibration data into dictionary format
         if isinstance(original.microcontrollers.valve_calibration_data, tuple):
-            original.microcontrollers.valve_calibration_data = {
-                k: v for k, v in original.microcontrollers.valve_calibration_data
-            }
+            original.microcontrollers.valve_calibration_data = dict(original.microcontrollers.valve_calibration_data)
 
         # Saves the data to the YAML file
         original.to_yaml(file_path=path)
@@ -355,7 +347,7 @@ def get_working_directory() -> Path:
         The path to the local working directory.
 
     Raises:
-        FileNotFoundError: If the local working directory for the local machine has not been configured.
+        FileNotFoundError: If the local working directory has not been configured for the host-machine.
     """
     # Uses appdirs to locate the user data directory and resolve the path to the configuration file
     app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
@@ -364,9 +356,8 @@ def get_working_directory() -> Path:
     # If the cache file or the Sun lab data directory does not exist, aborts with an error
     if not path_file.exists():
         message = (
-            "Unable to resolve the path to the local Sun lab working directory, as local machine does not have a "
-            "configured working directory. Configure the local working directory by using the 'sl-configure directory' "
-            "CLI command."
+            "Unable to resolve the path to the local Sun lab working directory, as it has not been set. "
+            "Set the local working directory by using the 'sl-configure directory' CLI command."
         )
         console.error(message=message, error=FileNotFoundError)
 
@@ -377,98 +368,14 @@ def get_working_directory() -> Path:
     # If the configuration file does not exist, also aborts with an error
     if not working_directory.exists():
         message = (
-            "Unable to resolve the path to the local Sun lab working directory, as the directory pointed by the path "
-            "stored in the Sun lab data directory does not exist. Configure a new working directory by using the "
-            "'sl-configure directory' CLI command."
+            "Unable to resolve the path to the local Sun lab working directory, as the currently configured directory "
+            "does not exist at the expected path. Set a new working directory by using the 'sl-configure directory' "
+            "CLI command."
         )
         console.error(message=message, error=FileNotFoundError)
 
     # Returns the path to the working directory
     return working_directory
-
-
-def get_credentials_file_path(service: bool = False) -> Path:
-    """Resolves and returns the path to the requested .yaml file that stores access credentials for the Sun lab
-    remote compute server.
-
-    Depending on the configuration, either returns the path to the 'user_credentials.yaml' file (default) or the
-    'service_credentials.yaml' file.
-
-    Notes:
-        Assumes that the local working directory has been configured before calling this function.
-
-    Args:
-        service: Determines whether this function must evaluate and return the path to the
-            'service_credentials.yaml' file (if true) or the 'user_credentials.yaml' file (if false).
-
-    Raises:
-        FileNotFoundError: If either the 'service_credentials.yaml' or the 'user_credentials.yaml' files do not exist
-            in the local Sun lab working directory.
-        ValueError: If both credential files exist, but the requested credentials file is not configured.
-    """
-    # Gets the path to the local working directory.
-    working_directory = get_working_directory()
-
-    # Resolves the paths to the credential files.
-    service_path = working_directory.joinpath("service_credentials.yaml")
-    user_path = working_directory.joinpath("user_credentials.yaml")
-
-    # If the caller requires the service account, evaluates the service credentials file.
-    if service:
-        # Ensures that the credentials' file exists.
-        if not service_path.exists():
-            message = (
-                f"Unable to locate the 'service_credentials.yaml' file in the Sun lab working directory "
-                f"{service_path}. If you intend to work with the remote compute server in the 'service' mode, use the "
-                f"'sl-configure server -s' CLI command to create the service server access credentials file. Note, "
-                f"most lab users should skip this step, all intended interactions with teh server can be carried out "
-                f"via the user access mode."
-            )
-            console.error(message=message, error=FileNotFoundError)
-            raise FileNotFoundError(message)  # Fallback to appease mypy, should not be reachable
-
-        credentials: ServerCredentials = ServerCredentials.from_yaml(file_path=service_path)  
-
-        # If the service account is not configured, aborts with an error.
-        if credentials.username == "YourNetID" or credentials.password == "YourPassword":
-            message = (
-                "The 'service_credentials.yaml' file appears to be unconfigured or contains placeholder credentials. "
-                "Use the 'sl-configure server -s' CLI command to reconfigure the server credentials file."
-            )
-            console.error(message=message, error=ValueError)
-            raise ValueError(message)  # Fallback to appease mypy, should not be reachable
-
-        # If the service account is configured, returns the path to the service credentials file to caller
-        message = f"Server access credentials: Resolved. Using the service {credentials.username} account."
-        console.echo(message=message, level=LogLevel.SUCCESS)
-        return service_path
-
-    if not user_path.exists():
-        message = (
-            f"Unable to locate the 'user_credentials.yaml' file in the Sun lab working directory {user_path}. Call "
-            f"the 'sl-configure server' CLI command to create the user server access credentials file. Note, "
-            f"all users need to have a valid user credentials file to work with the data stored on the remote "
-            f"server."
-        )
-        console.error(message=message, error=FileNotFoundError)
-        raise FileNotFoundError(message)  # Fallback to appease mypy, should not be reachable
-
-    # Otherwise, evaluates the user credentials file.
-    credentials: ServerCredentials = ServerCredentials.from_yaml(file_path=user_path)  
-
-    # If the user account is not configured, aborts with an error.
-    if credentials.username == "YourNetID" or credentials.password == "YourPassword":
-        message = (
-            "The 'user_credentials.yaml' file appears to be unconfigured or contains placeholder credentials. "
-            "Use the 'sl-configure server' CLI command to reconfigure the server credentials file."
-        )
-        console.error(message=message, error=ValueError)
-        raise ValueError(message)  # Fallback to appease mypy, should not be reachable
-
-    # Otherwise, returns the path to the user credentials file to caller
-    message = f"Server access credentials: Resolved. Using the {credentials.username} account."
-    console.echo(message=message, level=LogLevel.SUCCESS)
-    return user_path
 
 
 # Maps supported file names to configuration classes. This is used when loading the configuration data into memory.
@@ -478,22 +385,15 @@ _supported_configuration_files = {
 
 
 def create_system_configuration_file(system: AcquisitionSystems | str) -> None:
-    """Creates the .yaml configuration file for the requested Sun lab data acquisition system and configures the local
+    """Creates the .YAML configuration file for the requested Sun lab data acquisition system and configures the local
     machine (PC) to use this file for all future acquisition-system-related calls.
-
-    This function is used to initially configure or override the existing configuration of any data acquisition system
-    used in the lab.
 
     Notes:
         This function creates the configuration file inside the shared Sun lab working directory on the local machine.
-        It assumes that the user has configured (created) the directory before calling this function.
-
-        A data acquisition system can consist of multiple machines (PCs). The configuration file is typically only
-        present on the 'main' machine that manages all runtimes.
 
     Args:
         system: The name (type) of the data acquisition system for which to create the configuration file. Must be one
-            of the following supported options: mesoscope-vr.
+            of the valid members of the AcquisitionSystems enumeration.
 
     Raises:
         ValueError: If the input acquisition system name (type) is not recognized.
@@ -536,10 +436,6 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
     """Resolves the path to the local data acquisition system configuration file and loads the configuration data as
     a SystemConfiguration instance.
 
-    This service function is used by all Sun lab data acquisition runtimes to load the system configuration data from
-    the locally stored configuration file. It supports resolving and returning the data for all data acquisition
-    systems currently used in the lab.
-
     Returns:
         The initialized SystemConfiguration class instance for the local data acquisition system that stores the loaded
         configuration parameters.
@@ -557,9 +453,9 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
     if len(config_files) != 1:
         file_names = [f.name for f in config_files]
         message = (
-            f"Expected a single dta acquisition system configuration file to be found inside the local Sun lab working "
-            f"directory ({directory}), but found {len(config_files)} files ({', '.join(file_names)}). Use the "
-            f"'sl-configure system' CLI command to reconfigure the local machine to only contain a single data "
+            f"Expected a single data acquisition system configuration file to be found inside the local Sun lab "
+            f"working directory ({directory}), but found {len(config_files)} files ({', '.join(file_names)}). Call the "
+            f"'sl-configure system' CLI command to reconfigure the host-machine to only contain a single data "
             f"acquisition system configuration file."
         )
         console.error(message=message, error=FileNotFoundError)
@@ -572,13 +468,13 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
     # Ensures that the file name is supported
     if file_name not in _supported_configuration_files:
         message = (
-            f"The data acquisition system configuration file '{file_name}' stored in teh local Sun lab working "
-            f"directory is not recognized. Use one of the supported configuration files: "
-            f"{', '.join(_supported_configuration_files.keys())}."
+            f"The data acquisition system configuration file '{file_name}' stored in the local Sun lab working "
+            f"directory is not recognized. Call the 'sl-configure system' CLI command to reconfigure the host-machine "
+            f"to use a supported configuration file."
         )
         console.error(message=message, error=ValueError)
         raise ValueError(message)  # Fallback to appease mypy, should not be reachable
 
     # Loads and return the configuration data
     configuration_class = _supported_configuration_files[file_name]
-    return configuration_class.from_yaml(file_path=configuration_file)  
+    return configuration_class.from_yaml(file_path=configuration_file)

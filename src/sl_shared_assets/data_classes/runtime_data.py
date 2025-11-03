@@ -1,6 +1,4 @@
-"""This module provides classes used by data acquisition systems to store certain types of acquired data. Note,
-different data acquisition session types use different combinations of classes from this module.
-"""
+"""This module provides the assets used by data acquisition systems to store a subset of the acquired data."""
 
 from dataclasses import dataclass
 

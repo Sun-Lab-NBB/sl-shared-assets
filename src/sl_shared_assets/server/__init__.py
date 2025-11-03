@@ -3,7 +3,7 @@ compute servers.
 """
 
 from .job import Job, JupyterJob
-from .server import Server, ServerCredentials, generate_server_credentials
+from .server import Server, ServerCredentials, get_credentials_file_path, generate_server_credentials
 from .pipeline import (
     ProcessingStatus,
     TrackerFileNames,
@@ -25,4 +25,5 @@ __all__ = [
     "TrackerFileNames",
     "generate_manager_id",
     "generate_server_credentials",
+    "get_credentials_file_path",
 ]

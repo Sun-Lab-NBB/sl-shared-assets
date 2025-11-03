@@ -1,4 +1,4 @@
-"""This module provides the assets for packaging the data for transmission by computing its integrity checksum."""
+"""This module provides the assets for computing data integrity checksums."""
 
 import os
 from pathlib import Path
@@ -21,10 +21,6 @@ _excluded_files = {
 
 def _calculate_file_checksum(base_directory: Path, file_path: Path) -> tuple[str, bytes]:
     """Calculates the xxHash3-128 checksum for the target file and its path relative to the base directory.
-
-    This worker function is passed to parallel workers used by the calculate_directory_hash() method that iteratively
-    calculates the checksum for all files inside a directory. Each call to this function returns the checksum for the
-    target file, which reflects both the contents of the file and its path relative to the base directory.
 
     Args:
         base_directory: The path to the directory being processed by the 'calculate_directory_checksum' function.
@@ -55,7 +51,7 @@ def _calculate_file_checksum(base_directory: Path, file_path: Path) -> tuple[str
 
 
 def calculate_directory_checksum(
-    directory: Path, num_processes: int | None = None, *, batch: bool = False, save_checksum: bool = True
+    directory: Path, num_processes: int | None = None, *, progress: bool = False, save_checksum: bool = True
 ) -> str:
     """Calculates the xxHash3-128 checksum for the input directory.
 
@@ -72,8 +68,7 @@ def calculate_directory_checksum(
         directory: The path to the directory for which to generate the checksum.
         num_processes: The number of processes to use for parallelizing checksum calculation. If set to None, the
             function uses all available CPU cores.
-        batch: Determines whether the function is called while batch-processing multiple directories. This is used
-            to optimize progress reporting to avoid cluttering the terminal.
+        progress: Determines whether to track the checksum calculation progress using a progress bar.
         save_checksum: Determines whether the checksum should be saved (written to) a .txt file.
 
     Returns:
@@ -104,7 +99,7 @@ def calculate_directory_checksum(
 
         # Collects results as they complete
         results = []
-        if not batch:
+        if not progress:
             with tqdm(
                 total=len(files), desc=f"Calculating checksum for {Path(*directory.parts[-6:])}", unit="file"
             ) as pbar:

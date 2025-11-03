@@ -1,4 +1,5 @@
-"""This module provides the assets for moving the data between destinations available on the host-machine's filesystem.
+"""This module provides the assets for moving the data between destinations available on the host-machine's filesystem
+and removing the data from the host-machine.
 """
 
 import os
@@ -10,7 +11,7 @@ from tqdm import tqdm
 from ataraxis_time import PrecisionTimer
 from ataraxis_base_utilities import console, ensure_directory_exists
 
-from .packaging_tools import calculate_directory_checksum
+from .checksum_tools import calculate_directory_checksum
 
 
 def delete_directory(directory_path: Path) -> None:
@@ -75,18 +76,19 @@ def transfer_directory(
     *,
     verify_integrity: bool = False,
     remove_source: bool = False,
+    progress: bool = False,
 ) -> None:
     """Copies the contents of the input source directory to the destination directory while preserving the underlying
     directory hierarchy.
 
     Notes:
-        This method recreates the moved directory hierarchy on the destination if the hierarchy does not exist. This is
-        done before copying the files.
+        This function recreates the moved directory hierarchy on the destination if the hierarchy does not exist. This
+        is done before copying the files.
 
-        The method executes a multithreaded copy operation and does not by default remove the source data after the
+        The function executes a multithreaded copy operation and does not by default remove the source data after the
         copy is complete.
 
-        If the method is configured to verify the transferred data's integrity, it generates an xxHash-128 checksum of
+        If the function is configured to verify the transferred data's integrity, it generates an xxHash-128 checksum of
         the data before and after the transfer and compares the two checksums to detect data corruption.
 
     Args:
@@ -97,6 +99,7 @@ def transfer_directory(
         verify_integrity: Determines whether to perform integrity verification for the transferred files.
         remove_source: Determines whether to remove the source directory after the transfer is complete and
             (optionally) verified.
+        progress: Determines whether to track the transfer progress using a progress bar.
 
     Raises:
         RuntimeError: If the transferred files do not pass the xxHas3-128 checksum integrity verification.
@@ -113,7 +116,7 @@ def transfer_directory(
     # If transfer integrity verification is enabled, but the source directory does not contain the 'ax_checksum.txt'
     # file, checksums the directory before the transfer operation.
     if verify_integrity and not source.joinpath("ax_checksum.txt").exists():
-        calculate_directory_checksum(directory=source, batch=False, save_checksum=True)
+        calculate_directory_checksum(directory=source, progress=False, save_checksum=True)
 
     # Ensures the destination root directory exists.
     ensure_directory_exists(destination)
@@ -144,16 +147,22 @@ def transfer_directory(
                 total=len(file_list),
                 desc=f"Transferring files to {Path(*destination.parts[-6:])}",
                 unit="file",
+                disable=not progress,
             ):
                 # Propagates any exceptions from the file transfer.
                 future.result()
     else:
-        for file in tqdm(file_list, desc=f"Transferring files to {Path(*destination.parts[-6:])}", unit="file"):
+        for file in tqdm(
+            file_list,
+            desc=f"Transferring files to {Path(*destination.parts[-6:])}",
+            unit="file",
+            disable=not progress,
+        ):
             _transfer_file(file, source, destination)
 
     # Verifies the integrity of the transferred directory by rerunning xxHash3-128 calculation.
     if verify_integrity:
-        destination_checksum = calculate_directory_checksum(directory=destination, batch=False, save_checksum=False)
+        destination_checksum = calculate_directory_checksum(directory=destination, progress=False, save_checksum=False)
         with source.joinpath("ax_checksum.txt").open("r") as local_checksum:
             message = (
                 f"Checksum mismatch detected when transferring {Path(*source.parts[-6:])} to "

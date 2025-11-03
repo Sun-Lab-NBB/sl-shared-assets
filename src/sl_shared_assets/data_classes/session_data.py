@@ -16,7 +16,7 @@ from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
 
 from .configuration_data import AcquisitionSystems, get_system_configuration_data
-from ..tools.transfer_tools import delete_directory
+from ..data_transfer.transfer_tools import delete_directory
 
 
 class SessionTypes(StrEnum):
@@ -441,7 +441,9 @@ class SessionData(YamlConfig):
         while session_path.exists():
             counter += 1
             new_session_name = f"{session_name}_{counter}"
-            session_path = acquisition_system.filesystem.root_directory.joinpath(project_name, animal_id, new_session_name)
+            session_path = acquisition_system.filesystem.root_directory.joinpath(
+                project_name, animal_id, new_session_name
+            )
 
         # If a conflict is detected and resolved, warns the user about the resolved conflict.
         if counter > 0:
