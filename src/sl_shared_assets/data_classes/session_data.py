@@ -162,8 +162,7 @@ class ProcessedData:
         self.root_path = root_directory_path.parents[3]
 
     def make_directories(self) -> None:
-        """Ensures that all major subdirectories and the root directory exist, creating any missing directories.
-        """
+        """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
         ensure_directory_exists(self.processed_data_path)
         ensure_directory_exists(self.camera_data_path)
         ensure_directory_exists(self.behavior_data_path)
@@ -192,8 +191,7 @@ class TrackingData:
         self.session_lock_path = self.tracking_data_path.joinpath("session_lock.yaml")
 
     def make_directories(self) -> None:
-        """Ensures that all major subdirectories and the root directory exist, creating any missing directories.
-        """
+        """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
         ensure_directory_exists(self.tracking_data_path)
 
 
@@ -488,7 +486,7 @@ class SessionData(YamlConfig):
         session_data_path = session_data_files.pop()
 
         # Loads class data from the.yaml file
-        instance: SessionData = cls.from_yaml(file_path=session_data_path)  
+        instance: SessionData = cls.from_yaml(file_path=session_data_path)
 
         # The method assumes that the 'donor' .yaml file is always stored inside the raw_data directory of the session
         # to be processed. In turn, that directory is expected to be found under the path root/project/animal/session.
@@ -593,11 +591,11 @@ class SessionData(YamlConfig):
         origin = copy.deepcopy(self)
 
         # Resets all path fields to Null (None) before saving the instance to disk
-        origin.raw_data = None  
-        origin.processed_data = None  
-        origin.source_data = None  
-        origin.archived_data = None  
-        origin.tracking_data = None  
+        origin.raw_data = None
+        origin.processed_data = None
+        origin.source_data = None
+        origin.archived_data = None
+        origin.tracking_data = None
 
         # Converts StringEnum instances to strings
         origin.session_type = str(origin.session_type)
@@ -639,7 +637,7 @@ class SessionLock(YamlConfig):
     def _load_state(self) -> None:
         """Loads the current lock state from the .yaml file."""
         if self.file_path.exists():
-            instance: SessionLock = self.from_yaml(self.file_path)  
+            instance: SessionLock = self.from_yaml(self.file_path)
             self._manager_id = copy.copy(instance._manager_id)
         else:
             # Creates a new lock file with the default state (unlocked)
@@ -649,8 +647,8 @@ class SessionLock(YamlConfig):
         """Saves the current lock state to the .yaml file."""
         # Creates a copy without file paths for clean serialization
         original = copy.deepcopy(self)
-        original.file_path = None  
-        original._lock_path = None  
+        original.file_path = None
+        original._lock_path = None
         original.to_yaml(file_path=self.file_path)
 
     def acquire(self, manager_id: int) -> None:
