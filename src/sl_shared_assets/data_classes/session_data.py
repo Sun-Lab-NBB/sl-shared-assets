@@ -14,7 +14,6 @@ from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import get_timestamp
 
 from .configuration_data import AcquisitionSystems, get_system_configuration_data
-from ..data_transfer.transfer_tools import delete_directory
 
 
 class SessionTypes(StrEnum):
@@ -197,85 +196,51 @@ class TrackingData:
 
 @dataclass
 class SessionData(YamlConfig):
-    """Stores and manages the data layout of a single Sun lab data acquisition session.
-
-    The primary purpose of this class is to maintain the session data structure across all supported destinations
-    and to provide a unified data access interface shared by all Sun lab libraries. It is specifically designed for
-    working with the data from a single session, performed by a single animal under the specific project. The class is
-    used to manage both raw and processed data: it follows the data through acquisition, preprocessing, and processing
-    stages of the Sun lab data workflow. This class serves as an entry point for all interactions with the managed
-    session's data.
+    """Defines the hierarchical data layout of a single data acquisition session.
 
     Notes:
-        The class is not designed to be instantiated directly. Instead, use the create() method to generate a new
-        session or load() method to access the data of an already existing session.
+        Do not initialize this class directly. Instead, use the create() method when starting new data acquisition
+        sessions or the load() method when accessing data for an existing session.
 
-        When the class is used to create a new session, it generates the new session's name using the current UTC
+        When this class is used to create a new session, it generates the new session's name using the current UTC
         timestamp, accurate to microseconds. This ensures that each session 'name' is unique and preserves the overall
         session order.
     """
 
     project_name: str
-    """Stores the name of the project for which the session was acquired."""
+    """The name of the project for which the session was acquired."""
     animal_id: str
-    """Stores the unique identifier of the animal that participates in the session."""
+    """The unique identifier of the animal that participates in the session."""
     session_name: str
-    """Stores the name (timestamp-based ID) of the session."""
+    """The unique identifier (name) of the session."""
     session_type: str | SessionTypes
-    """Stores the type of the session. Has to be set to one of the supported session types, defined in the SessionTypes
-    enumeration exposed by the sl-shared-assets library.
-    """
+    """The type of the session."""
     acquisition_system: str | AcquisitionSystems = AcquisitionSystems.MESOSCOPE_VR
-    """Stores the name of the data acquisition system that acquired the data. Has to be set to one of the supported 
-    acquisition systems, defined in the AcquisitionSystems enumeration exposed by the sl-shared-assets library."""
+    """The name of the data acquisition system used to acquire the session's data"""
     experiment_name: str | None = None
-    """Stores the name of the experiment performed during the session. If the session_type field indicates that the 
-    session is an experiment, this field communicates the specific experiment configuration used by the session. During 
-    runtime, this name is used to load the specific experiment configuration data stored in a .yaml file with the same 
-    name. If the session is not an experiment session, this field should be left as Null (None)."""
+    """The name of the experiment performed during the session or Null (None), if the session is not an experiment 
+    session."""
     python_version: str = "3.11.13"
-    """Stores the Python version that was used to acquire session data."""
+    """The Python version used to acquire session's data."""
     sl_experiment_version: str = "3.0.0"
-    """Stores the version of the sl-experiment library that was used to acquire the session data."""
+    """The version of the sl-experiment library used to acquire the session's data."""
     raw_data: RawData = field(default_factory=lambda: RawData())
-    """Stores absolute paths to all directories and files that jointly make the session's raw data hierarchy. This 
-    hierarchy is initially resolved by the acquisition system that acquires the session and used to store all data 
-    acquired during the session runtime."""
+    """Defines the session's raw data hierarchy."""
     processed_data: ProcessedData = field(default_factory=lambda: ProcessedData())
-    """Stores absolute paths to all directories and files that jointly make the session's processed data hierarchy. 
-    Processed data encompasses all data generated from the raw data as part of data processing."""
-    source_data: RawData = field(default_factory=lambda: RawData())
-    """Stores absolute paths to the same data as the 'raw_data' field, but with all paths resolved relative to the 
-    'processed_data' root. On systems that use the same root for processed and raw data, the source and raw directories 
-    are identical. On systems that use different root directories for processed and raw data, the source and raw 
-    directories are different. This is used to optimize data processing on the remote compute server by temporarily 
-    copying all session data to the fast processed data volume."""
-    archived_data: ProcessedData = field(default_factory=lambda: ProcessedData())
-    """Similar to the 'source_data' field, stores the absolute path to the same data as the 'processed_data' field, but 
-    with all paths resolved relative to the 'raw_data' root. This path is used as part of the session data archiving 
-    process to collect all session data (raw and processed) on the slow 'storage' volume of the remote compute server.
-    """
+    """Defines the session's processed data hierarchy."""
     tracking_data: TrackingData = field(default_factory=lambda: TrackingData())
-    """Stores absolute paths to all directories and files that jointly make the session's tracking data hierarchy. This 
-    hierarchy is used during all stages of data processing to track the processing progress and ensure only a single 
-    manager process can modify the session's data at any given time, ensuring access safety."""
+    """Defines the session's tracking data hierarchy."""
 
     def __post_init__(self) -> None:
-        """Ensures raw_data, processed_data, and source_data are always instances of RawData and ProcessedData."""
+        """Ensures that all instances used to define the session's data hierarchy are properly initialized."""
         if not isinstance(self.raw_data, RawData):
             self.raw_data = RawData()
 
         if not isinstance(self.processed_data, ProcessedData):
             self.processed_data = ProcessedData()
 
-        if not isinstance(self.source_data, RawData):
-            self.raw_data = RawData()
-
-        if not isinstance(self.archived_data, ProcessedData):
-            self.archived_data = ProcessedData()
-
         if not isinstance(self.tracking_data, TrackingData):
-            self.raw_data = RawData()
+            self.tracking_data = TrackingData()
 
     @classmethod
     def create(
@@ -413,18 +378,18 @@ class SessionData(YamlConfig):
             sl_experiment_version=sl_experiment_version,
         )
 
-        # Saves the configured instance data to the session's folder so that it can be reused during processing or
+        # Saves the configured instance data to the session's directory so that it can be reused during processing or
         # preprocessing.
         instance.save()
 
-        # Also saves the SystemConfiguration and ExperimentConfiguration instances to the same folder using the paths
+        # Also saves the SystemConfiguration and ExperimentConfiguration instances to the same directory using the paths
         # resolved for the RawData instance above.
 
-        # Dumps the acquisition system's configuration data to the session's folder
+        # Dumps the acquisition system's configuration data to the session's directory
         acquisition_system.save(path=instance.raw_data.system_configuration_path)
 
         if experiment_name is not None:
-            # Copies the experiment_configuration.yaml file to the session's folder
+            # Copies the experiment_configuration.yaml file to the session's directory
             experiment_configuration_path = acquisition_system.filesystem.root_directory.joinpath(
                 project_name, "configuration", f"{experiment_name}.yaml"
             )
@@ -441,43 +406,33 @@ class SessionData(YamlConfig):
     @classmethod
     def load(
         cls,
-        session_path: Path,
-        processed_data_root: Path | None = None,
+        session_path: Path
     ) -> "SessionData":
-        """Loads the SessionData instance from the target session's session_data.yaml file.
-
-        This method is used to load the data layout information of an already existing session. Primarily, this is used
-        when processing session data. Due to how SessionData is stored and used in the lab, this method always loads the
-        data layout from the session_data.yaml file stored inside the 'raw_data' session subfolder. Currently, all
-        interactions with Sun lab data require access to the 'raw_data' folder of each session.
+        """Loads the target session's data from the specified session_data.yaml file.
 
         Notes:
-            To create a new session, use the create() method instead.
+            To create a new session, use the create() method.
 
         Args:
-            session_path: The path to the root directory of an existing session, e.g.: root/project/animal/session.
-            processed_data_root: If processed data is kept on a drive different from the one that stores raw data,
-                provide the path to the root project directory (directory that stores all Sun lab projects) on that
-                drive. The method will automatically resolve the project/animal/session/processed_data hierarchy using
-                this root path. If raw and processed data are kept on the same drive, keep this set to None.
+            session_path: The path to the directory where to search for the session_data.yaml file. Typically, this
+                is the path to the root session's directory, e.g.: root/project/animal/session.
 
         Returns:
-            An initialized SessionData instance for the session whose data is stored at the provided path.
+            An initialized SessionData instance that stores the loaded session's data.
 
         Raises:
-            FileNotFoundError: If multiple or no 'session_data.yaml' file instances are found under the input session
-                path directory.
-
+            FileNotFoundError: If multiple or no 'session_data.yaml' file instances are found under the input directory.
         """
+
         # To properly initialize the SessionData instance, the provided path should contain a single session_data.yaml
         # file at any hierarchy level.
         session_data_files = [file for file in session_path.rglob("*session_data.yaml")]
         if len(session_data_files) != 1:
             message = (
-                f"Unable to load the SessionData class for the target session. Expected a single session_data.yaml "
-                f"file to be located under the directory tree specified by the input path: {session_path}. Instead, "
-                f"encountered {len(session_data_files)} candidate files. This indicates that the input path does not "
-                f"point to a valid session directory."
+                f"Unable to load the target session's data. Expected a single session_data.yaml file to be located "
+                f"under the directory tree specified by the input path: {session_path}. Instead, encountered "
+                f"{len(session_data_files)} candidate files. This indicates that the input path does not point to a "
+                f"valid session data hierarchy."
             )
             console.error(message=message, error=FileNotFoundError)
 
@@ -485,17 +440,13 @@ class SessionData(YamlConfig):
         # session data hierarchy.
         session_data_path = session_data_files.pop()
 
-        # Loads class data from the.yaml file
+        # Loads the session's data from the.yaml file
         instance: SessionData = cls.from_yaml(file_path=session_data_path)
 
-        # The method assumes that the 'donor' .yaml file is always stored inside the raw_data directory of the session
+        # The method assumes that the 'donor' YAML file is always stored inside the raw_data directory of the session
         # to be processed. In turn, that directory is expected to be found under the path root/project/animal/session.
-        # The code below uses this heuristic to discover the raw data root based on the session data file path.
+        # The code below uses this heuristic to discover the host-machine's root data directory.
         local_root = session_data_path.parents[4]  # Raw data root session directory
-
-        # Unless a different root is provided for processed data, it uses the same root as raw_data.
-        if processed_data_root is None:
-            processed_data_root = local_root
 
         # RAW DATA
         instance.raw_data.resolve_paths(
@@ -506,58 +457,11 @@ class SessionData(YamlConfig):
 
         # PROCESSED DATA
         instance.processed_data.resolve_paths(
-            root_directory_path=processed_data_root.joinpath(
+            root_directory_path=local_root.joinpath(
                 instance.project_name, instance.animal_id, instance.session_name, "processed_data"
             )
         )
-
-        # If the processed data root is different from the raw data root, resolves the path to the 'source' and
-        # 'archive' data directories. Otherwise, uses the same paths as 'raw' and 'processed' data directories.
-        if processed_data_root != local_root:
-            # SOURCE DATA
-            instance.source_data.resolve_paths(
-                root_directory_path=processed_data_root.joinpath(
-                    instance.project_name, instance.animal_id, instance.session_name, "source_data"
-                )
-            )
-            # Note, since source data is populated as part of the 'preparation' runtime, does not make the directories.
-
-            # ARCHIVED DATA
-            instance.archived_data.resolve_paths(
-                root_directory_path=local_root.joinpath(
-                    instance.project_name, instance.animal_id, instance.session_name, "archived_data"
-                )
-            )
-
-            # If the session has been processed with the processed data root previously matching the raw data root,
-            # ensures that there is no 'processed_data' directory on the raw data root. In other words, ensures that
-            # the session data always has only a single copy of the 'processed_data' directory.
-            old_processed_data_path = local_root.joinpath(
-                instance.project_name, instance.animal_id, instance.session_name, "processed_data"
-            )
-            delete_directory(old_processed_data_path)
-
-        else:
-            # SOURCE DATA
-            instance.source_data.resolve_paths(
-                root_directory_path=processed_data_root.joinpath(
-                    instance.project_name, instance.animal_id, instance.session_name, "raw_data"
-                )
-            )
-
-            # ARCHIVED DATA
-            instance.archived_data.resolve_paths(
-                root_directory_path=local_root.joinpath(
-                    instance.project_name, instance.animal_id, instance.session_name, "processed_data"
-                )
-            )
-
-        # Similar to source_data, archived data is populated as part of the 'archiving' pipeline, so directories for
-        # this data are not resolved.
-
-        # If there is no archived processed data, ensures that processed data hierarchy exists.
-        if not instance.archived_data.processed_data_path.exists():
-            instance.processed_data.make_directories()
+        instance.processed_data.make_directories()  # Ensures that processed data hierarchy exists.
 
         # TRACKING DATA
         instance.tracking_data.resolve_paths(
@@ -571,37 +475,30 @@ class SessionData(YamlConfig):
         return instance
 
     def runtime_initialized(self) -> None:
-        """Ensures that the 'nk.bin' marker file is removed from the session's raw_data folder.
+        """Ensures that the 'nk.bin' marker file is removed from the session's raw_data directory.
 
-        The 'nk.bin' marker is generated as part of the SessionData initialization (creation) process to mark sessions
-        that did not fully initialize during runtime. This service method is designed to be called by the sl-experiment
-        library classes to remove the 'nk.bin' marker when it is safe to do so. It should not be called by end-users.
+        Notes:
+            This service method is used by the sl-experiment library to acquire the session's data. Do not call this
+            method manually.
         """
         self.raw_data.nk_path.unlink(missing_ok=True)
 
     def save(self) -> None:
-        """Saves the instance data to the 'raw_data' directory of the managed session as a 'session_data.yaml' file.
-
-        This is used to save the data stored in the instance to disk so that it can be reused during further stages of
-        data processing. The method is intended to only be used by the SessionData instance itself during its
-        create() method runtime.
-        """
+        """Caches the instance's data to the session's 'raw_data' directory as a 'session_data.yaml' file."""
         # Generates a copy of the original class to avoid modifying the instance that will be used for further
-        # processing
+        # processing.
         origin = copy.deepcopy(self)
 
-        # Resets all path fields to Null (None) before saving the instance to disk
+        # Resets all path fields to Null (None) before saving the instance to disk.
         origin.raw_data = None
         origin.processed_data = None
-        origin.source_data = None
-        origin.archived_data = None
         origin.tracking_data = None
 
-        # Converts StringEnum instances to strings
+        # Converts StringEnum instances to strings.
         origin.session_type = str(origin.session_type)
         origin.acquisition_system = str(origin.acquisition_system)
 
-        # Saves instance data as a .YAML file
+        # Saves instance data as a .YAML file.
         origin.to_yaml(file_path=self.raw_data.session_data_path)
 
 
