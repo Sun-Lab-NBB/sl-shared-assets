@@ -1,4 +1,4 @@
-"""This module provides the dataclasses used to store animal surgery data extracted from the Sun lab surgery log."""
+"""This module provides the assets used to store animal surgery data extracted from the Sun lab surgery log."""
 
 from dataclasses import dataclass
 
@@ -6,7 +6,7 @@ from ataraxis_data_structures import YamlConfig
 
 
 @dataclass()
-class SubjectData:
+class SubjectData:  # pragma: no cover
     """Stores information about the subject of the surgical intervention."""
 
     id: int
@@ -30,7 +30,7 @@ class SubjectData:
 
 
 @dataclass()
-class ProcedureData:
+class ProcedureData:  # pragma: no cover
     """Stores general information about the surgical intervention."""
 
     surgery_start_us: int
@@ -53,7 +53,7 @@ class ProcedureData:
 
 
 @dataclass
-class DrugData:
+class DrugData:  # pragma: no cover
     """Stores information about all medical substances (drugs) administered to the subject before, during, and
     immediately after the surgical intervention.
     """
@@ -77,7 +77,7 @@ class DrugData:
 
 
 @dataclass
-class ImplantData:
+class ImplantData:  # pragma: no cover
     """Stores information about a single implantation procedure performed during the surgical intervention.
 
     Multiple ImplantData instances can be used at the same time if the surgery involved multiple implantation
@@ -99,7 +99,7 @@ class ImplantData:
 
 
 @dataclass
-class InjectionData:
+class InjectionData:  # pragma: no cover
     """Stores information about a single injection performed during the surgical intervention.
 
     Multiple InjectionData instances can be used at the same time if the surgery involved multiple injections.
@@ -122,7 +122,7 @@ class InjectionData:
 
 
 @dataclass
-class SurgeryData(YamlConfig):
+class SurgeryData(YamlConfig):  # pragma: no cover
     """Stores information about a surgical intervention performed on an animal before data acquisition session(s)."""
 
     subject: SubjectData

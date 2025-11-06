@@ -50,6 +50,7 @@ from .data_classes import (
     MesoscopeExperimentDescriptor,
     MesoscopeExperimentConfiguration,
     get_working_directory,
+    get_google_credentials_path,
     get_system_configuration_data,
 )
 from .data_transfer import (
@@ -104,6 +105,7 @@ __all__ = [
     "delete_directory",
     "generate_manager_id",
     "get_credentials_file_path",
+    "get_google_credentials_path",
     "get_system_configuration_data",
     "get_working_directory",
     "transfer_directory",

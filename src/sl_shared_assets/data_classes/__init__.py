@@ -1,6 +1,5 @@
-"""This package provides the classes used to store data acquired in the Sun lab and to configure all elements and
-pipelines making up the lab's data workflow. Many classes from this package are designed to be saved to disk as .yaml
-files and restored from the .yaml files as needed.
+"""This package provides the assets that allow storing the data acquired in the Sun lab and configuring all elements and
+pipelines making up the lab's data workflow.
 """
 
 from .runtime_data import (

@@ -1,7 +1,5 @@
-"""This module provides classes jointly responsible for maintaining the Sun lab project data hierarchy across all
-machines used to acquire, process, and store the data. Primarily, classes from this module are used to manage the
-access to the data acquired as part of a single data acquisition session in a thread-safe and location-agnostic
-fashion.
+"""This module provides the assets that maintain the Sun lab project data hierarchy across all machines used to
+acquire, process, and store the data.
 """
 
 import copy
@@ -20,131 +18,80 @@ from ..data_transfer.transfer_tools import delete_directory
 
 
 class SessionTypes(StrEnum):
-    """Stores the data acquisition session types supported by all data acquisition systems used in the Sun lab.
-
-    A data acquisition session is typically carried out to acquire experiment data, train the animal for the upcoming
-    experiment sessions, or to assess the quality of surgical or other pre-experiment interventions. After acquisition,
-    the session is treated as a uniform package whose components can be accessed via the SessionData class.
-
-    Notes:
-        Different acquisition systems support different session types and may not be suited for acquiring some of the
-        session types listed in this enumeration.
-    """
+    """Defines the data acquisition session types supported by all data acquisition systems used in the Sun lab."""
 
     LICK_TRAINING = "lick training"
     """A Mesoscope-VR session designed to teach animals to use the water delivery port while being head-fixed."""
     RUN_TRAINING = "run training"
     """A Mesoscope-VR session designed to teach animals to run on the treadmill while being head-fixed."""
     MESOSCOPE_EXPERIMENT = "mesoscope experiment"
-    """A Mesoscope-VR experiment session. The session uses Unity game engine to run virtual reality tasks and collects 
-    brain activity data using 2-Photon Random Access Mesoscope (2P-RAM)."""
+    """A Mesoscope-VR experiment session. The session uses the Unity game engine to run virtual reality tasks and 
+    collects brain activity data using 2-Photon Random Access Mesoscope (2P-RAM)."""
     WINDOW_CHECKING = "window checking"
     """A Mesoscope-VR session designed to evaluate the quality of the cranial window implantation procedure and the 
-    suitability of the animal for being imaged with the Mesoscope. The session uses the Mesoscope to assess the quality 
+    suitability of the animal for experiment sessions. The session uses the Mesoscope to assess the quality 
     of the cell activity data."""
 
 
 @dataclass()
 class RawData:
-    """Stores the paths to the directories and files that make up the 'raw_data' session-specific directory.
-
-    The raw_data directory stores the data acquired during the session data acquisition runtime, before and after
-    preprocessing. Since preprocessing does not irreversibly alter the data, any data in that folder is considered
-    'raw,' event if preprocessing losslessly re-compresses the data for efficient transfer.
-
-    Notes:
-        Sun lab data management strategy primarily relies on keeping multiple redundant copies of the raw_data for
-        each acquired session. Typically, one copy is stored on the lab's processing server and the other is stored on
-        the NAS.
+    """Provides the paths to the directories and files that store the data acquired and losslessly preprocessed during
+    the session's data acquisition runtime.
     """
 
     raw_data_path: Path = Path()
-    """Stores the path to the root raw_data directory of the session. This directory stores all raw data during 
-    acquisition and preprocessing. Note, preprocessing does not alter raw data, so at any point in time all data inside
-    the folder is considered 'raw'."""
+    """The path to the root directory that stores the session's raw data."""
     camera_data_path: Path = Path()
-    """Stores the path to the directory that contains all camera data acquired during the session. Primarily, this 
-    includes .mp4 video files from each recorded camera."""
+    """The path to the directory that contains the video camera data acquired during the session's runtime."""
     mesoscope_data_path: Path = Path()
-    """Stores the path to the directory that contains all Mesoscope data acquired during the session. Primarily, this 
-    includes the mesoscope-acquired .tiff files (brain activity data) and the MotionEstimator.me file (motion 
-    estimation data). This directory is created for all sessions, but is only used (filled) by the sessions that use 
-    the Mesoscope-VR system to acquire brain activity data."""
+    """The path to the directory that contains the Mesoscope data acquired during the session's runtime."""
     behavior_data_path: Path = Path()
-    """Stores the path to the directory that contains all non-video behavior data acquired during the session. 
-    Primarily, this includes the .npz log files that store serialized data acquired by all hardware components of the 
-    data acquisition system other than cameras and brain activity data acquisition devices (such as the Mesoscope)."""
+    """The path to the directory that contains the non-video behavior data acquired during the session's runtime."""
     zaber_positions_path: Path = Path()
-    """Stores the path to the zaber_positions.yaml file. This file contains the snapshot of all Zaber motor positions 
-    at the end of the session. Zaber motors are used to position the LickPort, HeadBar, and Wheel Mesoscope-VR modules
-    to support proper brain activity recording and behavior during the session. This file is only created for sessions 
-    that use the Mesoscope-VR system."""
+    """The path to the zaber_positions.yaml file that contains the snapshot of all Zaber motor positions 
+    at the end of the session's runtime."""
     session_descriptor_path: Path = Path()
-    """Stores the path to the session_descriptor.yaml file. This file is filled jointly by the data acquisition system 
-    and the experimenter. It contains session-specific information, such as the specific task parameters and the notes 
-    made by the experimenter during runtime. Each supported session type uses a unique SessionDescriptor class to define
-    the format and content of the session_descriptor.yaml file."""
+    """The path to the session_descriptor.yaml file that contains session-specific information, such as the specific 
+    task parameters and the notes made by the experimenter during the session's runtime."""
     hardware_state_path: Path = Path()
-    """Stores the path to the hardware_state.yaml file. This file contains the partial snapshot of the calibration 
-    parameters used by the data acquisition system modules during the session. Primarily, it is used during data 
-    processing to interpret the raw data stored inside .npz log files."""
+    """The path to the hardware_state.yaml file that contains the partial snapshot of the configuration parameters used 
+    by the data acquisition system's hardware modules during the session's runtime."""
     surgery_metadata_path: Path = Path()
-    """Stores the path to the surgery_metadata.yaml file. This file contains the most actual information about the 
-    surgical intervention(s) performed on the animal prior to the session."""
+    """The path to the surgery_metadata.yaml file that contains the information about the surgical intervention(s) 
+    performed on the animal prior to the session's runtime."""
     session_data_path: Path = Path()
-    """Stores the path to the session_data.yaml file. This path is used by the SessionData instance to save itself to 
-    disk as a .yaml file. In turn, the cached data is reused to reinstate the same data hierarchy across all supported 
-    destinations, enabling various libraries to interface with the session data."""
+    """The path to the session_data.yaml file. This path is used by the SessionData instance to save itself to disk as 
+    a .yaml file."""
     experiment_configuration_path: Path = Path()
-    """Stores the path to the experiment_configuration.yaml file. This file contains the snapshot of the 
-    experiment runtime configuration used by the session. This file is only created for experiment sessions."""
+    """The path to the experiment_configuration.yaml file that contains the snapshot of the experiment's configuration 
+    used during the session's runtime. This file is only created for experiment sessions."""
     mesoscope_positions_path: Path = Path()
-    """Stores the path to the mesoscope_positions.yaml file. This file contains the snapshot of the positions used
-    by the Mesoscope at the end of the session. This includes both the physical position of the mesoscope objective and
-    the 'virtual' tip, tilt, and fastZ positions set via ScanImage software. This file is only created for sessions that
-    use the Mesoscope-VR system to acquire brain activity data."""
+    """The path to the mesoscope_positions.yaml file that contains the snapshot of the imaging axes positions used
+    by the Mesoscope at the end of the session's runtime."""
     window_screenshot_path: Path = Path()
-    """Stores the path to the .png screenshot of the ScanImagePC screen. As a minimum, the screenshot should contain the
-    image of the imaging plane and the red-dot alignment window. This is used to generate a visual snapshot of the 
-    cranial window alignment and cell appearance for each experiment session. This file is only created for sessions 
-    that use the Mesoscope-VR system to acquire brain activity data."""
+    """The path to the .png screenshot of the ScanImagePC screen that communicates the visual snapshot of the 
+    cranial window alignment and cell appearance at the beginning of the session's runtime."""
     system_configuration_path: Path = Path()
-    """Stores the path to the system_configuration.yaml file. This file contains the exact snapshot of the data 
-    acquisition system configuration parameters used to acquire session data."""
+    """The path to the system_configuration.yaml file that contains the exact snapshot of the data acquisition system 
+    configuration parameters used to acquire the session's data."""
     checksum_path: Path = Path()
-    """Stores the path to the ax_checksum.txt file. This file is generated as part of packaging the data for 
-    transmission and stores the xxHash-128 checksum of the data. It is used to verify that the transmission did not 
-    damage or otherwise alter the data."""
+    """The path to the ax_checksum.txt file that stores the xxHash-128 checksum of the data used to verify its 
+    integrity during transmission."""
     telomere_path: Path = Path()
-    """Stores the path to the telomere.bin file. This file is statically generated at the end of the session's data 
-    acquisition based on experimenter feedback to mark sessions that ran in-full with no issues. Sessions without a 
-    telomere.bin file are considered 'incomplete' and are excluded from all automated processing, as they may contain 
-    corrupted, incomplete, or otherwise unusable data."""
+    """The path to the telomere.bin file that marks the sessions suitable for unsupervised data processing."""
     ubiquitin_path: Path = Path()
-    """Stores the path to the ubiquitin.bin file. This file is primarily used by the sl-experiment library to mark 
-    local session data directories for deletion (purging). Typically, it is created once the data is safely moved to 
-    the long-term storage destinations (NAS and Server) and the integrity of the moved data is verified on at least one 
-    destination. During 'sl-purge' sl-experiment runtimes, the library discovers and removes all session data marked 
-    with 'ubiquitin.bin' files from the machine that runs the command."""
+    """The path to the ubiquitin.bin file used to mark session data directories for deletion (purging)."""
     nk_path: Path = Path()
-    """Stores the path to the nk.bin file. This file is used by the sl-experiment library to mark sessions undergoing
-    runtime initialization. Since runtime initialization is a complex process that may encounter a runtime error, the 
-    marker is used to discover sessions that failed to initialize. Since uninitialized sessions by definition do not 
-    contain any valuable data, they are marked for immediate deletion from all managed destinations."""
+    """THe path to the nk.bin file used by the sl-experiment library to mark sessions undergoing runtime initialization.
+    """
     root_path: Path = Path()
-    """Stores the path to the root directory of the volume that stores raw data from all Sun lab projects. Primarily,
-    this is necessary for pipelines working with the data on the remote compute server to efficiently move it between 
-    storage and working (processing) volumes."""
+    """The path to the root directory of the host-machine's volume that stores raw data from all Sun lab projects."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
 
-        This method is called each time the (wrapper) SessionData class is instantiated to regenerate the managed path
-        hierarchy on any machine that instantiates the class.
-
         Args:
-            root_directory_path: The path to the top-level directory of the session. Typically, this path is assembled
-                using the following hierarchy: root/project/animal/session_id
+            root_directory_path: The path to the top-level raw data directory of the session's data hierarchy.
         """
         # Generates the managed paths
         self.raw_data_path = root_directory_path
@@ -170,11 +117,7 @@ class RawData:
         self.root_path = root_directory_path.parents[3]
 
     def make_directories(self) -> None:
-        """Ensures that all major subdirectories and the root directory exist, creating any missing directories.
-
-        This method is called each time the (wrapper) SessionData class is instantiated and allowed to generate
-        missing data directories.
-        """
+        """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
         ensure_directory_exists(self.raw_data_path)
         ensure_directory_exists(self.camera_data_path)
         ensure_directory_exists(self.mesoscope_data_path)
@@ -183,40 +126,30 @@ class RawData:
 
 @dataclass()
 class ProcessedData:
-    """Stores the paths to the directories and files that make up the 'processed_data' session-specific directory.
-
-    The processed_data directory stores the data generated by various processing pipelines from the raw data (contents
-    of the raw_data directory). Processed data represents an intermediate step between raw data and the dataset used in
-    the data analysis, but is not itself designed to be analyzed.
+    """Provides the paths to the directories and files that store the data generated by the processing pipelines from
+    the raw data.
     """
 
     processed_data_path: Path = Path()
-    """Stores the path to the root processed_data directory of the session. This directory stores the processed session 
-    data, generated from raw_data directory contents by various data processing pipelines."""
+    """The path to the root directory that stores the session's processed data."""
     camera_data_path: Path = Path()
-    """Stores the path to the directory that contains video tracking data generated by the Sun lab DeepLabCut-based 
+    """The path to the directory that contains video tracking data generated by the Sun lab DeepLabCut-based 
     video processing pipeline(s)."""
     mesoscope_data_path: Path = Path()
-    """Stores path to the directory that contains processed brain activity (cell) data generated by sl-suite2p 
-    processing pipelines (single-day and multi-day). This directory is only used by sessions acquired with 
-    the Mesoscope-VR system."""
+    """The path to the directory that contains processed brain activity (cell) data generated by sl-suite2p 
+    processing pipelines (single-day and multi-day)."""
     behavior_data_path: Path = Path()
-    """Stores the path to the directory that contains the non-video and non-brain-activity data extracted from 
-    .npz log files by the sl-behavior log processing pipeline."""
+    """The path to the directory that contains the non-video behavior data extracted from the .npz log archives by the 
+    sl-behavior log processing pipeline."""
     root_path: Path = Path()
-    """Stores the path to the root directory of the volume that stores processed data from all Sun lab projects. 
-    Primarily, this is necessary for pipelines working with the data on the remote compute server to efficiently move it
-    between storage and working (processing) volumes."""
+    """The path to the root directory of the host-machine's volume that stores processed data from all Sun lab 
+    projects."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
 
-        This method is called each time the (wrapper) SessionData class is instantiated to regenerate the managed path
-        hierarchy on any machine that instantiates the class.
-
         Args:
-            root_directory_path: The path to the top-level directory of the session. Typically, this path is assembled
-                using the following hierarchy: root/project/animal/session_id
+            root_directory_path: The path to the top-level processed data directory of the session's data hierarchy.
         """
         # Generates the managed paths
         self.processed_data_path = root_directory_path
@@ -230,9 +163,6 @@ class ProcessedData:
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories.
-
-        This method is called each time the (wrapper) SessionData class is instantiated and allowed to generate
-        missing data directories.
         """
         ensure_directory_exists(self.processed_data_path)
         ensure_directory_exists(self.camera_data_path)
@@ -241,31 +171,21 @@ class ProcessedData:
 
 @dataclass()
 class TrackingData:
-    """Stores the paths to the directories and files that make up the 'tracking_data' session-specific directory.
-
-    This directory was added in version 5.0.0 to store the ProcessingTracker files and .lock files for pipelines and
-    tasks used to work with session's data after acquisition.
+    """Provides the paths to the directories that store the ProcessingTracker files and .lock files for pipelines and
+    tasks used to work with the session's data after acquisition.
     """
 
     tracking_data_path: Path = Path()
-    """Stores the path to the root tracking_data directory of the session. This directory stores the .yaml 
-    ProcessingTracker files and the .lock FileLock files that jointly ensure that session's data is accessed in a 
-    thread-safe way while being processed by multiple different processes and pipelines."""
+    """The path to the root directory that stores the session's tracking data."""
     session_lock_path: Path = Path()
-    """Stores the path to the session's session_lock.yaml file. This file is used to ensure that only a single 
-    manager process has exclusive access to the session's data on the remote compute server. This allows multiple 
-    data processing pipelines to safely run for the same session without compromising session data integrity. This 
-    file is intended to be used through the SessionLock class."""
+    """The path to the session's session_lock.yaml file used to ensure that only a single manager process has exclusive
+    access to the session's data at the same time."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
 
-        This method is called each time the (wrapper) SessionData class is instantiated to regenerate the managed path
-        hierarchy on any machine that instantiates the class.
-
         Args:
-            root_directory_path: The path to the top-level directory of the session. Typically, this path is assembled
-                using the following hierarchy: root/project/animal/session_id
+            root_directory_path: The path to the top-level tracking data directory of the session's data hierarchy.
         """
         # Generates the managed paths
         self.tracking_data_path = root_directory_path
@@ -273,9 +193,6 @@ class TrackingData:
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories.
-
-        This method is called each time the (wrapper) SessionData class is instantiated and allowed to generate
-        missing data directories.
         """
         ensure_directory_exists(self.tracking_data_path)
 
@@ -571,7 +488,7 @@ class SessionData(YamlConfig):
         session_data_path = session_data_files.pop()
 
         # Loads class data from the.yaml file
-        instance: SessionData = cls.from_yaml(file_path=session_data_path)  # type: ignore
+        instance: SessionData = cls.from_yaml(file_path=session_data_path)  
 
         # The method assumes that the 'donor' .yaml file is always stored inside the raw_data directory of the session
         # to be processed. In turn, that directory is expected to be found under the path root/project/animal/session.
@@ -675,14 +592,12 @@ class SessionData(YamlConfig):
         # processing
         origin = copy.deepcopy(self)
 
-        # Resets all path fields to null. These fields are not loaded from the disk when the instance is loaded, so
-        # setting them to null has no negative consequences. Conversely, keeping these fields with Path objects
-        # prevents the SessionData instance from being loaded from the disk.
-        origin.raw_data = None  # type: ignore
-        origin.processed_data = None  # type: ignore
-        origin.source_data = None  # type: ignore
-        origin.archived_data = None  # type: ignore
-        origin.tracking_data = None  # type: ignore
+        # Resets all path fields to Null (None) before saving the instance to disk
+        origin.raw_data = None  
+        origin.processed_data = None  
+        origin.source_data = None  
+        origin.archived_data = None  
+        origin.tracking_data = None  
 
         # Converts StringEnum instances to strings
         origin.session_type = str(origin.session_type)
@@ -724,7 +639,7 @@ class SessionLock(YamlConfig):
     def _load_state(self) -> None:
         """Loads the current lock state from the .yaml file."""
         if self.file_path.exists():
-            instance: SessionLock = self.from_yaml(self.file_path)  # type: ignore
+            instance: SessionLock = self.from_yaml(self.file_path)  
             self._manager_id = copy.copy(instance._manager_id)
         else:
             # Creates a new lock file with the default state (unlocked)
@@ -734,8 +649,8 @@ class SessionLock(YamlConfig):
         """Saves the current lock state to the .yaml file."""
         # Creates a copy without file paths for clean serialization
         original = copy.deepcopy(self)
-        original.file_path = None  # type: ignore
-        original._lock_path = None  # type: ignore
+        original.file_path = None  
+        original._lock_path = None  
         original.to_yaml(file_path=self.file_path)
 
     def acquire(self, manager_id: int) -> None:
