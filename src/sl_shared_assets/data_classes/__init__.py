@@ -41,6 +41,8 @@ from .configuration_data import (
     MesoscopeExperimentConfiguration,
     get_working_directory,
     set_working_directory,
+    get_google_credentials_path,
+    set_google_credentials_path,
     get_system_configuration_data,
     create_system_configuration_file,
 )
@@ -76,7 +78,9 @@ __all__ = [
     "WindowCheckingDescriptor",
     "ZaberPositions",
     "create_system_configuration_file",
+    "get_google_credentials_path",
     "get_system_configuration_data",
     "get_working_directory",
+    "set_google_credentials_path",
     "set_working_directory",
 ]

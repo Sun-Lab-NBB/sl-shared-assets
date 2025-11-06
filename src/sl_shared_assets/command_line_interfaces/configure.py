@@ -12,6 +12,7 @@ from ..data_classes import (
     AcquisitionSystems,
     get_working_directory,
     set_working_directory,
+    set_google_credentials_path,
     create_system_configuration_file,
 )
 
@@ -171,3 +172,27 @@ def generate_system_configuration_file(system: AcquisitionSystems) -> None:
     created via this command, edit the file to modify the acquisition system configuration at any time.
     """
     create_system_configuration_file(system=system)
+
+
+@configure.command("sheets")
+@click.option(
+    "-c",
+    "--credentials",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="The absolute path to the Google Sheets service account credentials .JSON file.",
+)
+def configure_google_sheets(credentials: Path) -> None:
+    """Sets the path to the Google Sheets service account credentials file.
+
+    This command is used to configure access to the lab's Google Sheets files used for tracking surgical procedures,
+    water restriction logs, and other experimental metadata. The configured credentials file path is cached locally and
+    used by all Sun lab libraries that require Google Sheets access.
+    """
+    # Sets the Google Sheets credentials path
+    set_google_credentials_path(path=credentials)
+
+    console.echo(
+        message=f"Google Sheets credentials path set to: {credentials.resolve()}.",
+        level=LogLevel.SUCCESS,
+    )

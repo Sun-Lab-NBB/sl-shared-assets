@@ -97,14 +97,8 @@ class MesoscopeFileSystem:
 
 @dataclass()
 class MesoscopeGoogleSheets:
-    """Stores the identifiers and access credentials for the Google Sheets used by the Mesoscope-VR data
-    acquisition system.
-    """
+    """Stores the identifiers for the Google Sheets used by the Mesoscope-VR data acquisition system."""
 
-    google_credentials_path: Path = Path()
-    """The absolute path to the .JSON file that contains the credentials of the service account used to access and work 
-    with the Google Sheets used in the Sun lab.
-    """
     surgery_sheet_id: str = ""
     """The identifier of the Google Sheet that stores information about surgical interventions performed on the animals 
     that participate in data acquisition sessions."""
@@ -250,7 +244,6 @@ class MesoscopeSystemConfiguration(YamlConfig):
     def __post_init__(self) -> None:
         """Ensures that all instance assets are stored as the expected types."""
         # Restores Path objects from strings.
-        self.sheets.google_credentials_path = Path(self.sheets.google_credentials_path)
         self.filesystem.root_directory = Path(self.filesystem.root_directory)
         self.filesystem.server_directory = Path(self.filesystem.server_directory)
         self.filesystem.nas_directory = Path(self.filesystem.nas_directory)
@@ -290,7 +283,6 @@ class MesoscopeSystemConfiguration(YamlConfig):
         original = deepcopy(self)
 
         # Converts all Path objects to strings before dumping the data, as .YAML encoder does not recognize Path objects
-        original.sheets.google_credentials_path = str(original.sheets.google_credentials_path)
         original.filesystem.root_directory = str(original.filesystem.root_directory)
         original.filesystem.server_directory = str(original.filesystem.server_directory)
         original.filesystem.nas_directory = str(original.filesystem.nas_directory)
@@ -478,3 +470,83 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
     # Loads and return the configuration data
     configuration_class = _supported_configuration_files[file_name]
     return configuration_class.from_yaml(file_path=configuration_file)
+
+
+def set_google_credentials_path(path: Path) -> None:
+    """Sets the path to the Google Sheets service account credentials .JSON file for the local machine (PC) and
+    configures all future interactions with the Google Sheets API to use this file.
+
+    Notes:
+        This function caches the path to the Google Sheets credentials file in the user's data directory.
+
+    Args:
+        path: The path to the .JSON file containing the Google Sheets service account credentials.
+
+    Raises:
+        FileNotFoundError: If the specified .JSON file does not exist at the provided path.
+    """
+    # Verifies that the specified credentials file exists
+    if not path.exists():
+        message = (
+            f"Unable to set the Google Sheets credentials path. The specified file ({path}) does not exist. "
+            f"Ensure the .JSON credentials file exists at the specified path before calling this function."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    # Verifies that the file has a .json extension
+    if path.suffix.lower() != ".json":
+        message = (
+            f"Unable to set the Google Sheets credentials path. The specified file ({path}) does not have a .json "
+            f"extension. Provide the path to the Google Sheets service account credentials .JSON file."
+        )
+        console.error(message=message, error=ValueError)
+
+    # Resolves the path to the static .txt file used to store the path to the Google Sheets credentials file
+    app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
+    path_file = app_dir.joinpath("google_credentials_path.txt")
+
+    # In case this function is called before the app directory is created, ensures the app directory exists
+    ensure_directory_exists(path_file)
+
+    # Writes the absolute path to the credentials file
+    with path_file.open("w") as f:
+        f.write(str(path.resolve()))
+
+
+def get_google_credentials_path() -> Path:
+    """Resolves and returns the path to the Google Sheets service account credentials .JSON file.
+
+    Returns:
+        The path to the Google Sheets service account credentials .JSON file.
+
+    Raises:
+        FileNotFoundError: If the Google Sheets credentials path has not been configured for the host-machine, or if
+            the previously configured credentials file no longer exists at the expected path.
+    """
+    # Uses appdirs to locate the user data directory and resolve the path to the credentials' path cache file
+    app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
+    path_file = app_dir.joinpath("google_credentials_path.txt")
+
+    # If the cache file does not exist, aborts with an error
+    if not path_file.exists():
+        message = (
+            "Unable to resolve the path to the Google Sheets credentials file, as it has not been set. "
+            "Set the Google Sheets credentials path by using the 'sl-configure sheets' CLI command."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    # Once the location of the path storage file is resolved, reads the file path from the file
+    with path_file.open() as f:
+        credentials_path = Path(f.read().strip())
+
+    # If the credentials' file does not exist at the cached path, aborts with an error
+    if not credentials_path.exists():
+        message = (
+            "Unable to resolve the path to the Google Sheets credentials file, as the previously configured "
+            f"credentials file does not exist at the expected path ({credentials_path}). Set a new credentials path "
+            "by using the 'sl-configure sheets' CLI command."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    # Returns the path to the credentials' file
+    return credentials_path
