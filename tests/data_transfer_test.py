@@ -1,4 +1,7 @@
 from pathlib import Path
+import multiprocessing
+
+multiprocessing.set_start_method("spawn")  # Improves reproducibility.
 import os
 
 import pytest
@@ -848,3 +851,287 @@ def test_calculate_directory_checksum_binary_files(tmp_path):
     # Verifies consistency
     checksum2 = calculate_directory_checksum(directory=test_dir, save_checksum=False)
     assert checksum == checksum2
+
+
+@pytest.mark.xdist_group(name="group2")
+def test_transfer_directory_integrity_check_detects_corruption(sample_directory_structure, tmp_path, monkeypatch):
+    """Verifies that integrity verification detects corrupted transfers.
+
+    Args:
+        sample_directory_structure: Fixture providing a sample directory structure.
+        tmp_path: Pytest fixture providing a temporary directory path.
+        monkeypatch: Pytest fixture for modifying behavior.
+
+    This test simulates a corrupted file transfer by monkeypatching the checksum
+    calculation to return different values for source and destination.
+    """
+    source = sample_directory_structure
+    destination = tmp_path / "dest_corrupted"
+
+    # Tracks which directory is being checksummed
+    checksum_calls = []
+    original_calculate_checksum = calculate_directory_checksum
+
+    def mock_calculate_checksum(directory, progress=False, save_checksum=False, num_processes=None):
+        """Mocks calculate_directory_checksum to return different values for source and destination."""
+        checksum_calls.append(directory)
+        result = original_calculate_checksum(
+            directory=directory, progress=progress, save_checksum=save_checksum, num_processes=num_processes
+        )
+
+        # Returns different checksum for destination to simulate corruption
+        if directory == destination:
+            return "corrupted_checksum_00000000000000"
+        return result
+
+    # Applies monkeypatch
+    monkeypatch.setattr(
+        "sl_shared_assets.data_transfer.transfer_tools.calculate_directory_checksum", mock_calculate_checksum
+    )
+
+    # Attempts transfer with integrity verification
+    with pytest.raises(RuntimeError) as exc_info:
+        transfer_directory(
+            source=source,
+            destination=destination,
+            verify_integrity=True,
+        )
+
+    # Verifies the error message contains expected information
+    # Normalizes whitespace since the error message may contain line breaks
+    error_message = str(exc_info.value).replace("\n", " ")
+    assert "Checksum mismatch detected" in error_message
+    assert "corrupted in transmission" in error_message
+
+    # Verifies both source and destination were checksummed
+    assert len(checksum_calls) >= 2  # At least initial checksum and verification
+
+
+@pytest.mark.xdist_group(name="group2")
+def test_transfer_directory_checksum_path_truncation(tmp_path, monkeypatch):
+    """Verifies that error messages truncate long paths to the last 6 parts.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+        monkeypatch: Pytest fixture for modifying behavior.
+
+    This test verifies the Path(*parts[-6:]) truncation in error messages.
+    """
+    # Creates the deeply nested source path
+    source = tmp_path / "a" / "b" / "c" / "d" / "e" / "f" / "source"
+    source.mkdir(parents=True)
+    (source / "file.txt").write_text("content")
+
+    destination = tmp_path / "x" / "y" / "z" / "w" / "v" / "u" / "dest"
+    destination.mkdir(parents=True)
+
+    # Pre-calculates checksum
+    calculate_directory_checksum(directory=source, save_checksum=True)
+
+    # Tracks the original function
+    original_calculate_checksum = calculate_directory_checksum
+
+    # Mocks calculate_directory_checksum to return a corrupted hash for destination
+    def mock_calculate(directory, progress=False, save_checksum=False, num_processes=None):
+        result = original_calculate_checksum(
+            directory=directory, progress=progress, save_checksum=save_checksum, num_processes=num_processes
+        )
+        if directory == destination:
+            return "corrupted_hash_00000000000000"
+        return result
+
+    # Applies a monkeypatch to where the function is called in transfer_tools
+    monkeypatch.setattr("sl_shared_assets.data_transfer.transfer_tools.calculate_directory_checksum", mock_calculate)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        transfer_directory(
+            source=source,
+            destination=destination,
+            verify_integrity=True,
+        )
+
+    # Verifies the error message contains truncated paths (not full paths)
+    error_message = str(exc_info.value)
+    assert "Checksum mismatch detected" in error_message
+
+    # Verifies the paths show the last 6 parts (e/f/source and v/u/dest)
+    # The Path(*parts[-6:]) will show just the meaningful components
+    assert "e/f/source" in error_message or "e\\f\\source" in error_message  # Unix or Windows path separator
+    assert "v/u/dest" in error_message or "v\\u\\dest" in error_message
+
+
+@pytest.mark.xdist_group(name="group2")
+def test_transfer_directory_integrity_check_corruption_prevents_removal(
+    sample_directory_structure, tmp_path, monkeypatch
+):
+    """Verifies that the source is NOT removed when an integrity check fails.
+
+    Args:
+        sample_directory_structure: Fixture providing a sample directory structure.
+        tmp_path: Pytest fixture providing a temporary directory path.
+        monkeypatch: Pytest fixture for modifying behavior.
+
+    This test ensures that if a transfer is corrupted, the source data is preserved.
+    """
+    source = sample_directory_structure
+    destination = tmp_path / "dest_corrupted_no_removal"
+
+    # Mocks checksum to simulate corruption
+    original_calculate_checksum = calculate_directory_checksum
+
+    def mock_calculate_checksum(directory, progress=False, save_checksum=False, num_processes=None):
+        result = original_calculate_checksum(
+            directory=directory, progress=progress, save_checksum=save_checksum, num_processes=num_processes
+        )
+        if directory == destination:
+            return "different_checksum_1234567890abcd"
+        return result
+
+    monkeypatch.setattr(
+        "sl_shared_assets.data_transfer.transfer_tools.calculate_directory_checksum", mock_calculate_checksum
+    )
+
+    # Attempts transfer with both verification and removal enabled
+    with pytest.raises(RuntimeError):
+        transfer_directory(
+            source=source,
+            destination=destination,
+            verify_integrity=True,
+            remove_source=True,
+        )
+
+    # Verifies the source still exists (was not removed due to failed verification)
+    assert source.exists()
+    assert (source / "file1.txt").exists()
+
+
+@pytest.mark.xdist_group(name="group2")
+def test_transfer_directory_integrity_check_with_progress(sample_directory_structure, tmp_path):
+    """Verifies that integrity verification works with progress tracking enabled.
+
+    Args:
+        sample_directory_structure: Fixture providing a sample directory structure.
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures progress bars don't interfere with integrity verification.
+    """
+    source = sample_directory_structure
+    destination = tmp_path / "dest_progress_integrity"
+
+    # Performs transfer with both progress and integrity enabled
+    transfer_directory(
+        source=source,
+        destination=destination,
+        verify_integrity=True,
+        progress=True,
+    )
+
+    # Verifies successful transfer
+    assert destination.exists()
+    assert (destination / "file1.txt").exists()
+    assert (destination / "subdir1" / "file3.txt").exists()
+
+    # Verifies the checksum file exists
+    assert (source / "ax_checksum.txt").exists()
+
+
+@pytest.mark.xdist_group(name="group2")
+def test_transfer_directory_creates_checksum_when_missing(tmp_path):
+    """Verifies that checksum is automatically created if missing when verify_integrity=True.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the function handles missing checksums gracefully.
+    """
+    # Creates the source without a pre-calculated checksum
+    source = tmp_path / "source_no_checksum"
+    source.mkdir()
+    (source / "file1.txt").write_text("content1")
+    (source / "file2.txt").write_text("content2")
+
+    destination = tmp_path / "dest_auto_checksum"
+
+    # Verifies no checksum exists initially
+    assert not (source / "ax_checksum.txt").exists()
+
+    # Performs transfer with integrity verification
+    transfer_directory(
+        source=source,
+        destination=destination,
+        verify_integrity=True,
+    )
+
+    # Verifies checksum was automatically created
+    assert (source / "ax_checksum.txt").exists()
+
+    # Verifies successful transfer
+    assert destination.exists()
+    assert (destination / "file1.txt").read_text() == "content1"
+
+
+@pytest.mark.xdist_group(name="group2")
+def test_transfer_directory_preserves_checksum_file(sample_directory_structure, tmp_path):
+    """Verifies that the original checksum file is preserved in the source.
+
+    Args:
+        sample_directory_structure: Fixture providing a sample directory structure.
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the checksum file created during transfer remains in the source.
+    """
+    source = sample_directory_structure
+    destination = tmp_path / "dest_checksum_preserved"
+
+    # Verifies no checksum initially
+    assert not (source / "ax_checksum.txt").exists()
+
+    # Performs transfer with integrity verification
+    transfer_directory(
+        source=source,
+        destination=destination,
+        verify_integrity=True,
+    )
+
+    # Verifies the checksum file exists and persists in the source
+    assert (source / "ax_checksum.txt").exists()
+
+    # Verifies the checksum file is readable and valid
+    checksum_content = (source / "ax_checksum.txt").read_text().strip()
+    assert len(checksum_content) == 32  # xxHash3-128 hex string
+    assert all(c in "0123456789abcdef" for c in checksum_content)
+
+
+@pytest.mark.xdist_group(name="group2")
+def test_transfer_directory_integrity_multithread_consistency(large_directory_structure, tmp_path):
+    """Verifies that integrity checking works correctly with multithreaded transfers.
+
+    Args:
+        large_directory_structure: Fixture providing a large directory structure.
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures parallel file transfers don't compromise integrity verification.
+    """
+    source = large_directory_structure
+    destination = tmp_path / "dest_multi_integrity"
+
+    # Performs multithreaded transfer with integrity verification
+    transfer_directory(
+        source=source,
+        destination=destination,
+        num_threads=4,
+        verify_integrity=True,
+    )
+
+    # Verifies all files transferred correctly
+    source_files = sorted([f.relative_to(source) for f in source.rglob("*.txt")])
+    dest_files = sorted([f.relative_to(destination) for f in destination.rglob("*.txt")])
+
+    assert source_files == dest_files
+
+    # Spot checks file contents
+    assert (destination / "file_0.txt").exists()
+    assert (destination / "subdir_0" / "file_0.txt").exists()
+
+    # Verifies the source checksum file was created
+    assert (source / "ax_checksum.txt").exists()

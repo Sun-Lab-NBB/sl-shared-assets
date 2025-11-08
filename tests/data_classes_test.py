@@ -14,11 +14,22 @@ from sl_shared_assets import (
     MesoscopeExternalAssets,
     MesoscopeSystemConfiguration,
     MesoscopeGoogleSheets,
+    SessionTypes,
+    RawData,
+    ProcessedData,
+    TrackingData,
+    SessionData,
+    SessionLock,
     get_working_directory,
     get_system_configuration_data,
 )
 
-from sl_shared_assets.data_classes.configuration_data import set_working_directory, create_system_configuration_file
+from sl_shared_assets.data_classes.configuration_data import (
+    set_working_directory,
+    create_system_configuration_file,
+    set_google_credentials_path,
+    get_google_credentials_path,
+)
 
 
 @pytest.fixture
@@ -33,7 +44,6 @@ def sample_mesoscope_config() -> MesoscopeSystemConfiguration:
     config.filesystem.server_directory = Path("/mnt/server/projects")
     config.filesystem.nas_directory = Path("/mnt/nas/backup")
     config.filesystem.mesoscope_directory = Path("/mnt/mesoscope/data")
-    config.sheets.google_credentials_path = Path("/home/user/.credentials/service_account.json")
     config.sheets.surgery_sheet_id = "abc123"
     config.sheets.water_log_sheet_id = "xyz789"
     return config
@@ -97,6 +107,24 @@ def clean_working_directory(tmp_path, monkeypatch):
     return working_dir
 
 
+@pytest.fixture
+def sample_session_hierarchy(tmp_path) -> Path:
+    """Creates a sample session directory hierarchy for testing.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    Returns:
+        Path to the root session directory.
+    """
+    # Creates the session hierarchy: root/project/animal/session/raw_data
+    root = tmp_path / "data"
+    session_path = root / "test_project" / "test_animal" / "2024-01-15-12-30-45-123456" / "raw_data"
+    session_path.mkdir(parents=True)
+
+    return session_path.parent
+
+
 # Tests for AcquisitionSystems enumeration
 
 
@@ -117,6 +145,816 @@ def test_acquisition_systems_is_string_enum():
     This test ensures the enumeration members behave as strings.
     """
     assert isinstance(AcquisitionSystems.MESOSCOPE_VR, str)
+
+
+# Tests for SessionTypes enumeration
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_types_values():
+    """Verifies all SessionTypes enumeration values.
+
+    This test ensures the enumeration contains all expected session types.
+    """
+    assert SessionTypes.LICK_TRAINING == "lick training"
+    assert SessionTypes.RUN_TRAINING == "run training"
+    assert SessionTypes.MESOSCOPE_EXPERIMENT == "mesoscope experiment"
+    assert SessionTypes.WINDOW_CHECKING == "window checking"
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_types_is_string_enum():
+    """Verifies that SessionTypes inherits from StrEnum.
+
+    This test ensures the enumeration members behave as strings.
+    """
+    assert isinstance(SessionTypes.LICK_TRAINING, str)
+    assert isinstance(SessionTypes.RUN_TRAINING, str)
+    assert isinstance(SessionTypes.MESOSCOPE_EXPERIMENT, str)
+    assert isinstance(SessionTypes.WINDOW_CHECKING, str)
+
+
+# Tests for RawData dataclass
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_raw_data_default_initialization():
+    """Verifies default initialization of RawData.
+
+    This test ensures all path fields have default Path() values.
+    """
+    raw_data = RawData()
+
+    assert raw_data.raw_data_path == Path()
+    assert raw_data.camera_data_path == Path()
+    assert raw_data.mesoscope_data_path == Path()
+    assert raw_data.behavior_data_path == Path()
+    assert raw_data.zaber_positions_path == Path()
+    assert raw_data.session_descriptor_path == Path()
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_raw_data_resolve_paths(tmp_path):
+    """Verifies that resolve_paths correctly generates all data paths.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures all paths are properly resolved from the root directory.
+    """
+    raw_data = RawData()
+    root_path = tmp_path / "raw_data"
+
+    raw_data.resolve_paths(root_directory_path=root_path)
+
+    assert raw_data.raw_data_path == root_path
+    assert raw_data.camera_data_path == root_path / "camera_data"
+    assert raw_data.mesoscope_data_path == root_path / "mesoscope_data"
+    assert raw_data.behavior_data_path == root_path / "behavior_data"
+    assert raw_data.zaber_positions_path == root_path / "zaber_positions.yaml"
+    assert raw_data.session_descriptor_path == root_path / "session_descriptor.yaml"
+    assert raw_data.session_data_path == root_path / "session_data.yaml"
+    assert raw_data.telomere_path == root_path / "telomere.bin"
+    assert raw_data.ubiquitin_path == root_path / "ubiquitin.bin"
+    assert raw_data.nk_path == root_path / "nk.bin"
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_raw_data_make_directories(tmp_path):
+    """Verifies that make_directories creates all required subdirectories.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the directory creation method works correctly.
+    """
+    raw_data = RawData()
+    root_path = tmp_path / "raw_data"
+
+    raw_data.resolve_paths(root_directory_path=root_path)
+    raw_data.make_directories()
+
+    assert root_path.exists()
+    assert (root_path / "camera_data").exists()
+    assert (root_path / "mesoscope_data").exists()
+    assert (root_path / "behavior_data").exists()
+
+
+# Tests for ProcessedData dataclass
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_processed_data_default_initialization():
+    """Verifies default initialization of ProcessedData.
+
+    This test ensures all path fields have default Path() values.
+    """
+    processed_data = ProcessedData()
+
+    assert processed_data.processed_data_path == Path()
+    assert processed_data.camera_data_path == Path()
+    assert processed_data.mesoscope_data_path == Path()
+    assert processed_data.behavior_data_path == Path()
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_processed_data_resolve_paths(tmp_path):
+    """Verifies that resolve_paths correctly generates all data paths.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures all paths are properly resolved from the root directory.
+    """
+    processed_data = ProcessedData()
+    root_path = tmp_path / "processed_data"
+
+    processed_data.resolve_paths(root_directory_path=root_path)
+
+    assert processed_data.processed_data_path == root_path
+    assert processed_data.camera_data_path == root_path / "camera_data"
+    assert processed_data.mesoscope_data_path == root_path / "mesoscope_data"
+    assert processed_data.behavior_data_path == root_path / "behavior_data"
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_processed_data_make_directories(tmp_path):
+    """Verifies that make_directories creates all required subdirectories.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the directory creation method works correctly.
+    """
+    processed_data = ProcessedData()
+    root_path = tmp_path / "processed_data"
+
+    processed_data.resolve_paths(root_directory_path=root_path)
+    processed_data.make_directories()
+
+    assert root_path.exists()
+    assert (root_path / "camera_data").exists()
+    assert (root_path / "behavior_data").exists()
+
+
+# Tests for TrackingData dataclass
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_tracking_data_default_initialization():
+    """Verifies default initialization of TrackingData.
+
+    This test ensures all path fields have default Path() values.
+    """
+    tracking_data = TrackingData()
+
+    assert tracking_data.tracking_data_path == Path()
+    assert tracking_data.session_lock_path == Path()
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_tracking_data_resolve_paths(tmp_path):
+    """Verifies that resolve_paths correctly generates all data paths.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures all paths are properly resolved from the root directory.
+    """
+    tracking_data = TrackingData()
+    root_path = tmp_path / "tracking_data"
+
+    tracking_data.resolve_paths(root_directory_path=root_path)
+
+    assert tracking_data.tracking_data_path == root_path
+    assert tracking_data.session_lock_path == root_path / "session_lock.yaml"
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_tracking_data_make_directories(tmp_path):
+    """Verifies that make_directories creates the tracking directory.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the directory creation method works correctly.
+    """
+    tracking_data = TrackingData()
+    root_path = tmp_path / "tracking_data"
+
+    tracking_data.resolve_paths(root_directory_path=root_path)
+    tracking_data.make_directories()
+
+    assert root_path.exists()
+
+
+# Tests for SessionData dataclass
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_post_init_creates_nested_instances():
+    """Verifies that __post_init__ ensures nested dataclass instances exist.
+
+    This test ensures proper initialization of nested RawData, ProcessedData, and TrackingData.
+    """
+    session_data = SessionData(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_name="2024-01-15-12-30-45-123456",
+        session_type=SessionTypes.MESOSCOPE_EXPERIMENT,
+    )
+
+    assert isinstance(session_data.raw_data, RawData)
+    assert isinstance(session_data.processed_data, ProcessedData)
+    assert isinstance(session_data.tracking_data, TrackingData)
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_create_requires_valid_session_type(clean_working_directory, sample_mesoscope_config, monkeypatch):
+    """Verifies that create() raises ValueError for invalid session types.
+
+    Args:
+        clean_working_directory: Fixture providing a temporary working directory.
+        sample_mesoscope_config: Fixture providing a sample configuration.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures only valid SessionTypes are accepted.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    # Updates config with the actual root directory BEFORE creating directories
+    sample_mesoscope_config.filesystem.root_directory = clean_working_directory
+    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    sample_mesoscope_config.save(path=config_path)
+
+    # Creates project directory
+    project_dir = clean_working_directory / "test_project"
+    project_dir.mkdir(parents=True)
+
+    with pytest.raises(ValueError):
+        SessionData.create(
+            project_name="test_project",
+            animal_id="test_animal",
+            session_type="invalid_session_type",
+            python_version="3.11.13",
+            sl_experiment_version="3.0.0",
+        )
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_create_generates_session_directory(clean_working_directory, sample_mesoscope_config, monkeypatch):
+    """Verifies that create() generates the complete session directory structure.
+
+    Args:
+        clean_working_directory: Fixture providing a temporary working directory.
+        sample_mesoscope_config: Fixture providing a sample configuration.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures all session directories are created correctly.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    # Updates config with the actual root directory BEFORE creating directories
+    sample_mesoscope_config.filesystem.root_directory = clean_working_directory
+    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    sample_mesoscope_config.save(path=config_path)
+
+    # Creates project directory
+    project_dir = clean_working_directory / "test_project"
+    project_dir.mkdir(parents=True)
+
+    session_data = SessionData.create(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_type=SessionTypes.LICK_TRAINING,
+        python_version="3.11.13",
+        sl_experiment_version="3.0.0",
+    )
+
+    # Verifies directory structure
+    assert session_data.raw_data.raw_data_path.exists()
+    assert session_data.raw_data.camera_data_path.exists()
+    assert session_data.raw_data.mesoscope_data_path.exists()
+    assert session_data.raw_data.behavior_data_path.exists()
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_create_saves_session_data_yaml(clean_working_directory, sample_mesoscope_config, monkeypatch):
+    """Verifies that create() saves the session_data.yaml file.
+
+    Args:
+        clean_working_directory: Fixture providing a temporary working directory.
+        sample_mesoscope_config: Fixture providing a sample configuration.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures the session metadata file is created.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    # Updates config with the actual root directory BEFORE creating directories
+    sample_mesoscope_config.filesystem.root_directory = clean_working_directory
+    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    sample_mesoscope_config.save(path=config_path)
+
+    # Creates project directory
+    project_dir = clean_working_directory / "test_project"
+    project_dir.mkdir(parents=True)
+
+    session_data = SessionData.create(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_type=SessionTypes.MESOSCOPE_EXPERIMENT,
+        python_version="3.11.13",
+        sl_experiment_version="3.0.0",
+    )
+
+    assert session_data.raw_data.session_data_path.exists()
+    content = session_data.raw_data.session_data_path.read_text()
+    assert "project_name: test_project" in content
+    assert "animal_id: test_animal" in content
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_create_marks_with_nk_file(clean_working_directory, sample_mesoscope_config, monkeypatch):
+    """Verifies that create() marks new sessions with the nk.bin file.
+
+    Args:
+        clean_working_directory: Fixture providing a temporary working directory.
+        sample_mesoscope_config: Fixture providing a sample configuration.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures new sessions are properly marked for initialization tracking.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    # Updates config with the actual root directory BEFORE creating directories
+    sample_mesoscope_config.filesystem.root_directory = clean_working_directory
+    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    sample_mesoscope_config.save(path=config_path)
+
+    # Creates project directory
+    project_dir = clean_working_directory / "test_project"
+    project_dir.mkdir(parents=True)
+
+    session_data = SessionData.create(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_type=SessionTypes.RUN_TRAINING,
+        python_version="3.11.13",
+        sl_experiment_version="3.0.0",
+    )
+
+    assert session_data.raw_data.nk_path.exists()
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_load_finds_session_data_yaml(sample_session_hierarchy):
+    """Verifies that load() successfully finds and loads session_data.yaml.
+
+    Args:
+        sample_session_hierarchy: Fixture providing a sample session directory structure.
+
+    This test ensures the load method can locate the session data file.
+    """
+    # Creates a session_data.yaml file
+    raw_data_path = sample_session_hierarchy / "raw_data"
+    raw_data_path.mkdir(parents=True, exist_ok=True)
+
+    session_data_path = raw_data_path / "session_data.yaml"
+    session_data_content = """
+project_name: test_project
+animal_id: test_animal
+session_name: 2024-01-15-12-30-45-123456
+session_type: lick training
+acquisition_system: mesoscope-vr
+experiment_name: null
+python_version: 3.11.13
+sl_experiment_version: 3.0.0
+"""
+    session_data_path.write_text(session_data_content)
+
+    loaded_session = SessionData.load(session_path=sample_session_hierarchy)
+
+    assert loaded_session.project_name == "test_project"
+    assert loaded_session.animal_id == "test_animal"
+    assert loaded_session.session_type == "lick training"
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_load_raises_error_no_session_data_file(tmp_path):
+    """Verifies that load() raises FileNotFoundError when no session_data.yaml exists.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures proper error handling for missing session data files.
+    """
+    empty_dir = tmp_path / "empty_session"
+    empty_dir.mkdir()
+
+    with pytest.raises(FileNotFoundError):
+        SessionData.load(session_path=empty_dir)
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_load_raises_error_multiple_session_data_files(tmp_path):
+    """Verifies that load() raises FileNotFoundError when multiple session_data.yaml files exist.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures proper error handling for ambiguous session hierarchies.
+    """
+    session_dir = tmp_path / "ambiguous_session"
+    session_dir.mkdir()
+
+    # Creates multiple session_data.yaml files
+    (session_dir / "session_data.yaml").write_text("content1")
+    subdir = session_dir / "subdir"
+    subdir.mkdir()
+    (subdir / "session_data.yaml").write_text("content2")
+
+    with pytest.raises(FileNotFoundError):
+        SessionData.load(session_path=session_dir)
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_load_resolves_all_paths(sample_session_hierarchy):
+    """Verifies that load() resolves all RawData, ProcessedData, and TrackingData paths.
+
+    Args:
+        sample_session_hierarchy: Fixture providing a sample session directory structure.
+
+    This test ensures all session data paths are properly initialized after loading.
+    """
+    raw_data_path = sample_session_hierarchy / "raw_data"
+    raw_data_path.mkdir(parents=True, exist_ok=True)
+
+    session_data_path = raw_data_path / "session_data.yaml"
+    session_data_content = """
+project_name: test_project
+animal_id: test_animal
+session_name: 2024-01-15-12-30-45-123456
+session_type: mesoscope experiment
+acquisition_system: mesoscope-vr
+experiment_name: test_experiment
+python_version: 3.11.13
+sl_experiment_version: 3.0.0
+"""
+    session_data_path.write_text(session_data_content)
+
+    loaded_session = SessionData.load(session_path=sample_session_hierarchy)
+
+    # Verifies RawData paths
+    assert loaded_session.raw_data.raw_data_path.name == "raw_data"
+    assert loaded_session.raw_data.camera_data_path.name == "camera_data"
+
+    # Verifies ProcessedData paths
+    assert loaded_session.processed_data.processed_data_path.name == "processed_data"
+
+    # Verifies TrackingData paths
+    assert loaded_session.tracking_data.tracking_data_path.name == "tracking_data"
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_load_creates_processed_and_tracking_directories(sample_session_hierarchy):
+    """Verifies that load() creates processed_data and tracking_data directories.
+
+    Args:
+        sample_session_hierarchy: Fixture providing a sample session directory structure.
+
+    This test ensures missing processing directories are created during load() runtime.
+    """
+    raw_data_path = sample_session_hierarchy / "raw_data"
+    raw_data_path.mkdir(parents=True, exist_ok=True)
+
+    session_data_path = raw_data_path / "session_data.yaml"
+    session_data_content = """
+project_name: test_project
+animal_id: test_animal
+session_name: 2024-01-15-12-30-45-123456
+session_type: window checking
+acquisition_system: mesoscope-vr
+experiment_name: null
+python_version: 3.11.13
+sl_experiment_version: 3.0.0
+"""
+    session_data_path.write_text(session_data_content)
+
+    loaded_session = SessionData.load(session_path=sample_session_hierarchy)
+
+    assert loaded_session.processed_data.processed_data_path.exists()
+    assert loaded_session.tracking_data.tracking_data_path.exists()
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_runtime_initialized_removes_nk_file(sample_session_hierarchy):
+    """Verifies that runtime_initialized() removes the nk.bin marker file.
+
+    Args:
+        sample_session_hierarchy: Fixture providing a sample session directory structure.
+
+    This test ensures the initialization marker is properly removed.
+    """
+    raw_data_path = sample_session_hierarchy / "raw_data"
+    raw_data_path.mkdir(parents=True, exist_ok=True)
+
+    session_data_path = raw_data_path / "session_data.yaml"
+    session_data_content = """
+project_name: test_project
+animal_id: test_animal
+session_name: 2024-01-15-12-30-45-123456
+session_type: lick training
+acquisition_system: mesoscope-vr
+experiment_name: null
+python_version: 3.11.13
+sl_experiment_version: 3.0.0
+"""
+    session_data_path.write_text(session_data_content)
+
+    loaded_session = SessionData.load(session_path=sample_session_hierarchy)
+
+    # Creates the nk.bin file
+    loaded_session.raw_data.nk_path.touch()
+    assert loaded_session.raw_data.nk_path.exists()
+
+    # Calls runtime_initialized
+    loaded_session.runtime_initialized()
+
+    assert not loaded_session.raw_data.nk_path.exists()
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy):
+    """Verifies that save() converts SessionTypes and AcquisitionSystems to strings.
+
+    Args:
+        sample_session_hierarchy: Fixture providing a sample session directory structure.
+
+    This test ensures enum values are properly serialized in YAML.
+    """
+    raw_data_path = sample_session_hierarchy / "raw_data"
+    raw_data_path.mkdir(parents=True, exist_ok=True)
+
+    session_data = SessionData(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_name="2024-01-15-12-30-45-123456",
+        session_type=SessionTypes.MESOSCOPE_EXPERIMENT,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        python_version="3.11.13",
+        sl_experiment_version="3.0.0",
+    )
+
+    session_data.raw_data.resolve_paths(root_directory_path=raw_data_path)
+    session_data.save()
+
+    content = session_data.raw_data.session_data_path.read_text()
+    assert "session_type: mesoscope experiment" in content
+    assert "acquisition_system: mesoscope-vr" in content
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_save_does_not_include_path_objects(sample_session_hierarchy):
+    """Verifies that save() excludes path objects from the saved YAML.
+
+    Args:
+        sample_session_hierarchy: Fixture providing a sample session directory structure.
+
+    This test ensures only metadata is saved, not path instances.
+    """
+    raw_data_path = sample_session_hierarchy / "raw_data"
+    raw_data_path.mkdir(parents=True, exist_ok=True)
+
+    session_data = SessionData(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_name="2024-01-15-12-30-45-123456",
+        session_type=SessionTypes.RUN_TRAINING,
+        python_version="3.11.13",
+        sl_experiment_version="3.0.0",
+    )
+
+    session_data.raw_data.resolve_paths(root_directory_path=raw_data_path)
+    session_data.save()
+
+    content = session_data.raw_data.session_data_path.read_text()
+    assert "raw_data: null" in content
+    assert "processed_data: null" in content
+    assert "tracking_data: null" in content
+
+
+# Tests for SessionLock dataclass
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_lock_initialization(tmp_path):
+    """Verifies basic initialization of SessionLock.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the lock file path is properly initialized.
+    """
+    lock_file = tmp_path / "session_lock.yaml"
+    session_lock = SessionLock(file_path=lock_file)
+
+    assert session_lock.file_path == lock_file
+    assert session_lock._manager_id == -1
+    assert session_lock.lock_path == str(lock_file.with_suffix(".yaml.lock"))
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_lock_acquire_creates_lock_file(tmp_path):
+    """Verifies that acquire() creates the lock file with the correct manager ID.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the lock acquisition mechanism works correctly.
+    """
+    lock_file = tmp_path / "session_lock.yaml"
+    session_lock = SessionLock(file_path=lock_file)
+
+    manager_id = 12345
+    session_lock.acquire(manager_id=manager_id)
+
+    assert lock_file.exists()
+    content = lock_file.read_text()
+    assert f"_manager_id: {manager_id}" in content
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_lock_acquire_raises_error_if_locked_by_another_manager(tmp_path):
+    """Verifies that acquire() raises RuntimeError when locked by another manager.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures exclusive lock ownership is enforced.
+    Note: This test creates separate SessionLock instances to simulate different processes.
+    """
+    lock_file = tmp_path / "session_lock.yaml"
+
+    # The first manager acquires lock (simulates the first process)
+    session_lock_1 = SessionLock(file_path=lock_file)
+    session_lock_1.acquire(manager_id=100)
+
+    # The second manager attempts to acquire lock (simulates the second process)
+    session_lock_2 = SessionLock(file_path=lock_file)
+    with pytest.raises(RuntimeError):
+        session_lock_2.acquire(manager_id=200)
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_lock_acquire_allows_reacquisition_by_same_manager(tmp_path):
+    """Verifies that acquire() allows the same manager to reacquire the lock.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures idempotent lock acquisition for the lock owner.
+    Note: This test creates separate SessionLock instances to simulate the same process
+    reacquiring the lock after reloading state.
+    """
+    lock_file = tmp_path / "session_lock.yaml"
+
+    # First acquisition
+    session_lock_1 = SessionLock(file_path=lock_file)
+    manager_id = 12345
+    session_lock_1.acquire(manager_id=manager_id)
+
+    # The same manager reacquires lock (simulates the same process reloading state)
+    session_lock_2 = SessionLock(file_path=lock_file)
+    session_lock_2.acquire(manager_id=manager_id)  # Should not raise error
+
+    # Verifies the lock is still held by the same manager
+    session_lock_2._load_state()
+    assert session_lock_2._manager_id == manager_id
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_lock_release_removes_lock_ownership(tmp_path):
+    """Verifies that release() removes lock ownership.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the lock release mechanism works correctly.
+    """
+    lock_file = tmp_path / "session_lock.yaml"
+    session_lock = SessionLock(file_path=lock_file)
+
+    manager_id = 12345
+    session_lock.acquire(manager_id=manager_id)
+    session_lock.release(manager_id=manager_id)
+
+    # Reloads state to verify
+    session_lock._load_state()
+    assert session_lock._manager_id == -1
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_lock_release_raises_error_if_not_owner(tmp_path):
+    """Verifies that release() raises RuntimeError when called by a non-owner.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures only the lock owner can release the lock.
+    Note: This test creates separate SessionLock instances to simulate different processes.
+    """
+    lock_file = tmp_path / "session_lock.yaml"
+
+    # First manager acquires a lock
+    session_lock_1 = SessionLock(file_path=lock_file)
+    session_lock_1.acquire(manager_id=100)
+
+    # Different manager attempts to release a lock
+    session_lock_2 = SessionLock(file_path=lock_file)
+    with pytest.raises(RuntimeError):
+        session_lock_2.release(manager_id=200)
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_lock_force_release_clears_any_lock(tmp_path):
+    """Verifies that force_release() clears the lock regardless of ownership.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the emergency lock release mechanism works correctly.
+    """
+    lock_file = tmp_path / "session_lock.yaml"
+
+    # Manager acquires lock
+    session_lock_1 = SessionLock(file_path=lock_file)
+    session_lock_1.acquire(manager_id=12345)
+
+    # Force release from any process (simulated by different instance)
+    session_lock_2 = SessionLock(file_path=lock_file)
+    session_lock_2.force_release()
+
+    # Reloads state to verify
+    session_lock_2._load_state()
+    assert session_lock_2._manager_id == -1
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_lock_check_owner_passes_for_correct_owner(tmp_path):
+    """Verifies that check_owner() passes when called by the lock owner.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures ownership verification works correctly for valid owners.
+    Note: This test creates separate SessionLock instances to simulate a process
+    checking its ownership after reloading state.
+    """
+    lock_file = tmp_path / "session_lock.yaml"
+
+    # Manager acquires lock
+    session_lock_1 = SessionLock(file_path=lock_file)
+    manager_id = 12345
+    session_lock_1.acquire(manager_id=manager_id)
+
+    # The same manager checks ownership (simulated by different instance loading state)
+    session_lock_2 = SessionLock(file_path=lock_file)
+    session_lock_2.check_owner(manager_id=manager_id)  # Should not raise error
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_lock_check_owner_raises_error_for_wrong_owner(tmp_path):
+    """Verifies that check_owner() raises ValueError when called by a non-owner.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures ownership verification rejects non-owners.
+    Note: This test creates separate SessionLock instances to simulate different processes.
+    """
+    lock_file = tmp_path / "session_lock.yaml"
+
+    # First manager acquires a lock
+    session_lock_1 = SessionLock(file_path=lock_file)
+    session_lock_1.acquire(manager_id=100)
+
+    # Different manager checks ownership
+    session_lock_2 = SessionLock(file_path=lock_file)
+    with pytest.raises(ValueError):
+        session_lock_2.check_owner(manager_id=200)
 
 
 # Tests for MesoscopeExperimentState dataclass
@@ -265,7 +1103,6 @@ def test_mesoscope_google_sheets_default_initialization():
     """
     sheets = MesoscopeGoogleSheets()
 
-    assert sheets.google_credentials_path == Path()
     assert sheets.surgery_sheet_id == ""
     assert sheets.water_log_sheet_id == ""
 
@@ -277,12 +1114,10 @@ def test_mesoscope_google_sheets_custom_initialization():
     This test ensures all fields accept custom values.
     """
     sheets = MesoscopeGoogleSheets(
-        google_credentials_path=Path("/home/user/.creds/service.json"),
         surgery_sheet_id="abc123xyz",
         water_log_sheet_id="def456uvw",
     )
 
-    assert sheets.google_credentials_path == Path("/home/user/.creds/service.json")
     assert sheets.surgery_sheet_id == "abc123xyz"
     assert sheets.water_log_sheet_id == "def456uvw"
 
@@ -839,6 +1674,138 @@ def test_get_working_directory_raises_error_if_directory_missing(clean_working_d
         get_working_directory()
 
 
+# Tests for set_google_credentials_path function
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_set_google_credentials_path_creates_cache_file(tmp_path, monkeypatch):
+    """Verifies that set_google_credentials_path creates the credentials' cache file.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures the credentials' path is properly cached.
+    """
+    app_dir = tmp_path / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    credentials_file = tmp_path / "service_account.json"
+    credentials_file.write_text('{"type": "service_account"}')
+
+    set_google_credentials_path(credentials_file)
+
+    cache_file = app_dir / "google_credentials_path.txt"
+    assert cache_file.exists()
+    assert cache_file.read_text() == str(credentials_file.resolve())
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_set_google_credentials_path_raises_error_file_not_exists(tmp_path, monkeypatch):
+    """Verifies that set_google_credentials_path raises error for non-existent files.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures the function validates file existence.
+    """
+    app_dir = tmp_path / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    non_existent_file = tmp_path / "missing.json"
+
+    with pytest.raises(FileNotFoundError):
+        set_google_credentials_path(non_existent_file)
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_set_google_credentials_path_raises_error_wrong_extension(tmp_path, monkeypatch):
+    """Verifies that set_google_credentials_path raises error for non-JSON files.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures the function validates the file extension.
+    """
+    app_dir = tmp_path / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    wrong_extension = tmp_path / "credentials.txt"
+    wrong_extension.write_text("not json")
+
+    with pytest.raises(ValueError):
+        set_google_credentials_path(wrong_extension)
+
+
+# Tests for get_google_credentials_path function
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_get_google_credentials_path_returns_cached_path(tmp_path, monkeypatch):
+    """Verifies that get_google_credentials_path returns the cached credentials path.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures the function retrieves the correct cached credentials path.
+    """
+    app_dir = tmp_path / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    credentials_file = tmp_path / "service_account.json"
+    credentials_file.write_text('{"type": "service_account"}')
+
+    set_google_credentials_path(credentials_file)
+    retrieved_path = get_google_credentials_path()
+
+    assert retrieved_path == credentials_file.resolve()
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_get_google_credentials_path_raises_error_if_not_set(tmp_path, monkeypatch):
+    """Verifies that get_google_credentials_path raises an error if not configured.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures the function raises an error when the credentials' path is not set.
+    """
+    app_dir = tmp_path / "empty_app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    with pytest.raises(FileNotFoundError):
+        get_google_credentials_path()
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_get_google_credentials_path_raises_error_if_file_missing(tmp_path, monkeypatch):
+    """Verifies that get_google_credentials_path raises an error if the cached file no longer exists.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures the function detects when the cached credentials file is missing.
+    """
+    app_dir = tmp_path / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    credentials_file = tmp_path / "service_account.json"
+    credentials_file.write_text('{"type": "service_account"}')
+
+    set_google_credentials_path(credentials_file)
+
+    # Deletes the credentials' file
+    credentials_file.unlink()
+
+    with pytest.raises(FileNotFoundError):
+        get_google_credentials_path()
+
+
 # Tests for the create_system_configuration_file function
 
 
@@ -1060,7 +2027,6 @@ def test_get_system_configuration_data_path_types(clean_working_directory, sampl
     assert isinstance(loaded_config.filesystem.root_directory, Path)
     assert isinstance(loaded_config.filesystem.server_directory, Path)
     assert isinstance(loaded_config.filesystem.nas_directory, Path)
-    assert isinstance(loaded_config.sheets.google_credentials_path, Path)
 
 
 @pytest.mark.xdist_group(name="group3")
@@ -1089,3 +2055,187 @@ def test_get_system_configuration_data_valve_calibration_tuple(
     # Verifies valve calibration is a tuple
     assert isinstance(loaded_config.microcontrollers.valve_calibration_data, tuple)
     assert all(isinstance(item, tuple) for item in loaded_config.microcontrollers.valve_calibration_data)
+
+
+# Add this test after the existing SessionData.create tests
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_create_raises_error_if_project_does_not_exist(
+    clean_working_directory, sample_mesoscope_config, monkeypatch
+):
+    """Verifies that create() raises FileNotFoundError when the project doesn't exist.
+
+    Args:
+        clean_working_directory: Fixture providing a temporary working directory.
+        sample_mesoscope_config: Fixture providing a sample configuration.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures sessions cannot be created for non-existent projects.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    # Updates config with the actual root directory
+    sample_mesoscope_config.filesystem.root_directory = clean_working_directory
+    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    sample_mesoscope_config.save(path=config_path)
+
+    # Does NOT create the project directory
+
+    with pytest.raises(FileNotFoundError) as exc_info:
+        SessionData.create(
+            project_name="nonexistent_project",
+            animal_id="test_animal",
+            session_type=SessionTypes.LICK_TRAINING,
+            python_version="3.11.13",
+            sl_experiment_version="3.0.0",
+        )
+
+    # Verifies the error message mentioning the project and CLI command
+    assert "nonexistent_project" in str(exc_info.value)
+    assert "sl-project create" in str(exc_info.value)
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_create_copies_experiment_configuration(
+    clean_working_directory, sample_mesoscope_config, sample_experiment_config, monkeypatch
+):
+    """Verifies that create() copies experiment configuration when experiment_name is provided.
+
+    Args:
+        clean_working_directory: Fixture providing a temporary working directory.
+        sample_mesoscope_config: Fixture providing a sample configuration.
+        sample_experiment_config: Fixture providing a sample experiment configuration.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures experiment configuration files are copied to session directories.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    # Updates config with the actual root directory
+    sample_mesoscope_config.filesystem.root_directory = clean_working_directory
+    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    sample_mesoscope_config.save(path=config_path)
+
+    # Creates project and configuration directories
+    project_dir = clean_working_directory / "test_project"
+    config_dir = project_dir / "configuration"
+    config_dir.mkdir(parents=True)
+
+    # Creates experiment configuration file
+    experiment_name = "test_experiment"
+    experiment_config_path = config_dir / f"{experiment_name}.yaml"
+    sample_experiment_config.to_yaml(file_path=experiment_config_path)
+
+    # Creates session with experiment name
+    session_data = SessionData.create(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_type=SessionTypes.MESOSCOPE_EXPERIMENT,
+        experiment_name=experiment_name,
+        python_version="3.11.13",
+        sl_experiment_version="3.0.0",
+    )
+
+    # Verifies experiment configuration was copied to the session directory
+    assert session_data.raw_data.experiment_configuration_path.exists()
+
+    # Verifies content matches original
+    loaded_config = MesoscopeExperimentConfiguration.from_yaml(
+        file_path=session_data.raw_data.experiment_configuration_path
+    )
+    assert loaded_config.unity_scene_name == sample_experiment_config.unity_scene_name
+    assert loaded_config.cue_map == sample_experiment_config.cue_map
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_create_without_experiment_name_skips_experiment_config(
+    clean_working_directory, sample_mesoscope_config, monkeypatch
+):
+    """Verifies that create() does not copy experiment config when experiment_name is None.
+
+    Args:
+        clean_working_directory: Fixture providing a temporary working directory.
+        sample_mesoscope_config: Fixture providing a sample configuration.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures experiment configuration is only copied for experiment sessions.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    # Updates config with the actual root directory
+    sample_mesoscope_config.filesystem.root_directory = clean_working_directory
+    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    sample_mesoscope_config.save(path=config_path)
+
+    # Creates project directory
+    project_dir = clean_working_directory / "test_project"
+    project_dir.mkdir(parents=True)
+
+    # Creates a session WITHOUT an experiment name
+    session_data = SessionData.create(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_type=SessionTypes.LICK_TRAINING,
+        experiment_name=None,
+        python_version="3.11.13",
+        sl_experiment_version="3.0.0",
+    )
+
+    # Verifies an experiment configuration path exists but the file does not
+    assert (
+        session_data.raw_data.experiment_configuration_path
+        == session_data.raw_data.raw_data_path / "experiment_configuration.yaml"
+    )
+    assert not session_data.raw_data.experiment_configuration_path.exists()
+
+
+@pytest.mark.xdist_group(name="group3")
+def test_session_data_create_saves_system_configuration(clean_working_directory, sample_mesoscope_config, monkeypatch):
+    """Verifies that create() saves the system configuration to the session directory.
+
+    Args:
+        clean_working_directory: Fixture providing a temporary working directory.
+        sample_mesoscope_config: Fixture providing a sample configuration.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures the system configuration snapshot is saved with each session.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    # Updates config with the actual root directory
+    sample_mesoscope_config.filesystem.root_directory = clean_working_directory
+    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    sample_mesoscope_config.save(path=config_path)
+
+    # Creates project directory
+    project_dir = clean_working_directory / "test_project"
+    project_dir.mkdir(parents=True)
+
+    session_data = SessionData.create(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_type=SessionTypes.WINDOW_CHECKING,
+        python_version="3.11.13",
+        sl_experiment_version="3.0.0",
+    )
+
+    # Verifies system configuration file exists
+    assert session_data.raw_data.system_configuration_path.exists()
+
+    # Verifies content can be loaded
+    loaded_config = MesoscopeSystemConfiguration.from_yaml(file_path=session_data.raw_data.system_configuration_path)
+    assert loaded_config.name == sample_mesoscope_config.name
+    assert loaded_config.cameras.face_camera_index == sample_mesoscope_config.cameras.face_camera_index

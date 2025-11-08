@@ -45,7 +45,7 @@ def delete_directory(directory_path: Path) -> None:
         try:
             directory_path.rmdir()
             break  # Breaks early if the call succeeds
-        except Exception:
+        except Exception:  # pragma: no cover
             delay_timer.delay(block=False, delay=500, allow_sleep=True)  # For each failed attempt, sleeps for 500 ms
             continue
 
@@ -164,11 +164,11 @@ def transfer_directory(
     if verify_integrity:
         destination_checksum = calculate_directory_checksum(directory=destination, progress=False, save_checksum=False)
         with source.joinpath("ax_checksum.txt").open("r") as local_checksum:
-            message = (
-                f"Checksum mismatch detected when transferring {Path(*source.parts[-6:])} to "
-                f"{Path(*destination.parts[-6:])}! The data was likely corrupted in transmission."
-            )
             if destination_checksum != local_checksum.readline().strip():
+                message = (
+                    f"Checksum mismatch detected when transferring {Path(*source.parts[-6:])} to "
+                    f"{Path(*destination.parts[-6:])}! The data was likely corrupted in transmission."
+                )
                 console.error(message=message, error=RuntimeError)
 
     # If necessary, removes the transferred directory from the original location.

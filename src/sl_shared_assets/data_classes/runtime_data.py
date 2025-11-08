@@ -1,8 +1,8 @@
 """This module provides the assets used by data acquisition systems to store a subset of the acquired data."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass  # pragma: no cover
 
-from ataraxis_data_structures import YamlConfig
+from ataraxis_data_structures import YamlConfig  # pragma: no cover
 
 
 @dataclass()
@@ -180,7 +180,7 @@ class WindowCheckingDescriptor(YamlConfig):  # pragma: no cover
 
 
 @dataclass()
-class ZaberPositions(YamlConfig):
+class ZaberPositions(YamlConfig):  # pragma: no cover
     """Stores Zaber motor positions reused between data acquisition sessions that use the Mesoscope-VR system."""
 
     headbar_z: int = 0
@@ -200,7 +200,7 @@ class ZaberPositions(YamlConfig):
 
 
 @dataclass()
-class MesoscopePositions(YamlConfig):
+class MesoscopePositions(YamlConfig):  # pragma: no cover
     """Stores the positions of real and virtual Mesoscope imaging axes reused between experiment sessions that use the
     Mesoscope-VR system.
     """

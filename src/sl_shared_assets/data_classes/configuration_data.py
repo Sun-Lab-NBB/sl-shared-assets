@@ -451,7 +451,8 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
             f"acquisition system configuration file."
         )
         console.error(message=message, error=FileNotFoundError)
-        raise FileNotFoundError(message)  # Fallback to appease mypy, should not be reachable
+        # Fallback to appease mypy, should not be reachable
+        raise FileNotFoundError(message)  # pragma: no cover
 
     # Gets the single configuration file
     configuration_file = config_files[0]
@@ -465,7 +466,8 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
             f"to use a supported configuration file."
         )
         console.error(message=message, error=ValueError)
-        raise ValueError(message)  # Fallback to appease mypy, should not be reachable
+        # Fallback to appease mypy, should not be reachable
+        raise ValueError(message)  # pragma: no cover
 
     # Loads and return the configuration data
     configuration_class = _supported_configuration_files[file_name]

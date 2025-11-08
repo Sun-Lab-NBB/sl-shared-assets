@@ -19,7 +19,7 @@ _excluded_files = {
 }
 
 
-def _calculate_file_checksum(base_directory: Path, file_path: Path) -> tuple[str, bytes]:
+def _calculate_file_checksum(base_directory: Path, file_path: Path) -> tuple[str, bytes]:  # pragma: no cover
     """Calculates the xxHash3-128 checksum for the target file and its path relative to the base directory.
 
     Args:

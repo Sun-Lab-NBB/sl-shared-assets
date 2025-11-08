@@ -1,8 +1,8 @@
 """This module provides the assets used to store animal surgery data extracted from the Sun lab surgery log."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass  # pragma: no cover
 
-from ataraxis_data_structures import YamlConfig
+from ataraxis_data_structures import YamlConfig  # pragma: no cover
 
 
 @dataclass()

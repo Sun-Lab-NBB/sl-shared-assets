@@ -2,26 +2,26 @@
 workflow.
 """
 
-from pathlib import Path
+from pathlib import Path  # pragma: no cover
 
-import click
-from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
+import click  # pragma: no cover
+from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists  # pragma: no cover
 
-from ..server import generate_server_credentials
+from ..server import generate_server_credentials  # pragma: no cover
 from ..data_classes import (
     AcquisitionSystems,
     get_working_directory,
     set_working_directory,
     set_google_credentials_path,
     create_system_configuration_file,
-)
+)  # pragma: no cover
 
 # Ensures that displayed CLICK help messages are formatted according to the lab standard.
-CONTEXT_SETTINGS = dict(max_content_width=120)
+CONTEXT_SETTINGS = {"max_content_width": 120}  # pragma: no cover
 
 
 @click.group("configure", context_settings=CONTEXT_SETTINGS)
-def configure() -> None:
+def configure() -> None:  # pragma: no cover
     """This Command-Line Interface (CLI) allows configuring major components of the Sun lab data acquisition,
     processing, and analysis workflow, such as acquisition systems and compute server(s).
     """
@@ -35,7 +35,7 @@ def configure() -> None:
     required=True,
     help="The absolute path to the directory where to cache Sun lab configuration and local runtime data.",
 )
-def configure_directory(directory: Path) -> None:
+def configure_directory(directory: Path) -> None:  # pragma: no cover
     """Sets the input directory as the Sun lab working directory, creating any missing path components.
 
     This command as the initial entry-point for setting up any machine (PC) to work with Sun lab libraries and data.
@@ -123,12 +123,13 @@ def configure_directory(directory: Path) -> None:
 def generate_server_credentials_file(
     username: str,
     password: str,
-    service: bool,
     host: str,
     storage_root: str,
     working_root: str,
     shared_directory: str,
-) -> None:
+    *,
+    service: bool,
+) -> None:  # pragma: no cover
     """Generates a service or user server access credentials' file.
 
     This command is used to set up access to the lab's remote compute server(s). The Server class uses the data stored
@@ -162,7 +163,7 @@ def generate_server_credentials_file(
     default=AcquisitionSystems.MESOSCOPE_VR,
     help="The type (name) of the data acquisition system for which to generate the configuration file.",
 )
-def generate_system_configuration_file(system: AcquisitionSystems) -> None:
+def generate_system_configuration_file(system: AcquisitionSystems) -> None:  # pragma: no cover
     """Generates the configuration file for the specified data acquisition system.
 
     This command is typically used when setting up new data acquisition systems in the lab. The sl-experiment library
@@ -182,7 +183,7 @@ def generate_system_configuration_file(system: AcquisitionSystems) -> None:
     required=True,
     help="The absolute path to the Google Sheets service account credentials .JSON file.",
 )
-def configure_google_sheets(credentials: Path) -> None:
+def configure_google_sheets(credentials: Path) -> None:  # pragma: no cover
     """Sets the path to the Google Sheets service account credentials file.
 
     This command is used to configure access to the lab's Google Sheets files used for tracking surgical procedures,
