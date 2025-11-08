@@ -152,6 +152,7 @@ class ProcessedData:
         ensure_directory_exists(self.processed_data_path)
         ensure_directory_exists(self.camera_data_path)
         ensure_directory_exists(self.behavior_data_path)
+        ensure_directory_exists(self.mesoscope_data_path)
 
 
 @dataclass()
@@ -293,10 +294,6 @@ class SessionData(YamlConfig):
         raw_data.resolve_paths(root_directory_path=session_path.joinpath("raw_data"))
         raw_data.make_directories()  # Generates the local 'raw_data' directory tree
 
-        # Infers the path to the root data directory under which the session's project is stored. This assumes that
-        # the raw_data directory is found under root/project/animal/session_id
-        root_path = session_path.parents[2]
-
         # Generates the SessionData instance.
         instance = SessionData(
             project_name=project_name,
@@ -354,7 +351,7 @@ class SessionData(YamlConfig):
         """
         # To properly initialize the SessionData instance, the provided path should contain a single session_data.yaml
         # file at any hierarchy level.
-        session_data_files = list(session_path.rglob("*session_data.yaml"))
+        session_data_files = list(session_path.rglob("session_data.yaml"))
         if len(session_data_files) != 1:
             message = (
                 f"Unable to load the target session's data. Expected a single session_data.yaml file to be located "
@@ -372,31 +369,18 @@ class SessionData(YamlConfig):
         instance: SessionData = cls.from_yaml(file_path=session_data_path)
 
         # The method assumes that the 'donor' YAML file is always stored inside the raw_data directory of the session
-        # to be processed. In turn, that directory is expected to be found under the path root/project/animal/session.
-        # The code below uses this heuristic to discover the host-machine's root data directory.
-        local_root = session_data_path.parents[4]  # Raw data root session directory
+        # to be processed. Uses this heuristic to get the path to the root session's directory.
+        local_root = session_data_path.parents[1]
 
         # RAW DATA
-        instance.raw_data.resolve_paths(
-            root_directory_path=local_root.joinpath(
-                instance.project_name, instance.animal_id, instance.session_name, "raw_data"
-            )
-        )
+        instance.raw_data.resolve_paths(root_directory_path=local_root.joinpath(local_root, "raw_data"))
 
         # PROCESSED DATA
-        instance.processed_data.resolve_paths(
-            root_directory_path=local_root.joinpath(
-                instance.project_name, instance.animal_id, instance.session_name, "processed_data"
-            )
-        )
+        instance.processed_data.resolve_paths(root_directory_path=local_root.joinpath(local_root, "processed_data"))
         instance.processed_data.make_directories()  # Ensures that processed data hierarchy exists.
 
         # TRACKING DATA
-        instance.tracking_data.resolve_paths(
-            root_directory_path=local_root.joinpath(
-                instance.project_name, instance.animal_id, instance.session_name, "tracking_data"
-            )
-        )
+        instance.tracking_data.resolve_paths(root_directory_path=local_root.joinpath(local_root, "tracking_data"))
         instance.tracking_data.make_directories()  # Ensures tracking data directories exist
 
         # Returns the initialized SessionData instance to caller
