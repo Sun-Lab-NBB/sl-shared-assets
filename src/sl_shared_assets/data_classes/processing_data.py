@@ -163,6 +163,7 @@ class ProcessingTracker(YamlConfig):
 
         Raises:
             TimeoutError: If the .LOCK file for the tracker .YAML file cannot be acquired within the timeout period.
+            PermissionError: If another manager process is currently holding exclusive access to the pipeline's tracker.
         """
         # Acquires the lock
         lock = FileLock(self.lock_path)
@@ -178,8 +179,9 @@ class ProcessingTracker(YamlConfig):
                     f"is currently executing the pipeline. Only a single manager process is allowed to execute "
                     f"the pipeline at the same time."
                 )
-                console.error(message=message, error=RuntimeError)
-                raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
+                console.error(message=message, error=PermissionError)
+                # Fallback to appease mypy, should not be reachable
+                raise PermissionError(message)  # pragma: no cover
 
             # Otherwise, if the pipeline is already running for the current manager process, returns without modifying
             # the tracker data.
@@ -203,6 +205,7 @@ class ProcessingTracker(YamlConfig):
 
         Raises:
             TimeoutError: If the .Lock file for the tracker .YAML file cannot be acquired within the timeout period.
+            PermissionError: If another manager process is currently holding exclusive access to the pipeline's tracker.
         """
         lock = FileLock(self.lock_path)
         with lock.acquire(timeout=10.0):
@@ -221,8 +224,9 @@ class ProcessingTracker(YamlConfig):
                     f"managed by the process with id {self._manager_id}, preventing other processes from interfacing "
                     f"with the pipeline."
                 )
-                console.error(message=message, error=RuntimeError)
-                raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
+                console.error(message=message, error=PermissionError)
+                # Fallback to appease mypy, should not be reachable
+                raise PermissionError(message)  # pragma: no cover
 
             # Indicates that the pipeline aborted with an error
             self._running = False
@@ -240,6 +244,7 @@ class ProcessingTracker(YamlConfig):
 
         Raises:
             TimeoutError: If the .Lock file for the tracker .YAML file cannot be acquired within the timeout period.
+            PermissionError: If another manager process is currently holding exclusive access to the pipeline's tracker.
         """
         lock = FileLock(self.lock_path)
         with lock.acquire(timeout=10.0):
@@ -258,8 +263,9 @@ class ProcessingTracker(YamlConfig):
                     f"is managed by the process with id {self._manager_id}, preventing other processes from "
                     f"interfacing with the pipeline."
                 )
-                console.error(message=message, error=RuntimeError)
-                raise RuntimeError(message)  # Fallback to appease mypy, should not be reachable
+                console.error(message=message, error=PermissionError)
+                # Fallback to appease mypy, should not be reachable
+                raise PermissionError(message)  # pragma: no cover
 
             # Increments completed job tracker
             self._completed_jobs += 1

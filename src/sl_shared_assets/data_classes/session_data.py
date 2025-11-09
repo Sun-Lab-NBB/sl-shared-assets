@@ -470,7 +470,7 @@ class SessionLock(YamlConfig):
         Raises:
             TimeoutError: If the .lock file cannot be acquired for a long period of time due to being held by another
                 process.
-            RuntimeError: If the session's data lock is held by another process.
+            PermissionError: If the session's data lock is held by another process.
         """
         lock = FileLock(self.lock_path)
         with lock.acquire(timeout=10.0):
@@ -483,9 +483,9 @@ class SessionLock(YamlConfig):
                     f"for the manager with id {manager_id}. The lock file indicates that the exclusive access is "
                     f"already held by the process with id {self._manager_id}."
                 )
-                console.error(message=message, error=RuntimeError)
+                console.error(message=message, error=PermissionError)
                 # Fallback to appease mypy, should not be reachable
-                raise RuntimeError(message)  # pragma: no cover
+                raise PermissionError(message)  # pragma: no cover
 
             # The lock is free or already owned by this manager. If the lock is free, locks the session for the current
             # manager. If it is already owned by this manager, it does nothing.
@@ -501,7 +501,7 @@ class SessionLock(YamlConfig):
         Raises:
             TimeoutError: If the .lock file cannot be acquired for a long period of time due to being held by another
                 process.
-            RuntimeError: If the session's data lock is held by another process.
+            PermissionError: If the session's data lock is held by another process.
         """
         lock = FileLock(self.lock_path)
         with lock.acquire(timeout=10.0):
@@ -513,9 +513,9 @@ class SessionLock(YamlConfig):
                     f"from the manager with id {manager_id}. The lock file indicates that the exclusive access is "
                     f"currently held by the process with id {self._manager_id}."
                 )
-                console.error(message=message, error=RuntimeError)
+                console.error(message=message, error=PermissionError)
                 # Fallback to appease mypy, should not be reachable
-                raise RuntimeError(message)  # pragma: no cover
+                raise PermissionError(message)  # pragma: no cover
 
             # Releases the lock
             self._manager_id = -1

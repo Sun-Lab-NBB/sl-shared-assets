@@ -776,7 +776,7 @@ def test_session_lock_acquire_creates_lock_file(tmp_path):
 
 
 def test_session_lock_acquire_raises_error_if_locked_by_another_manager(tmp_path):
-    """Verifies that acquire() raises RuntimeError when locked by another manager.
+    """Verifies that acquire() raises PermissionError when locked by another manager.
 
     Args:
         tmp_path: Pytest fixture providing a temporary directory path.
@@ -792,7 +792,7 @@ def test_session_lock_acquire_raises_error_if_locked_by_another_manager(tmp_path
 
     # The second manager attempts to acquire lock (simulates the second process)
     session_lock_2 = SessionLock(file_path=lock_file)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(PermissionError):
         session_lock_2.acquire(manager_id=200)
 
 
@@ -843,7 +843,7 @@ def test_session_lock_release_removes_lock_ownership(tmp_path):
 
 
 def test_session_lock_release_raises_error_if_not_owner(tmp_path):
-    """Verifies that release() raises RuntimeError when called by a non-owner.
+    """Verifies that release() raises PermissionError when called by a non-owner.
 
     Args:
         tmp_path: Pytest fixture providing a temporary directory path.
@@ -859,7 +859,7 @@ def test_session_lock_release_raises_error_if_not_owner(tmp_path):
 
     # Different manager attempts to release a lock
     session_lock_2 = SessionLock(file_path=lock_file)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(PermissionError):
         session_lock_2.release(manager_id=200)
 
 
@@ -2645,7 +2645,7 @@ def test_processing_tracker_start_prevents_different_manager(tmp_path):
     # The second manager attempts to start the pipeline
     tracker2 = ProcessingTracker(file_path=tracker_file)
 
-    with pytest.raises(RuntimeError) as exc_info:
+    with pytest.raises(PermissionError) as exc_info:
         tracker2.start(manager_id=200, job_count=3)
 
     assert "Unable to start the processing pipeline" in str(exc_info.value)
@@ -2749,7 +2749,7 @@ def test_processing_tracker_stop_prevents_wrong_manager(tmp_path):
     # Manager 2 attempts to stop the pipeline
     tracker2 = ProcessingTracker(file_path=tracker_file)
 
-    with pytest.raises(RuntimeError) as exc_info:
+    with pytest.raises(PermissionError) as exc_info:
         tracker2.stop(manager_id=200)
 
     assert "Unable to report that the processing pipeline has completed" in str(exc_info.value)
@@ -2814,7 +2814,7 @@ def test_processing_tracker_error_prevents_wrong_manager(tmp_path):
     # Manager 2 attempts to report an error
     tracker2 = ProcessingTracker(file_path=tracker_file)
 
-    with pytest.raises(RuntimeError) as exc_info:
+    with pytest.raises(PermissionError) as exc_info:
         tracker2.error(manager_id=200)
 
     assert "Unable to report that the processing pipeline has encountered an error" in str(exc_info.value)
@@ -3013,13 +3013,13 @@ def test_processing_tracker_concurrent_access_via_locks(tmp_path):
     tracker1.start(manager_id=100, job_count=5)
 
     # Second should fail
-    with pytest.raises(RuntimeError):
+    with pytest.raises(PermissionError):
         tracker2.start(manager_id=200, job_count=3)
 
     # Only first manager can modify state
     tracker1.stop(manager_id=100)
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(PermissionError):
         tracker2.stop(manager_id=200)
 
 
