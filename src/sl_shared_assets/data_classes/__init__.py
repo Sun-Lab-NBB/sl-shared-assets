@@ -1,13 +1,6 @@
-"""This package provides the assets that allow storing the data acquired in the Sun lab and configuring all elements and
-pipelines making up the lab's data workflow.
+"""This package provides the assets for storing the data acquired in the Sun lab and configuring all lab's data
+workflow components.
 """
-
-from processing_data import (
-    ProcessingStatus,
-    TrackerFileNames,
-    ProcessingTracker,
-    ProcessingPipelines,
-)
 
 from .runtime_data import (
     ZaberPositions,
@@ -34,11 +27,17 @@ from .surgery_data import (
     InjectionData,
     ProcedureData,
 )
+from .processing_data import (
+    TrackerFiles,
+    ProcessingStatus,
+    ProcessingTracker,
+    ProcessingPipelines,
+)
 from .configuration_data import (
     MesoscopeCameras,
-    ServerCredentials,
     AcquisitionSystems,
     MesoscopeFileSystem,
+    ServerConfiguration,
     MesoscopeGoogleSheets,
     MesoscopeExternalAssets,
     MesoscopeExperimentState,
@@ -48,11 +47,11 @@ from .configuration_data import (
     MesoscopeExperimentConfiguration,
     get_working_directory,
     set_working_directory,
-    get_credentials_file_path,
-    generate_server_credentials,
+    get_server_configuration,
     get_google_credentials_path,
     set_google_credentials_path,
     get_system_configuration_data,
+    create_server_configuration_file,
     create_system_configuration_file,
 )
 
@@ -81,20 +80,20 @@ __all__ = [
     "ProcessingTracker",
     "RawData",
     "RunTrainingDescriptor",
-    "ServerCredentials",
+    "ServerConfiguration",
     "SessionData",
     "SessionLock",
     "SessionTypes",
     "SubjectData",
     "SurgeryData",
-    "TrackerFileNames",
+    "TrackerFiles",
     "TrackingData",
     "WindowCheckingDescriptor",
     "ZaberPositions",
+    "create_server_configuration_file",
     "create_system_configuration_file",
-    "generate_server_credentials",
-    "get_credentials_file_path",
     "get_google_credentials_path",
+    "get_server_configuration",
     "get_system_configuration_data",
     "get_working_directory",
     "set_google_credentials_path",

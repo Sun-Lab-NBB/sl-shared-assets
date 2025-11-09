@@ -74,7 +74,6 @@ def large_directory_structure(tmp_path) -> Path:
     return root
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_delete_directory_basic(tmp_path):
     """Verifies basic directory deletion functionality.
 
@@ -97,7 +96,6 @@ def test_delete_directory_basic(tmp_path):
     assert not test_dir.exists()
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_delete_directory_nested(tmp_path):
     """Verifies deletion of nested directory structures.
 
@@ -126,7 +124,6 @@ def test_delete_directory_nested(tmp_path):
     assert not level2.exists()
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_delete_directory_nonexistent(tmp_path):
     """Verifies that deleting a non-existent directory does not raise errors.
 
@@ -138,7 +135,6 @@ def test_delete_directory_nonexistent(tmp_path):
     delete_directory(nonexistent)
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_delete_directory_empty(tmp_path):
     """Verifies deletion of empty directories.
 
@@ -153,7 +149,6 @@ def test_delete_directory_empty(tmp_path):
     assert not empty_dir.exists()
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_basic(sample_directory_structure, tmp_path):
     """Verifies basic directory transfer functionality.
 
@@ -186,7 +181,6 @@ def test_transfer_directory_basic(sample_directory_structure, tmp_path):
     assert source.exists()
 
 
-@pytest.mark.xdist_group(name="group2")
 @pytest.mark.parametrize("num_threads", [1, 2, 4, -1])
 def test_transfer_directory_multithreading(sample_directory_structure, tmp_path, num_threads):
     """Verifies that transfer_directory works correctly with different thread counts.
@@ -210,7 +204,6 @@ def test_transfer_directory_multithreading(sample_directory_structure, tmp_path,
     assert (destination / "file1.txt").read_text() == "content1"
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_with_removal(sample_directory_structure, tmp_path):
     """Verifies that the source directory is removed when remove_source=True.
 
@@ -236,7 +229,6 @@ def test_transfer_directory_with_removal(sample_directory_structure, tmp_path):
     assert not source.exists()
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_with_integrity_check(sample_directory_structure, tmp_path):
     """Verifies the integrity verification feature of transfer_directory.
 
@@ -259,7 +251,6 @@ def test_transfer_directory_with_integrity_check(sample_directory_structure, tmp
     assert (source / "ax_checksum.txt").exists()
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_with_existing_checksum(sample_directory_structure, tmp_path):
     """Verifies transfer when the checksum file already exists.
 
@@ -282,7 +273,6 @@ def test_transfer_directory_with_existing_checksum(sample_directory_structure, t
     assert (destination / "file1.txt").read_text() == "content1"
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_nonexistent_source(tmp_path):
     """Verifies that transferring a non-existent source raises FileNotFoundError.
 
@@ -296,7 +286,6 @@ def test_transfer_directory_nonexistent_source(tmp_path):
         transfer_directory(source=source, destination=destination)
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_preserves_structure(tmp_path):
     """Verifies that complex directory hierarchies are preserved during transfer.
 
@@ -334,7 +323,6 @@ def test_transfer_directory_preserves_structure(tmp_path):
     assert (destination / "level1" / "level2" / "level3" / "l3.txt").read_text() == "level3"
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_empty_source(tmp_path):
     """Verifies transfer of an empty directory.
 
@@ -352,7 +340,6 @@ def test_transfer_directory_empty_source(tmp_path):
     assert len(list(destination.iterdir())) == 0
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_large_dataset(large_directory_structure, tmp_path):
     """Verifies transfer of a larger directory structure with multiple threads.
 
@@ -379,7 +366,6 @@ def test_transfer_directory_large_dataset(large_directory_structure, tmp_path):
     assert (destination / "subdir_0" / "file_0.txt").exists()
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_with_integrity_and_removal(sample_directory_structure, tmp_path):
     """Verifies combined integrity verification and source removal.
 
@@ -407,7 +393,6 @@ def test_transfer_directory_with_integrity_and_removal(sample_directory_structur
     assert not source.exists()
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_delete_directory_parallel_performance(tmp_path):
     """Verifies that parallel deletion works with many files.
 
@@ -440,7 +425,6 @@ def test_delete_directory_parallel_performance(tmp_path):
     assert not test_dir.exists()
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_metadata_preservation(sample_directory_structure, tmp_path):
     """Verifies that file metadata is preserved during transfer.
 
@@ -469,7 +453,6 @@ def test_transfer_directory_metadata_preservation(sample_directory_structure, tm
     assert abs(transferred_stat.st_mtime - original_stat.st_mtime) < 1
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_to_existing_destination(sample_directory_structure, tmp_path):
     """Verifies transfer when the destination directory already exists.
 
@@ -493,7 +476,6 @@ def test_transfer_directory_to_existing_destination(sample_directory_structure, 
     assert (destination / "subdir1" / "file3.txt").exists()
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_single_vs_multi_thread_consistency(sample_directory_structure, tmp_path):
     """Verifies that single-threaded and multithreaded transfers produce identical results.
 
@@ -524,7 +506,6 @@ def test_transfer_directory_single_vs_multi_thread_consistency(sample_directory_
         assert single_content == multi_content
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_calculate_directory_checksum_basic(sample_directory_structure):
     """Verifies basic checksum calculation functionality.
 
@@ -539,7 +520,6 @@ def test_calculate_directory_checksum_basic(sample_directory_structure):
     assert all(c in "0123456789abcdef" for c in checksum)
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_calculate_directory_checksum_saves_file(sample_directory_structure):
     """Verifies that the checksum file is saved when save_checksum=True.
 
@@ -557,7 +537,6 @@ def test_calculate_directory_checksum_saves_file(sample_directory_structure):
     assert saved_checksum == checksum
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_calculate_directory_checksum_consistency(sample_directory_structure):
     """Verifies that calculating checksum multiple times produces identical results.
 
@@ -571,7 +550,6 @@ def test_calculate_directory_checksum_consistency(sample_directory_structure):
     assert checksum1 == checksum2 == checksum3
 
 
-@pytest.mark.xdist_group(name="group2")
 @pytest.mark.parametrize("num_processes", [1, 2, 4, None])
 def test_calculate_directory_checksum_multiprocessing(sample_directory_structure, num_processes):
     """Verifies that checksum calculation produces consistent results with different process counts.
@@ -595,7 +573,6 @@ def test_calculate_directory_checksum_multiprocessing(sample_directory_structure
     assert checksum == checksum_single
 
 
-@pytest.mark.xdist_group(name="group2")
 @pytest.mark.parametrize("progress", [True, False])
 def test_calculate_directory_checksum_progress_mode(sample_directory_structure, progress):
     """Verifies that progress mode produces identical checksums (only affects progress display).
@@ -613,7 +590,6 @@ def test_calculate_directory_checksum_progress_mode(sample_directory_structure, 
     assert len(checksum) == 32
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_calculate_directory_checksum_excludes_service_files(tmp_path):
     """Verifies that service files are excluded from checksum calculation.
 
@@ -643,7 +619,6 @@ def test_calculate_directory_checksum_excludes_service_files(tmp_path):
     assert checksum_with_service == checksum_without_service
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_calculate_directory_checksum_empty_directory(tmp_path):
     """Verifies checksum calculation for an empty directory.
 
@@ -660,7 +635,6 @@ def test_calculate_directory_checksum_empty_directory(tmp_path):
     assert len(checksum) == 32
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_calculate_directory_checksum_content_sensitivity(tmp_path):
     """Verifies that checksum changes when file content changes.
 
@@ -682,7 +656,6 @@ def test_calculate_directory_checksum_content_sensitivity(tmp_path):
     assert checksum1 != checksum2
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_calculate_directory_checksum_structure_sensitivity(tmp_path):
     """Verifies that checksum changes when the directory structure changes.
 
@@ -704,7 +677,6 @@ def test_calculate_directory_checksum_structure_sensitivity(tmp_path):
     assert checksum1 != checksum2
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_calculate_directory_checksum_path_sensitivity(tmp_path):
     """Verifies that checksum reflects file paths (not just content).
 
@@ -729,7 +701,6 @@ def test_calculate_directory_checksum_path_sensitivity(tmp_path):
     assert checksum1 != checksum2
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_calculate_directory_checksum_large_files(tmp_path):
     """Verifies checksum calculation with large files (tests chunked reading).
 
@@ -754,7 +725,6 @@ def test_calculate_directory_checksum_large_files(tmp_path):
     assert checksum1 == checksum2
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_calculate_directory_checksum_nested_structure(tmp_path):
     """Verifies checksum calculation with deeply nested directory structures.
 
@@ -776,7 +746,6 @@ def test_calculate_directory_checksum_nested_structure(tmp_path):
     assert len(checksum) == 32
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_calculate_directory_checksum_with_existing_checksum_file(tmp_path):
     """Verifies behavior when the checksum file already exists.
 
@@ -799,7 +768,6 @@ def test_calculate_directory_checksum_with_existing_checksum_file(tmp_path):
     assert saved_checksum != "old_checksum_value"
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_calculate_directory_checksum_different_structures(tmp_path):
     """Verifies that different directory structures produce different checksums.
 
@@ -827,7 +795,6 @@ def test_calculate_directory_checksum_different_structures(tmp_path):
     assert checksum1 != checksum2
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_calculate_directory_checksum_binary_files(tmp_path):
     """Verifies checksum calculation with binary files.
 
@@ -853,7 +820,6 @@ def test_calculate_directory_checksum_binary_files(tmp_path):
     assert checksum == checksum2
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_integrity_check_detects_corruption(sample_directory_structure, tmp_path, monkeypatch):
     """Verifies that integrity verification detects corrupted transfers.
 
@@ -907,7 +873,6 @@ def test_transfer_directory_integrity_check_detects_corruption(sample_directory_
     assert len(checksum_calls) >= 2  # At least initial checksum and verification
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_checksum_path_truncation(tmp_path, monkeypatch):
     """Verifies that error messages truncate long paths to the last 6 parts.
 
@@ -960,7 +925,6 @@ def test_transfer_directory_checksum_path_truncation(tmp_path, monkeypatch):
     assert "v/u/dest" in error_message or "v\\u\\dest" in error_message
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_integrity_check_corruption_prevents_removal(
     sample_directory_structure, tmp_path, monkeypatch
 ):
@@ -1005,7 +969,6 @@ def test_transfer_directory_integrity_check_corruption_prevents_removal(
     assert (source / "file1.txt").exists()
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_integrity_check_with_progress(sample_directory_structure, tmp_path):
     """Verifies that integrity verification works with progress tracking enabled.
 
@@ -1035,7 +998,6 @@ def test_transfer_directory_integrity_check_with_progress(sample_directory_struc
     assert (source / "ax_checksum.txt").exists()
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_creates_checksum_when_missing(tmp_path):
     """Verifies that checksum is automatically created if missing when verify_integrity=True.
 
@@ -1070,7 +1032,6 @@ def test_transfer_directory_creates_checksum_when_missing(tmp_path):
     assert (destination / "file1.txt").read_text() == "content1"
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_preserves_checksum_file(sample_directory_structure, tmp_path):
     """Verifies that the original checksum file is preserved in the source.
 
@@ -1102,7 +1063,6 @@ def test_transfer_directory_preserves_checksum_file(sample_directory_structure, 
     assert all(c in "0123456789abcdef" for c in checksum_content)
 
 
-@pytest.mark.xdist_group(name="group2")
 def test_transfer_directory_integrity_multithread_consistency(large_directory_structure, tmp_path):
     """Verifies that integrity checking works correctly with multithreaded transfers.
 

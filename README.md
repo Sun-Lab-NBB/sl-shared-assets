@@ -1,5 +1,5 @@
 # sl-shared-assets
-A python library that provides data acquisition and processing assets shared between Sun (NeuroAI) lab libraries.
+A Python library that provides data acquisition and processing assets shared between Sun (NeuroAI) lab libraries.
 
 ![PyPI - Version](https://img.shields.io/pypi/v/sl-shared-assets)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/sl-shared-assets)
@@ -14,7 +14,7 @@ ___
 
 ## Detailed Description
 
-Primarily, this library is designed to make the two main Sun lab libraries used for data acquisition 
+This library makes the two main Sun lab libraries used for data acquisition 
 ([sl-experiment](https://github.com/Sun-Lab-NBB/sl-experiment)) and processing 
 ([sl-forgery](https://github.com/Sun-Lab-NBB/sl-forgery)) independent of each other.
 
@@ -39,7 +39,8 @@ ___
 
 ## Dependencies
 
-All software library dependencies are installed automatically as part of the library installation.
+All library dependencies are installed automatically by all supported installation methods 
+(see the [Installation](#installation) section).
 
 ---
 
@@ -47,15 +48,18 @@ All software library dependencies are installed automatically as part of the lib
 
 ### Source
 
-Note, installation from source is ***highly discouraged*** for everyone who is not an active project developer.
+Note, installation from source is ***highly discouraged*** for anyone who is not an active project developer.
 
-1. Download this repository to your local machine using any method, such as Git-cloning. Use one
-   of the stable releases from [GitHub](https://github.com/Sun-Lab-NBB/sl-shared-assets/releases).
-2. Unpack the downloaded zip and note the path to the binary wheel (`.whl`) file contained in the archive.
-3. Run ```python -m pip install WHEEL_PATH```, replacing 'WHEEL_PATH' with the path to the wheel file, to install the 
-   wheel into the active python environment.
+1. Download this repository to the local machine using the preferred method, such as git-cloning. Use one of the 
+   [stable releases](https://github.com/Sun-Lab-NBB/sl-shared-assets/releases) that include precompiled binary and 
+   source code distribution (sdist) wheels.
+2. If the downloaded distribution is stored as a compressed archive, unpack it using the appropriate decompression tool.
+3. ```cd``` to the root directory of the prepared project distribution.
+4. Run ```python -m pip install .``` to install the project. Alternatively, if using a distribution with precompiled
+   binaries, use ```python -m pip install WHEEL_PATH```, replacing 'WHEEL_PATH' with the path to the wheel file.
 
 ### pip
+
 Use the following command to install the library using pip: ```pip install sl-shared-assets```.
 
 ---
@@ -77,15 +81,16 @@ Developers working on integrating sl-shared-assets into other libraries should s
 [API documentation](https://sl-shared-assets-api-docs.netlify.app/) for the detailed description of the methods and 
 classes exposed by components of this library.
 
-**Note!** The API documentation includes important information about Command-Line Interfaces (CLIs) exposed by this 
-library as part of installation into a Python environment.
+**Note!** The API documentation includes important information about configuration Command-Line Interface (CLI) exposed
+by this library as part of installation into a Python environment.
 
 ___
 
 ## Versioning
 
-This project uses [semantic versioning](https://semver.org/). For the versions available, see the 
-[tags on this repository](https://github.com/Sun-Lab-NBB/sl-shared-assets/tags).
+This project uses [semantic versioning](https://semver.org/). See the 
+[tags on this repository](https://github.com/Sun-Lab-NBB/sl-shared-assets/tags) for the available project 
+releases.
 
 ---
 
@@ -107,7 +112,6 @@ ___
 
 - All Sun lab [members](https://neuroai.github.io/sunlab/people) for providing the inspiration and comments during the
   development of this library.
-- The creators of all other projects used in the development automation pipelines and source code of this project
-  [see pyproject.toml](pyproject.toml).
+- The creators of all other dependencies and projects listed in the [pyproject.toml](pyproject.toml) file.
 
 ---

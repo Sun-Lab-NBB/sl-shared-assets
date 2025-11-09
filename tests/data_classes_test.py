@@ -22,13 +22,20 @@ from sl_shared_assets import (
     SessionLock,
     get_working_directory,
     get_system_configuration_data,
+    ProcessingTracker,
+    TrackerFiles,
+    ProcessingStatus,
+    ProcessingPipelines,
+    get_google_credentials_path,
+    get_server_configuration,
+    ServerConfiguration,
 )
 
 from sl_shared_assets.data_classes.configuration_data import (
     set_working_directory,
     create_system_configuration_file,
     set_google_credentials_path,
-    get_google_credentials_path,
+    create_server_configuration_file,
 )
 
 
@@ -128,17 +135,15 @@ def sample_session_hierarchy(tmp_path) -> Path:
 # Tests for AcquisitionSystems enumeration
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_acquisition_systems_mesoscope_vr():
     """Verifies the MESOSCOPE_VR acquisition system enumeration value.
 
     This test ensures the enumeration contains the expected string value.
     """
-    assert AcquisitionSystems.MESOSCOPE_VR == "mesoscope-vr"
-    assert str(AcquisitionSystems.MESOSCOPE_VR) == "mesoscope-vr"
+    assert AcquisitionSystems.MESOSCOPE_VR == "mesoscope"
+    assert str(AcquisitionSystems.MESOSCOPE_VR) == "mesoscope"
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_acquisition_systems_is_string_enum():
     """Verifies that AcquisitionSystems inherits from StrEnum.
 
@@ -150,7 +155,6 @@ def test_acquisition_systems_is_string_enum():
 # Tests for SessionTypes enumeration
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_types_values():
     """Verifies all SessionTypes enumeration values.
 
@@ -162,7 +166,6 @@ def test_session_types_values():
     assert SessionTypes.WINDOW_CHECKING == "window checking"
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_types_is_string_enum():
     """Verifies that SessionTypes inherits from StrEnum.
 
@@ -177,7 +180,6 @@ def test_session_types_is_string_enum():
 # Tests for RawData dataclass
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_raw_data_default_initialization():
     """Verifies default initialization of RawData.
 
@@ -193,7 +195,6 @@ def test_raw_data_default_initialization():
     assert raw_data.session_descriptor_path == Path()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_raw_data_resolve_paths(tmp_path):
     """Verifies that resolve_paths correctly generates all data paths.
 
@@ -219,7 +220,6 @@ def test_raw_data_resolve_paths(tmp_path):
     assert raw_data.nk_path == root_path / "nk.bin"
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_raw_data_make_directories(tmp_path):
     """Verifies that make_directories creates all required subdirectories.
 
@@ -243,7 +243,6 @@ def test_raw_data_make_directories(tmp_path):
 # Tests for ProcessedData dataclass
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_processed_data_default_initialization():
     """Verifies default initialization of ProcessedData.
 
@@ -257,7 +256,6 @@ def test_processed_data_default_initialization():
     assert processed_data.behavior_data_path == Path()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_processed_data_resolve_paths(tmp_path):
     """Verifies that resolve_paths correctly generates all data paths.
 
@@ -277,7 +275,6 @@ def test_processed_data_resolve_paths(tmp_path):
     assert processed_data.behavior_data_path == root_path / "behavior_data"
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_processed_data_make_directories(tmp_path):
     """Verifies that make_directories creates all required subdirectories.
 
@@ -300,7 +297,6 @@ def test_processed_data_make_directories(tmp_path):
 # Tests for TrackingData dataclass
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_tracking_data_default_initialization():
     """Verifies default initialization of TrackingData.
 
@@ -312,7 +308,6 @@ def test_tracking_data_default_initialization():
     assert tracking_data.session_lock_path == Path()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_tracking_data_resolve_paths(tmp_path):
     """Verifies that resolve_paths correctly generates all data paths.
 
@@ -330,7 +325,6 @@ def test_tracking_data_resolve_paths(tmp_path):
     assert tracking_data.session_lock_path == root_path / "session_lock.yaml"
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_tracking_data_make_directories(tmp_path):
     """Verifies that make_directories creates the tracking directory.
 
@@ -351,7 +345,6 @@ def test_tracking_data_make_directories(tmp_path):
 # Tests for SessionData dataclass
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_post_init_creates_nested_instances():
     """Verifies that __post_init__ ensures nested dataclass instances exist.
 
@@ -369,7 +362,6 @@ def test_session_data_post_init_creates_nested_instances():
     assert isinstance(session_data.tracking_data, TrackingData)
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_create_requires_valid_session_type(clean_working_directory, sample_mesoscope_config, monkeypatch):
     """Verifies that create() raises ValueError for invalid session types.
 
@@ -387,7 +379,7 @@ def test_session_data_create_requires_valid_session_type(clean_working_directory
 
     # Updates config with the actual root directory BEFORE creating directories
     sample_mesoscope_config.filesystem.root_directory = clean_working_directory
-    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
     sample_mesoscope_config.save(path=config_path)
 
     # Creates project directory
@@ -404,7 +396,6 @@ def test_session_data_create_requires_valid_session_type(clean_working_directory
         )
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_create_generates_session_directory(clean_working_directory, sample_mesoscope_config, monkeypatch):
     """Verifies that create() generates the complete session directory structure.
 
@@ -422,7 +413,7 @@ def test_session_data_create_generates_session_directory(clean_working_directory
 
     # Updates config with the actual root directory BEFORE creating directories
     sample_mesoscope_config.filesystem.root_directory = clean_working_directory
-    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
     sample_mesoscope_config.save(path=config_path)
 
     # Creates project directory
@@ -444,7 +435,6 @@ def test_session_data_create_generates_session_directory(clean_working_directory
     assert session_data.raw_data.behavior_data_path.exists()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_create_saves_session_data_yaml(clean_working_directory, sample_mesoscope_config, monkeypatch):
     """Verifies that create() saves the session_data.yaml file.
 
@@ -462,7 +452,7 @@ def test_session_data_create_saves_session_data_yaml(clean_working_directory, sa
 
     # Updates config with the actual root directory BEFORE creating directories
     sample_mesoscope_config.filesystem.root_directory = clean_working_directory
-    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
     sample_mesoscope_config.save(path=config_path)
 
     # Creates project directory
@@ -483,7 +473,6 @@ def test_session_data_create_saves_session_data_yaml(clean_working_directory, sa
     assert "animal_id: test_animal" in content
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_create_marks_with_nk_file(clean_working_directory, sample_mesoscope_config, monkeypatch):
     """Verifies that create() marks new sessions with the nk.bin file.
 
@@ -501,7 +490,7 @@ def test_session_data_create_marks_with_nk_file(clean_working_directory, sample_
 
     # Updates config with the actual root directory BEFORE creating directories
     sample_mesoscope_config.filesystem.root_directory = clean_working_directory
-    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
     sample_mesoscope_config.save(path=config_path)
 
     # Creates project directory
@@ -519,7 +508,6 @@ def test_session_data_create_marks_with_nk_file(clean_working_directory, sample_
     assert session_data.raw_data.nk_path.exists()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_load_finds_session_data_yaml(sample_session_hierarchy):
     """Verifies that load() successfully finds and loads session_data.yaml.
 
@@ -538,7 +526,7 @@ project_name: test_project
 animal_id: test_animal
 session_name: 2024-01-15-12-30-45-123456
 session_type: lick training
-acquisition_system: mesoscope-vr
+acquisition_system: mesoscope
 experiment_name: null
 python_version: 3.11.13
 sl_experiment_version: 3.0.0
@@ -552,7 +540,6 @@ sl_experiment_version: 3.0.0
     assert loaded_session.session_type == "lick training"
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_load_raises_error_no_session_data_file(tmp_path):
     """Verifies that load() raises FileNotFoundError when no session_data.yaml exists.
 
@@ -568,7 +555,6 @@ def test_session_data_load_raises_error_no_session_data_file(tmp_path):
         SessionData.load(session_path=empty_dir)
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_load_raises_error_multiple_session_data_files(tmp_path):
     """Verifies that load() raises FileNotFoundError when multiple session_data.yaml files exist.
 
@@ -590,7 +576,6 @@ def test_session_data_load_raises_error_multiple_session_data_files(tmp_path):
         SessionData.load(session_path=session_dir)
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_load_resolves_all_paths(sample_session_hierarchy):
     """Verifies that load() resolves all RawData, ProcessedData, and TrackingData paths.
 
@@ -608,7 +593,7 @@ project_name: test_project
 animal_id: test_animal
 session_name: 2024-01-15-12-30-45-123456
 session_type: mesoscope experiment
-acquisition_system: mesoscope-vr
+acquisition_system: mesoscope
 experiment_name: test_experiment
 python_version: 3.11.13
 sl_experiment_version: 3.0.0
@@ -628,7 +613,6 @@ sl_experiment_version: 3.0.0
     assert loaded_session.tracking_data.tracking_data_path.name == "tracking_data"
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_load_creates_processed_and_tracking_directories(sample_session_hierarchy):
     """Verifies that load() creates processed_data and tracking_data directories.
 
@@ -646,7 +630,7 @@ project_name: test_project
 animal_id: test_animal
 session_name: 2024-01-15-12-30-45-123456
 session_type: window checking
-acquisition_system: mesoscope-vr
+acquisition_system: mesoscope
 experiment_name: null
 python_version: 3.11.13
 sl_experiment_version: 3.0.0
@@ -659,7 +643,6 @@ sl_experiment_version: 3.0.0
     assert loaded_session.tracking_data.tracking_data_path.exists()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_runtime_initialized_removes_nk_file(sample_session_hierarchy):
     """Verifies that runtime_initialized() removes the nk.bin marker file.
 
@@ -677,7 +660,7 @@ project_name: test_project
 animal_id: test_animal
 session_name: 2024-01-15-12-30-45-123456
 session_type: lick training
-acquisition_system: mesoscope-vr
+acquisition_system: mesoscope
 experiment_name: null
 python_version: 3.11.13
 sl_experiment_version: 3.0.0
@@ -696,7 +679,6 @@ sl_experiment_version: 3.0.0
     assert not loaded_session.raw_data.nk_path.exists()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy):
     """Verifies that save() converts SessionTypes and AcquisitionSystems to strings.
 
@@ -723,10 +705,9 @@ def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy):
 
     content = session_data.raw_data.session_data_path.read_text()
     assert "session_type: mesoscope experiment" in content
-    assert "acquisition_system: mesoscope-vr" in content
+    assert "acquisition_system: mesoscope" in content
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_save_does_not_include_path_objects(sample_session_hierarchy):
     """Verifies that save() excludes path objects from the saved YAML.
 
@@ -759,7 +740,6 @@ def test_session_data_save_does_not_include_path_objects(sample_session_hierarch
 # Tests for SessionLock dataclass
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_lock_initialization(tmp_path):
     """Verifies basic initialization of SessionLock.
 
@@ -776,7 +756,6 @@ def test_session_lock_initialization(tmp_path):
     assert session_lock.lock_path == str(lock_file.with_suffix(".yaml.lock"))
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_lock_acquire_creates_lock_file(tmp_path):
     """Verifies that acquire() creates the lock file with the correct manager ID.
 
@@ -796,7 +775,6 @@ def test_session_lock_acquire_creates_lock_file(tmp_path):
     assert f"_manager_id: {manager_id}" in content
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_lock_acquire_raises_error_if_locked_by_another_manager(tmp_path):
     """Verifies that acquire() raises RuntimeError when locked by another manager.
 
@@ -818,16 +796,15 @@ def test_session_lock_acquire_raises_error_if_locked_by_another_manager(tmp_path
         session_lock_2.acquire(manager_id=200)
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_lock_acquire_allows_reacquisition_by_same_manager(tmp_path):
     """Verifies that acquire() allows the same manager to reacquire the lock.
 
     Args:
         tmp_path: Pytest fixture providing a temporary directory path.
 
-    This test ensures idempotent lock acquisition for the lock owner.
-    Note: This test creates separate SessionLock instances to simulate the same process
-    reacquiring the lock after reloading state.
+    This test ensures that calling the lock acquisition method multiple times does not do anything for the owner.
+    Note: This test creates separate SessionLock instances to simulate the same process reacquiring the lock after
+    reloading state.
     """
     lock_file = tmp_path / "session_lock.yaml"
 
@@ -845,7 +822,6 @@ def test_session_lock_acquire_allows_reacquisition_by_same_manager(tmp_path):
     assert session_lock_2._manager_id == manager_id
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_lock_release_removes_lock_ownership(tmp_path):
     """Verifies that release() removes lock ownership.
 
@@ -866,7 +842,6 @@ def test_session_lock_release_removes_lock_ownership(tmp_path):
     assert session_lock._manager_id == -1
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_lock_release_raises_error_if_not_owner(tmp_path):
     """Verifies that release() raises RuntimeError when called by a non-owner.
 
@@ -888,7 +863,6 @@ def test_session_lock_release_raises_error_if_not_owner(tmp_path):
         session_lock_2.release(manager_id=200)
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_lock_force_release_clears_any_lock(tmp_path):
     """Verifies that force_release() clears the lock regardless of ownership.
 
@@ -912,7 +886,6 @@ def test_session_lock_force_release_clears_any_lock(tmp_path):
     assert session_lock_2._manager_id == -1
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_lock_check_owner_passes_for_correct_owner(tmp_path):
     """Verifies that check_owner() passes when called by the lock owner.
 
@@ -935,7 +908,6 @@ def test_session_lock_check_owner_passes_for_correct_owner(tmp_path):
     session_lock_2.check_owner(manager_id=manager_id)  # Should not raise error
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_lock_check_owner_raises_error_for_wrong_owner(tmp_path):
     """Verifies that check_owner() raises ValueError when called by a non-owner.
 
@@ -960,7 +932,6 @@ def test_session_lock_check_owner_raises_error_for_wrong_owner(tmp_path):
 # Tests for MesoscopeExperimentState dataclass
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_experiment_state_initialization():
     """Verifies basic initialization of MesoscopeExperimentState.
 
@@ -983,7 +954,6 @@ def test_mesoscope_experiment_state_initialization():
     assert state.recovery_guided_trials == 3
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_experiment_state_types():
     """Verifies the data types of MesoscopeExperimentState fields.
 
@@ -1009,7 +979,6 @@ def test_mesoscope_experiment_state_types():
 # Tests for MesoscopeExperimentTrial dataclass
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_experiment_trial_initialization():
     """Verifies basic initialization of MesoscopeExperimentTrial.
 
@@ -1032,7 +1001,6 @@ def test_mesoscope_experiment_trial_initialization():
     assert trial.guidance_trigger_location_cm == 190.0
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_experiment_trial_types():
     """Verifies the data types of MesoscopeExperimentTrial fields.
 
@@ -1059,7 +1027,6 @@ def test_mesoscope_experiment_trial_types():
 # Tests for MesoscopeFileSystem dataclass
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_filesystem_default_initialization():
     """Verifies default initialization of MesoscopeFileSystem.
 
@@ -1073,7 +1040,6 @@ def test_mesoscope_filesystem_default_initialization():
     assert filesystem.mesoscope_directory == Path()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_filesystem_custom_initialization():
     """Verifies custom initialization of MesoscopeFileSystem.
 
@@ -1095,7 +1061,6 @@ def test_mesoscope_filesystem_custom_initialization():
 # Tests for MesoscopeGoogleSheets dataclass
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_google_sheets_default_initialization():
     """Verifies default initialization of MesoscopeGoogleSheets.
 
@@ -1107,7 +1072,6 @@ def test_mesoscope_google_sheets_default_initialization():
     assert sheets.water_log_sheet_id == ""
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_google_sheets_custom_initialization():
     """Verifies custom initialization of MesoscopeGoogleSheets.
 
@@ -1125,7 +1089,6 @@ def test_mesoscope_google_sheets_custom_initialization():
 # Tests for MesoscopeCameras dataclass
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_cameras_default_initialization():
     """Verifies default initialization of MesoscopeCameras.
 
@@ -1141,7 +1104,6 @@ def test_mesoscope_cameras_default_initialization():
     assert cameras.body_camera_preset == 5
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_cameras_custom_initialization():
     """Verifies custom initialization of MesoscopeCameras.
 
@@ -1167,7 +1129,6 @@ def test_mesoscope_cameras_custom_initialization():
 # Tests for MesoscopeMicroControllers dataclass
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_microcontrollers_default_initialization():
     """Verifies default initialization of MesoscopeMicroControllers.
 
@@ -1184,7 +1145,6 @@ def test_mesoscope_microcontrollers_default_initialization():
     assert len(mcu.valve_calibration_data) == 4
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_microcontrollers_valve_calibration_tuple():
     """Verifies valve_calibration_data is stored as a tuple of tuples.
 
@@ -1200,7 +1160,6 @@ def test_mesoscope_microcontrollers_valve_calibration_tuple():
     )
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_microcontrollers_custom_valve_calibration():
     """Verifies custom valve_calibration_data initialization.
 
@@ -1216,7 +1175,6 @@ def test_mesoscope_microcontrollers_custom_valve_calibration():
 # Tests for MesoscopeExternalAssets dataclass
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_external_assets_default_initialization():
     """Verifies default initialization of MesoscopeExternalAssets.
 
@@ -1231,7 +1189,6 @@ def test_mesoscope_external_assets_default_initialization():
     assert assets.unity_port == 1883
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_external_assets_custom_initialization():
     """Verifies custom initialization of MesoscopeExternalAssets.
 
@@ -1255,7 +1212,6 @@ def test_mesoscope_external_assets_custom_initialization():
 # Tests for MesoscopeSystemConfiguration dataclass
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_system_configuration_default_initialization():
     """Verifies default initialization of MesoscopeSystemConfiguration.
 
@@ -1271,7 +1227,6 @@ def test_mesoscope_system_configuration_default_initialization():
     assert isinstance(config.assets, MesoscopeExternalAssets)
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_system_configuration_post_init_path_conversion():
     """Verifies that __post_init__ converts string paths to Path objects.
 
@@ -1290,7 +1245,6 @@ def test_mesoscope_system_configuration_post_init_path_conversion():
     assert isinstance(config.filesystem.server_directory, Path)
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_system_configuration_post_init_valve_calibration_dict():
     """Verifies that __post_init__ converts valve_calibration_data dict to tuple.
 
@@ -1310,7 +1264,6 @@ def test_mesoscope_system_configuration_post_init_valve_calibration_dict():
     assert (10000, 0.5) in config.microcontrollers.valve_calibration_data
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_system_configuration_post_init_invalid_valve_calibration():
     """Verifies that __post_init__ raises TypeError for invalid valve calibration data.
 
@@ -1324,7 +1277,6 @@ def test_mesoscope_system_configuration_post_init_invalid_valve_calibration():
         config.__post_init__()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_system_configuration_save_yaml(tmp_path, sample_mesoscope_config):
     """Verifies that save() correctly writes configuration to YAML file.
 
@@ -1344,10 +1296,9 @@ def test_mesoscope_system_configuration_save_yaml(tmp_path, sample_mesoscope_con
     content = yaml_path.read_text()
     assert "name:" in content
     assert "filesystem:" in content
-    assert "mesoscope-vr" in content
+    assert "mesoscope" in content
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_system_configuration_save_converts_paths(tmp_path, sample_mesoscope_config):
     """Verifies that save() converts Path objects to strings in YAML.
 
@@ -1368,7 +1319,6 @@ def test_mesoscope_system_configuration_save_converts_paths(tmp_path, sample_mes
     assert "Path(" not in content
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_system_configuration_save_converts_valve_calibration(tmp_path, sample_mesoscope_config):
     """Verifies that save() converts valve calibration tuple to dict in YAML.
 
@@ -1388,7 +1338,6 @@ def test_mesoscope_system_configuration_save_converts_valve_calibration(tmp_path
     assert "valve_calibration_data:" in content
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_system_configuration_save_does_not_modify_original(tmp_path, sample_mesoscope_config):
     """Verifies that save() does not modify the original configuration instance.
 
@@ -1411,7 +1360,6 @@ def test_mesoscope_system_configuration_save_does_not_modify_original(tmp_path, 
     assert sample_mesoscope_config.microcontrollers.valve_calibration_data == original_valve_data
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_system_configuration_yaml_round_trip(tmp_path, sample_mesoscope_config):
     """Verifies that configuration can be saved and loaded without data loss.
 
@@ -1443,7 +1391,6 @@ def test_mesoscope_system_configuration_yaml_round_trip(tmp_path, sample_mesosco
 # Tests for MesoscopeExperimentConfiguration
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_experiment_configuration_initialization(sample_experiment_config):
     """Verifies basic initialization of MesoscopeExperimentConfiguration.
 
@@ -1459,7 +1406,6 @@ def test_mesoscope_experiment_configuration_initialization(sample_experiment_con
     assert "trial1" in sample_experiment_config.trial_structures
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_experiment_configuration_nested_structures(sample_experiment_config):
     """Verifies nested dataclass structures in MesoscopeExperimentConfiguration.
 
@@ -1477,7 +1423,6 @@ def test_mesoscope_experiment_configuration_nested_structures(sample_experiment_
     assert trial.cue_sequence == [1, 2, 3]
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_experiment_configuration_yaml_serialization(tmp_path, sample_experiment_config):
     """Verifies that MesoscopeExperimentConfiguration can be saved as YAML.
 
@@ -1498,7 +1443,6 @@ def test_mesoscope_experiment_configuration_yaml_serialization(tmp_path, sample_
     assert "TestScene" in content
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_mesoscope_experiment_configuration_yaml_deserialization(tmp_path, sample_experiment_config):
     """Verifies that MesoscopeExperimentConfiguration can be loaded from YAML.
 
@@ -1521,7 +1465,6 @@ def test_mesoscope_experiment_configuration_yaml_deserialization(tmp_path, sampl
 # Tests for set_working_directory function
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_set_working_directory_creates_directory(clean_working_directory, monkeypatch):
     """Verifies that set_working_directory creates the directory if it does not exist.
 
@@ -1543,7 +1486,6 @@ def test_set_working_directory_creates_directory(clean_working_directory, monkey
     assert new_dir.exists()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_set_working_directory_writes_path_file(clean_working_directory, monkeypatch):
     """Verifies that set_working_directory writes the path to the cache file.
 
@@ -1563,7 +1505,6 @@ def test_set_working_directory_writes_path_file(clean_working_directory, monkeyp
     assert path_file.read_text() == str(clean_working_directory)
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_set_working_directory_creates_app_directory(tmp_path, monkeypatch):
     """Verifies that set_working_directory creates the app data directory.
 
@@ -1584,7 +1525,6 @@ def test_set_working_directory_creates_app_directory(tmp_path, monkeypatch):
     assert app_dir.exists()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_set_working_directory_overwrites_existing(clean_working_directory, monkeypatch):
     """Verifies that set_working_directory overwrites an existing cached path.
 
@@ -1614,7 +1554,6 @@ def test_set_working_directory_overwrites_existing(clean_working_directory, monk
 # Tests for get_working_directory function
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_get_working_directory_returns_cached_path(clean_working_directory, monkeypatch):
     """Verifies that get_working_directory returns the cached directory path.
 
@@ -1633,7 +1572,6 @@ def test_get_working_directory_returns_cached_path(clean_working_directory, monk
     assert retrieved_dir == clean_working_directory
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_get_working_directory_raises_error_if_not_set(tmp_path, monkeypatch):
     """Verifies that get_working_directory raises FileNotFoundError if not configured.
 
@@ -1650,7 +1588,6 @@ def test_get_working_directory_raises_error_if_not_set(tmp_path, monkeypatch):
         get_working_directory()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_get_working_directory_raises_error_if_directory_missing(clean_working_directory, monkeypatch):
     """Verifies that get_working_directory raises error if cached directory does not exist.
 
@@ -1677,7 +1614,6 @@ def test_get_working_directory_raises_error_if_directory_missing(clean_working_d
 # Tests for set_google_credentials_path function
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_set_google_credentials_path_creates_cache_file(tmp_path, monkeypatch):
     """Verifies that set_google_credentials_path creates the credentials' cache file.
 
@@ -1700,7 +1636,6 @@ def test_set_google_credentials_path_creates_cache_file(tmp_path, monkeypatch):
     assert cache_file.read_text() == str(credentials_file.resolve())
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_set_google_credentials_path_raises_error_file_not_exists(tmp_path, monkeypatch):
     """Verifies that set_google_credentials_path raises error for non-existent files.
 
@@ -1719,7 +1654,6 @@ def test_set_google_credentials_path_raises_error_file_not_exists(tmp_path, monk
         set_google_credentials_path(non_existent_file)
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_set_google_credentials_path_raises_error_wrong_extension(tmp_path, monkeypatch):
     """Verifies that set_google_credentials_path raises error for non-JSON files.
 
@@ -1742,7 +1676,6 @@ def test_set_google_credentials_path_raises_error_wrong_extension(tmp_path, monk
 # Tests for get_google_credentials_path function
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_get_google_credentials_path_returns_cached_path(tmp_path, monkeypatch):
     """Verifies that get_google_credentials_path returns the cached credentials path.
 
@@ -1764,7 +1697,6 @@ def test_get_google_credentials_path_returns_cached_path(tmp_path, monkeypatch):
     assert retrieved_path == credentials_file.resolve()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_get_google_credentials_path_raises_error_if_not_set(tmp_path, monkeypatch):
     """Verifies that get_google_credentials_path raises an error if not configured.
 
@@ -1781,7 +1713,6 @@ def test_get_google_credentials_path_raises_error_if_not_set(tmp_path, monkeypat
         get_google_credentials_path()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_get_google_credentials_path_raises_error_if_file_missing(tmp_path, monkeypatch):
     """Verifies that get_google_credentials_path raises an error if the cached file no longer exists.
 
@@ -1809,7 +1740,6 @@ def test_get_google_credentials_path_raises_error_if_file_missing(tmp_path, monk
 # Tests for the create_system_configuration_file function
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_create_system_configuration_file_mesoscope_vr(clean_working_directory, monkeypatch):
     """Verifies that create_system_configuration_file creates a Mesoscope-VR config file.
 
@@ -1826,11 +1756,10 @@ def test_create_system_configuration_file_mesoscope_vr(clean_working_directory, 
     set_working_directory(clean_working_directory)
     create_system_configuration_file(AcquisitionSystems.MESOSCOPE_VR)
 
-    config_file = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    config_file = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
     assert config_file.exists()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_create_system_configuration_file_removes_existing(clean_working_directory, monkeypatch):
     """Verifies that create_system_configuration_file removes existing config files.
 
@@ -1847,7 +1776,7 @@ def test_create_system_configuration_file_removes_existing(clean_working_directo
     set_working_directory(clean_working_directory)
 
     # Creates an existing config file
-    existing_config = clean_working_directory / "old_configuration.yaml"
+    existing_config = clean_working_directory / "configuration" / "old_system_configuration.yaml"
     existing_config.write_text("old config")
 
     create_system_configuration_file(AcquisitionSystems.MESOSCOPE_VR)
@@ -1856,11 +1785,10 @@ def test_create_system_configuration_file_removes_existing(clean_working_directo
     assert not existing_config.exists()
 
     # Verifies new config exists
-    new_config = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    new_config = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
     assert new_config.exists()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_create_system_configuration_file_invalid_system(clean_working_directory, monkeypatch):
     """Verifies that create_system_configuration_file raises ValueError for invalid systems.
 
@@ -1879,7 +1807,6 @@ def test_create_system_configuration_file_invalid_system(clean_working_directory
         create_system_configuration_file("invalid-system")
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_create_system_configuration_file_creates_valid_yaml(clean_working_directory, monkeypatch):
     """Verifies that create_system_configuration_file creates valid YAML content.
 
@@ -1896,7 +1823,7 @@ def test_create_system_configuration_file_creates_valid_yaml(clean_working_direc
     set_working_directory(clean_working_directory)
     create_system_configuration_file(AcquisitionSystems.MESOSCOPE_VR)
 
-    config_file = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    config_file = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
     content = config_file.read_text()
 
     # Verifies basic YAML structure
@@ -1909,7 +1836,6 @@ def test_create_system_configuration_file_creates_valid_yaml(clean_working_direc
 # Tests for get_system_configuration_data function
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_get_system_configuration_data_loads_mesoscope_config(
     clean_working_directory, sample_mesoscope_config, monkeypatch
 ):
@@ -1928,7 +1854,7 @@ def test_get_system_configuration_data_loads_mesoscope_config(
     set_working_directory(clean_working_directory)
 
     # Saves configuration
-    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
     sample_mesoscope_config.save(path=config_path)
 
     # Loads configuration
@@ -1938,7 +1864,6 @@ def test_get_system_configuration_data_loads_mesoscope_config(
     assert loaded_config.name == sample_mesoscope_config.name
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_get_system_configuration_data_raises_error_no_config(clean_working_directory, monkeypatch):
     """Verifies that get_system_configuration_data raises an error when no config exists.
 
@@ -1957,7 +1882,6 @@ def test_get_system_configuration_data_raises_error_no_config(clean_working_dire
         get_system_configuration_data()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_get_system_configuration_data_raises_error_multiple_configs(clean_working_directory, monkeypatch):
     """Verifies that get_system_configuration_data raises error with multiple configs.
 
@@ -1980,7 +1904,6 @@ def test_get_system_configuration_data_raises_error_multiple_configs(clean_worki
         get_system_configuration_data()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_get_system_configuration_data_raises_error_unsupported_config(clean_working_directory, monkeypatch):
     """Verifies that get_system_configuration_data raises error for unsupported config names.
 
@@ -1996,13 +1919,12 @@ def test_get_system_configuration_data_raises_error_unsupported_config(clean_wor
     set_working_directory(clean_working_directory)
 
     # Creates unsupported config file
-    (clean_working_directory / "unsupported_configuration.yaml").write_text("config")
+    (clean_working_directory / "configuration" / "unsupported_system_configuration.yaml").write_text("config")
 
     with pytest.raises(ValueError):
         get_system_configuration_data()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_get_system_configuration_data_path_types(clean_working_directory, sample_mesoscope_config, monkeypatch):
     """Verifies that get_system_configuration_data returns Path objects (not strings).
 
@@ -2018,7 +1940,7 @@ def test_get_system_configuration_data_path_types(clean_working_directory, sampl
 
     set_working_directory(clean_working_directory)
 
-    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
     sample_mesoscope_config.save(path=config_path)
 
     loaded_config = get_system_configuration_data()
@@ -2029,7 +1951,6 @@ def test_get_system_configuration_data_path_types(clean_working_directory, sampl
     assert isinstance(loaded_config.filesystem.nas_directory, Path)
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_get_system_configuration_data_valve_calibration_tuple(
     clean_working_directory, sample_mesoscope_config, monkeypatch
 ):
@@ -2047,7 +1968,7 @@ def test_get_system_configuration_data_valve_calibration_tuple(
 
     set_working_directory(clean_working_directory)
 
-    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
     sample_mesoscope_config.save(path=config_path)
 
     loaded_config = get_system_configuration_data()
@@ -2060,7 +1981,6 @@ def test_get_system_configuration_data_valve_calibration_tuple(
 # Add this test after the existing SessionData.create tests
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_create_raises_error_if_project_does_not_exist(
     clean_working_directory, sample_mesoscope_config, monkeypatch
 ):
@@ -2080,7 +2000,7 @@ def test_session_data_create_raises_error_if_project_does_not_exist(
 
     # Updates config with the actual root directory
     sample_mesoscope_config.filesystem.root_directory = clean_working_directory
-    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
     sample_mesoscope_config.save(path=config_path)
 
     # Does NOT create the project directory
@@ -2099,7 +2019,6 @@ def test_session_data_create_raises_error_if_project_does_not_exist(
     assert "sl-project create" in str(exc_info.value)
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_create_copies_experiment_configuration(
     clean_working_directory, sample_mesoscope_config, sample_experiment_config, monkeypatch
 ):
@@ -2120,7 +2039,7 @@ def test_session_data_create_copies_experiment_configuration(
 
     # Updates config with the actual root directory
     sample_mesoscope_config.filesystem.root_directory = clean_working_directory
-    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
     sample_mesoscope_config.save(path=config_path)
 
     # Creates project and configuration directories
@@ -2154,7 +2073,6 @@ def test_session_data_create_copies_experiment_configuration(
     assert loaded_config.cue_map == sample_experiment_config.cue_map
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_create_without_experiment_name_skips_experiment_config(
     clean_working_directory, sample_mesoscope_config, monkeypatch
 ):
@@ -2174,7 +2092,7 @@ def test_session_data_create_without_experiment_name_skips_experiment_config(
 
     # Updates config with the actual root directory
     sample_mesoscope_config.filesystem.root_directory = clean_working_directory
-    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
     sample_mesoscope_config.save(path=config_path)
 
     # Creates project directory
@@ -2199,7 +2117,6 @@ def test_session_data_create_without_experiment_name_skips_experiment_config(
     assert not session_data.raw_data.experiment_configuration_path.exists()
 
 
-@pytest.mark.xdist_group(name="group3")
 def test_session_data_create_saves_system_configuration(clean_working_directory, sample_mesoscope_config, monkeypatch):
     """Verifies that create() saves the system configuration to the session directory.
 
@@ -2217,7 +2134,7 @@ def test_session_data_create_saves_system_configuration(clean_working_directory,
 
     # Updates config with the actual root directory
     sample_mesoscope_config.filesystem.root_directory = clean_working_directory
-    config_path = clean_working_directory / "mesoscope-vr_configuration.yaml"
+    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
     sample_mesoscope_config.save(path=config_path)
 
     # Creates project directory
@@ -2239,3 +2156,1026 @@ def test_session_data_create_saves_system_configuration(clean_working_directory,
     loaded_config = MesoscopeSystemConfiguration.from_yaml(file_path=session_data.raw_data.system_configuration_path)
     assert loaded_config.name == sample_mesoscope_config.name
     assert loaded_config.cameras.face_camera_index == sample_mesoscope_config.cameras.face_camera_index
+
+
+# Tests for ServerConfiguration dataclass
+
+
+def test_server_configuration_default_initialization():
+    """Verifies default initialization of ServerConfiguration.
+
+    This test ensures the class initializes with expected default values.
+    """
+    config = ServerConfiguration()
+
+    assert config.username == ""
+    assert config.password == ""
+    assert config.host == "cbsuwsun.biohpc.cornell.edu"
+    assert config.storage_root == "/local/storage"
+    assert config.working_root == "/local/workdir"
+    assert config.shared_directory_name == "sun_data"
+
+
+def test_server_configuration_post_init_resolves_paths():
+    """Verifies that __post_init__ correctly resolves derived paths.
+
+    This test ensures all paths are properly constructed.
+    """
+    config = ServerConfiguration(
+        username="testuser",
+        storage_root="/mnt/storage",
+        working_root="/mnt/work",
+        shared_directory_name="shared",
+    )
+
+    assert config.shared_storage_root == "/mnt/storage/shared"
+    assert config.shared_working_root == "/mnt/work/shared"
+    assert config.user_data_root == "/mnt/storage/testuser"
+    assert config.user_working_root == "/mnt/work/testuser"
+
+
+def test_server_configuration_custom_initialization():
+    """Verifies custom initialization of ServerConfiguration.
+
+    This test ensures all fields accept custom values.
+    """
+    config = ServerConfiguration(
+        username="myuser",
+        password="mypass",
+        host="example.com",
+        storage_root="/data",
+        working_root="/work",
+        shared_directory_name="lab_data",
+    )
+
+    assert config.username == "myuser"
+    assert config.password == "mypass"
+    assert config.host == "example.com"
+    assert config.storage_root == "/data"
+    assert config.working_root == "/work"
+    assert config.shared_directory_name == "lab_data"
+
+
+def test_server_configuration_yaml_round_trip(tmp_path):
+    """Verifies that ServerConfiguration survives YAML serialization.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures YAML round-trip preserves all data.
+    """
+    yaml_path = tmp_path / "server_config.yaml"
+
+    original = ServerConfiguration(
+        username="testuser",
+        password="testpass",
+        host="server.example.com",
+    )
+
+    original.to_yaml(file_path=yaml_path)
+    loaded = ServerConfiguration.from_yaml(file_path=yaml_path)
+
+    assert loaded.username == original.username
+    assert loaded.password == original.password
+    assert loaded.host == original.host
+    assert loaded.shared_storage_root == original.shared_storage_root
+
+
+# Tests for the create_server_configuration_file function
+
+
+def test_create_server_configuration_file_user(clean_working_directory, monkeypatch):
+    """Verifies that create_server_configuration_file creates user config.
+
+    Args:
+        clean_working_directory: Fixture providing a temporary working directory.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures the user server configuration is created correctly.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    create_server_configuration_file(
+        username="testuser",
+        password="testpass",
+        service=False,
+    )
+
+    config_file = clean_working_directory / "configuration" / "user_server_configuration.yaml"
+    assert config_file.exists()
+
+    # Verify content
+    loaded = ServerConfiguration.from_yaml(file_path=config_file)
+    assert loaded.username == "testuser"
+    assert loaded.password == "testpass"
+
+
+def test_create_server_configuration_file_service(clean_working_directory, monkeypatch):
+    """Verifies that create_server_configuration_file creates service config.
+
+    Args:
+        clean_working_directory: Fixture providing a temporary working directory.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures service server configuration is created correctly.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    create_server_configuration_file(
+        username="service_account",
+        password="service_pass",
+        service=True,
+    )
+
+    config_file = clean_working_directory / "configuration" / "service_server_configuration.yaml"
+    assert config_file.exists()
+
+    # Verify content
+    loaded = ServerConfiguration.from_yaml(file_path=config_file)
+    assert loaded.username == "service_account"
+    assert loaded.password == "service_pass"
+
+
+def test_create_server_configuration_file_custom_parameters(clean_working_directory, monkeypatch):
+    """Verifies that create_server_configuration_file accepts custom parameters.
+
+    Args:
+        clean_working_directory: Fixture providing a temporary working directory.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures custom server parameters are preserved.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    create_server_configuration_file(
+        username="myuser",
+        password="mypass",
+        host="custom.server.com",
+        storage_root="/custom/storage",
+        working_root="/custom/work",
+        shared_directory_name="custom_shared",
+        service=False,
+    )
+
+    config_file = clean_working_directory / "configuration" / "user_server_configuration.yaml"
+    loaded = ServerConfiguration.from_yaml(file_path=config_file)
+
+    assert loaded.host == "custom.server.com"
+    assert loaded.storage_root == "/custom/storage"
+    assert loaded.working_root == "/custom/work"
+    assert loaded.shared_directory_name == "custom_shared"
+
+
+# Tests for the get_server_configuration function
+
+
+def test_get_server_configuration_user(clean_working_directory, monkeypatch):
+    """Verifies that get_server_configuration loads user config.
+
+    Args:
+        clean_working_directory: Fixture providing a temporary working directory.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures user configuration can be retrieved.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    # Create user config
+    create_server_configuration_file(
+        username="testuser",
+        password="testpass",
+        service=False,
+    )
+
+    # Load it
+    config = get_server_configuration(service=False)
+
+    assert config.username == "testuser"
+    assert config.password == "testpass"
+
+
+def test_get_server_configuration_service(clean_working_directory, monkeypatch):
+    """Verifies that get_server_configuration loads service config.
+
+    Args:
+        clean_working_directory: Fixture providing a temporary working directory.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures service configuration can be retrieved.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    # Create service config
+    create_server_configuration_file(
+        username="service",
+        password="service_pass",
+        service=True,
+    )
+
+    # Load it
+    config = get_server_configuration(service=True)
+
+    assert config.username == "service"
+    assert config.password == "service_pass"
+
+
+def test_get_server_configuration_raises_error_if_missing(clean_working_directory, monkeypatch):
+    """Verifies that get_server_configuration raises error when config missing.
+
+    Args:
+        clean_working_directory: Fixture providing a temporary working directory.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures proper error handling for missing configurations.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    # Don't create any config files
+
+    with pytest.raises(FileNotFoundError) as exc_info:
+        get_server_configuration(service=False)
+
+    assert "user_server_configuration.yaml" in str(exc_info.value)
+
+
+def test_get_server_configuration_raises_error_if_unconfigured(clean_working_directory, monkeypatch):
+    """Verifies that get_server_configuration raises an error for placeholder credentials.
+
+    Args:
+        clean_working_directory: Fixture providing a temporary working directory.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures unconfigured files are detected.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    # Create config with empty credentials (unconfigured)
+    config_file = clean_working_directory / "configuration" / "user_server_configuration.yaml"
+    ServerConfiguration().to_yaml(file_path=config_file)
+
+    with pytest.raises(ValueError) as exc_info:
+        get_server_configuration(service=False)
+
+    assert "unconfigured" in str(exc_info.value).lower()
+
+
+def test_get_server_configuration_distinguishes_user_and_service(clean_working_directory, monkeypatch):
+    """Verifies that get_server_configuration correctly distinguishes user vs. service.
+
+    Args:
+        clean_working_directory: Fixture providing a temporary working directory.
+        monkeypatch: Pytest fixture for modifying environment variables.
+
+    This test ensures the correct config is loaded based on the service flag.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    # Create both configs with different usernames
+    create_server_configuration_file(
+        username="regular_user",
+        password="user_pass",
+        service=False,
+    )
+
+    create_server_configuration_file(
+        username="service_user",
+        password="service_pass",
+        service=True,
+    )
+
+    # Verify the correct config is loaded
+    user_config = get_server_configuration(service=False)
+    service_config = get_server_configuration(service=True)
+
+    assert user_config.username == "regular_user"
+    assert service_config.username == "service_user"
+
+
+# Tests for ProcessingTracker dataclass
+
+
+def test_processing_tracker_initialization(tmp_path):
+    """Verifies basic initialization of ProcessingTracker.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the tracker initializes with default values.
+    """
+    tracker_file = tmp_path / TrackerFiles.MANIFEST
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    assert tracker.file_path == tracker_file
+    assert tracker._complete is False
+    assert tracker._encountered_error is False
+    assert tracker._running is False
+    assert tracker._manager_id == -1
+    assert tracker._job_count == 1
+    assert tracker._completed_jobs == 0
+    assert tracker.lock_path == str(tracker_file.with_suffix(".yaml.lock"))
+
+
+def test_processing_tracker_post_init_validates_filename(tmp_path):
+    """Verifies that __post_init__ validates the tracker filename.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures only supported tracker filenames are accepted.
+    """
+    invalid_tracker = tmp_path / "invalid_tracker.yaml"
+
+    with pytest.raises(ValueError) as exc_info:
+        ProcessingTracker(file_path=invalid_tracker)
+
+    assert "Unsupported processing tracker file" in str(exc_info.value)
+    assert "invalid_tracker.yaml" in str(exc_info.value)
+
+
+def test_processing_tracker_post_init_accepts_valid_filenames(tmp_path):
+    """Verifies that __post_init__ accepts all TrackerFiles enum values.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures all official tracker filenames are supported.
+    """
+    for tracker_file_name in TrackerFiles:
+        tracker_path = tmp_path / tracker_file_name
+        tracker = ProcessingTracker(file_path=tracker_path)
+        assert tracker.file_path == tracker_path
+
+
+def test_processing_tracker_load_state_creates_file_if_missing(tmp_path):
+    """Verifies that _load_state() creates the tracker file if it doesn't exist.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the tracker auto-creates its state file.
+    """
+    tracker_file = tmp_path / TrackerFiles.MANIFEST
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    # Initially the file should not exist
+    assert not tracker_file.exists()
+
+    # Calling _load_state should create it
+    tracker._load_state()
+
+    assert tracker_file.exists()
+
+
+def test_processing_tracker_load_state_reads_existing_file(tmp_path):
+    """Verifies that _load_state() correctly reads from the existing file.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the tracker loads state from the disk correctly.
+    """
+    tracker_file = tmp_path / TrackerFiles.CHECKSUM
+
+    # Create the first tracker and set some state
+    tracker1 = ProcessingTracker(file_path=tracker_file)
+    tracker1._running = True
+    tracker1._manager_id = 12345
+    tracker1._job_count = 5
+    tracker1._completed_jobs = 3
+    tracker1._save_state()
+
+    # Create second tracker and load state
+    tracker2 = ProcessingTracker(file_path=tracker_file)
+    tracker2._load_state()
+
+    assert tracker2._running is True
+    assert tracker2._manager_id == 12345
+    assert tracker2._job_count == 5
+    assert tracker2._completed_jobs == 3
+
+
+def test_processing_tracker_save_state_preserves_file_and_lock_paths(tmp_path):
+    """Verifies that _save_state() doesn't modify file_path and lock_path.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the refactored _save_state() correctly preserves paths.
+    """
+    tracker_file = tmp_path / TrackerFiles.TRANSFER
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    original_file_path = tracker.file_path
+    original_lock_path = tracker.lock_path
+
+    tracker._save_state()
+
+    # Verify paths are unchanged
+    assert tracker.file_path == original_file_path
+    assert tracker.lock_path == original_lock_path
+    assert isinstance(tracker.file_path, Path)
+    assert isinstance(tracker.lock_path, str)
+
+
+def test_processing_tracker_start_locks_pipeline(tmp_path):
+    """Verifies that start() correctly locks the pipeline.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures start() sets the running state and manager ID.
+    """
+    tracker_file = tmp_path / TrackerFiles.BEHAVIOR
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    manager_id = 99999
+    job_count = 10
+
+    tracker.start(manager_id=manager_id, job_count=job_count)
+
+    # Reload state to verify persistence
+    tracker._load_state()
+
+    assert tracker._running is True
+    assert tracker._manager_id == manager_id
+    assert tracker._job_count == job_count
+    assert tracker._completed_jobs == 0
+    assert tracker._complete is False
+    assert tracker._encountered_error is False
+
+
+def test_processing_tracker_start_prevents_different_manager(tmp_path):
+    """Verifies that start() prevents different manager from acquiring lock.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures exclusive lock ownership.
+    """
+    tracker_file = tmp_path / TrackerFiles.SUITE2P
+
+    # First manager starts pipeline
+    tracker1 = ProcessingTracker(file_path=tracker_file)
+    tracker1.start(manager_id=100, job_count=5)
+
+    # The second manager attempts to start the pipeline
+    tracker2 = ProcessingTracker(file_path=tracker_file)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        tracker2.start(manager_id=200, job_count=3)
+
+    assert "Unable to start the processing pipeline" in str(exc_info.value)
+    assert "manager process with id 100" in str(exc_info.value)
+
+
+def test_processing_tracker_start_allows_same_manager_reacquisition(tmp_path):
+    """Verifies that start() allows the same manager to reacquire lock with no adverse side effects.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+    """
+    tracker_file = tmp_path / TrackerFiles.VIDEO
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    manager_id = 12345
+
+    # First start
+    tracker.start(manager_id=manager_id, job_count=5)
+
+    # Second start (should not raise error or modify state)
+    tracker.start(manager_id=manager_id, job_count=10)  # Note: job_count shouldn't change
+
+    tracker._load_state()
+    assert tracker._running is True
+    assert tracker._manager_id == manager_id
+    assert tracker._job_count == 5  # Original job count preserved
+
+
+def test_processing_tracker_stop_increments_completed_jobs(tmp_path):
+    """Verifies that stop() increments the completed job counter.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures job progress is tracked correctly.
+    """
+    tracker_file = tmp_path / TrackerFiles.MULTIDAY
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    manager_id = 55555
+    tracker.start(manager_id=manager_id, job_count=3)
+
+    # Stop first job
+    tracker.stop(manager_id=manager_id)
+    tracker._load_state()
+    assert tracker._completed_jobs == 1
+    assert tracker._running is True  # Still running
+
+    # Stop the second job
+    tracker.stop(manager_id=manager_id)
+    tracker._load_state()
+    assert tracker._completed_jobs == 2
+    assert tracker._running is True  # Still running
+
+
+def test_processing_tracker_stop_completes_pipeline_when_all_jobs_done(tmp_path):
+    """Verifies that stop() marks the pipeline complete when all jobs finish.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the pipeline completes after all jobs are done.
+    """
+    tracker_file = tmp_path / TrackerFiles.FORGING
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    manager_id = 77777
+    job_count = 2
+    tracker.start(manager_id=manager_id, job_count=job_count)
+
+    # Complete the first job
+    tracker.stop(manager_id=manager_id)
+    tracker._load_state()
+    assert tracker._running is True
+
+    # Complete the second (final) job
+    tracker.stop(manager_id=manager_id)
+    tracker._load_state()
+
+    assert tracker._running is False
+    assert tracker._complete is True
+    assert tracker._encountered_error is False
+    assert tracker._manager_id == -1
+
+
+def test_processing_tracker_stop_prevents_wrong_manager(tmp_path):
+    """Verifies that stop() prevents non-owner from reporting completion.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures only the owning manager can stop the pipeline.
+    """
+    tracker_file = tmp_path / TrackerFiles.MANIFEST
+
+    # Manager 1 starts the pipeline
+    tracker1 = ProcessingTracker(file_path=tracker_file)
+    tracker1.start(manager_id=100, job_count=5)
+
+    # Manager 2 attempts to stop the pipeline
+    tracker2 = ProcessingTracker(file_path=tracker_file)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        tracker2.stop(manager_id=200)
+
+    assert "Unable to report that the processing pipeline has completed" in str(exc_info.value)
+
+
+def test_processing_tracker_stop_ignores_if_not_running(tmp_path):
+    """Verifies that stop() safely ignores calls when the pipeline not running.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures stop() is safe to call on non-running pipelines.
+    """
+    tracker_file = tmp_path / TrackerFiles.CHECKSUM
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    # Don't start the pipeline
+    tracker.stop(manager_id=12345)  # Should not raise error
+
+    tracker._load_state()
+    assert tracker._completed_jobs == 0
+
+
+def test_processing_tracker_error_marks_pipeline_failed(tmp_path):
+    """Verifies that error() correctly marks the pipeline as failed.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the error state is properly recorded.
+    """
+    tracker_file = tmp_path / TrackerFiles.TRANSFER
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    manager_id = 88888
+    tracker.start(manager_id=manager_id, job_count=5)
+
+    # Report error
+    tracker.error(manager_id=manager_id)
+
+    tracker._load_state()
+    assert tracker._running is False
+    assert tracker._encountered_error is True
+    assert tracker._complete is False
+    assert tracker._manager_id == -1
+
+
+def test_processing_tracker_error_prevents_wrong_manager(tmp_path):
+    """Verifies that error() prevents non-owner from reporting errors.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures only the owning manager can report errors.
+    """
+    tracker_file = tmp_path / TrackerFiles.BEHAVIOR
+
+    # Manager 1 starts the pipeline
+    tracker1 = ProcessingTracker(file_path=tracker_file)
+    tracker1.start(manager_id=100, job_count=5)
+
+    # Manager 2 attempts to report an error
+    tracker2 = ProcessingTracker(file_path=tracker_file)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        tracker2.error(manager_id=200)
+
+    assert "Unable to report that the processing pipeline has encountered an error" in str(exc_info.value)
+
+
+def test_processing_tracker_error_ignores_if_not_running(tmp_path):
+    """Verifies that error() safely ignores calls when the pipeline not running.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures error() is safe to call on non-running pipelines.
+    """
+    tracker_file = tmp_path / TrackerFiles.SUITE2P
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    # Don't start the pipeline
+    tracker.error(manager_id=12345)  # Should not raise error
+
+    tracker._load_state()
+    assert tracker._encountered_error is False
+
+
+def test_processing_tracker_abort_resets_all_state(tmp_path):
+    """Verifies that abort() resets tracker to default state.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures abort() provides emergency recovery.
+    """
+    tracker_file = tmp_path / TrackerFiles.VIDEO
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    # Starts the pipeline and do some work
+    tracker.start(manager_id=12345, job_count=10)
+    tracker.stop(manager_id=12345)
+    tracker.stop(manager_id=12345)
+
+    # Abort from any process
+    tracker2 = ProcessingTracker(file_path=tracker_file)
+    tracker2.abort()
+
+    # Verify complete reset
+    tracker2._load_state()
+    assert tracker2._running is False
+    assert tracker2._manager_id == -1
+    assert tracker2._completed_jobs == 0
+    assert tracker2._job_count == 1
+    assert tracker2._complete is False
+    assert tracker2._encountered_error is False
+
+
+def test_processing_tracker_abort_allows_any_process(tmp_path):
+    """Verifies that abort() can be called by any process.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures abort() provides emergency override capability.
+    """
+    tracker_file = tmp_path / TrackerFiles.MULTIDAY
+
+    # Manager 1 locks the pipeline
+    tracker1 = ProcessingTracker(file_path=tracker_file)
+    tracker1.start(manager_id=100, job_count=5)
+
+    # Manager 2 aborts (should succeed)
+    tracker2 = ProcessingTracker(file_path=tracker_file)
+    tracker2.abort()  # Should not raise error
+
+    tracker2._load_state()
+    assert tracker2._running is False
+    assert tracker2._manager_id == -1
+
+
+def test_processing_tracker_complete_property(tmp_path):
+    """Verifies that the complete property correctly reports completion status.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the completion property accessor works correctly.
+    """
+    tracker_file = tmp_path / TrackerFiles.FORGING
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    # Initially not complete
+    assert tracker.complete is False
+
+    # Start and complete the pipeline
+    manager_id = 11111
+    tracker.start(manager_id=manager_id, job_count=1)
+    assert tracker.complete is False
+
+    tracker.stop(manager_id=manager_id)
+    assert tracker.complete is True
+
+
+def test_processing_tracker_encountered_error_property(tmp_path):
+    """Verifies that encountered_error property correctly reports error status.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the error property accessor works correctly.
+    """
+    tracker_file = tmp_path / TrackerFiles.MANIFEST
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    # Initially no error
+    assert tracker.encountered_error is False
+
+    # Start pipeline
+    manager_id = 22222
+    tracker.start(manager_id=manager_id, job_count=5)
+    assert tracker.encountered_error is False
+
+    # Report error
+    tracker.error(manager_id=manager_id)
+    assert tracker.encountered_error is True
+
+
+def test_processing_tracker_running_property(tmp_path):
+    """Verifies that the running property correctly reports running status.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the running property accessor works correctly.
+    """
+    tracker_file = tmp_path / TrackerFiles.CHECKSUM
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    # Initially not running
+    assert tracker.running is False
+
+    # Start pipeline
+    manager_id = 33333
+    tracker.start(manager_id=manager_id, job_count=3)
+    assert tracker.running is True
+
+    # Complete pipeline
+    for _ in range(3):
+        tracker.stop(manager_id=manager_id)
+
+    assert tracker.running is False
+
+
+def test_processing_tracker_properties_reload_state(tmp_path):
+    """Verifies that properties reload state from the disk on each access.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures properties always return current state from disk.
+    """
+    tracker_file = tmp_path / TrackerFiles.TRANSFER
+
+    # Create two tracker instances pointing to the same file
+    tracker1 = ProcessingTracker(file_path=tracker_file)
+    tracker2 = ProcessingTracker(file_path=tracker_file)
+
+    # Start the pipeline using tracker1
+    tracker1.start(manager_id=44444, job_count=2)
+
+    # Verify tracker2 sees the change via property access
+    assert tracker2.running is True
+    assert tracker2.complete is False
+
+    # Complete via tracker1
+    tracker1.stop(manager_id=44444)
+    tracker1.stop(manager_id=44444)
+
+    # Verify tracker2 sees completion
+    assert tracker2.running is False
+    assert tracker2.complete is True
+
+
+def test_processing_tracker_concurrent_access_via_locks(tmp_path):
+    """Verifies that file locks prevent race conditions in concurrent access.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the locking mechanism works for process safety.
+    Note: This is a basic test; true concurrency testing would require multiprocessing.
+    """
+    tracker_file = tmp_path / TrackerFiles.BEHAVIOR
+
+    # Simulate two processes accessing the same tracker
+    tracker1 = ProcessingTracker(file_path=tracker_file)
+    tracker2 = ProcessingTracker(file_path=tracker_file)
+
+    # Both try to start with different manager IDs
+    tracker1.start(manager_id=100, job_count=5)
+
+    # Second should fail
+    with pytest.raises(RuntimeError):
+        tracker2.start(manager_id=200, job_count=3)
+
+    # Only first manager can modify state
+    tracker1.stop(manager_id=100)
+
+    with pytest.raises(RuntimeError):
+        tracker2.stop(manager_id=200)
+
+
+def test_processing_tracker_yaml_round_trip(tmp_path):
+    """Verifies that tracker state survives YAML serialization round trip.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures YAML serialization preserves all state correctly.
+    """
+    tracker_file = tmp_path / TrackerFiles.SUITE2P
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    # Set the complex state
+    tracker.start(manager_id=99999, job_count=7)
+    tracker.stop(manager_id=99999)
+    tracker.stop(manager_id=99999)
+
+    # Create new instance and verify state loaded correctly
+    tracker2 = ProcessingTracker(file_path=tracker_file)
+    tracker2._load_state()
+
+    assert tracker2._running is True
+    assert tracker2._manager_id == 99999
+    assert tracker2._job_count == 7
+    assert tracker2._completed_jobs == 2
+    assert tracker2._complete is False
+    assert tracker2._encountered_error is False
+
+
+def test_processing_tracker_job_count_validation(tmp_path):
+    """Verifies behavior when job_count is 0 or negative.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test documents edge case behavior for invalid job counts.
+    Note: Current implementation doesn't validate job_count, but should it?
+    """
+    tracker_file = tmp_path / TrackerFiles.VIDEO
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    # Start with job_count of 0
+    tracker.start(manager_id=11111, job_count=0)
+
+    # Verify it completes immediately on the first stop
+    tracker.stop(manager_id=11111)
+
+    tracker._load_state()
+    assert tracker._complete is True
+
+
+def test_processing_tracker_state_transitions(tmp_path):
+    """Verifies correct state transitions through the pipeline lifecycle.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test validates the full state machine behavior.
+    """
+    tracker_file = tmp_path / TrackerFiles.MULTIDAY
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    # Initial state
+    assert not tracker.running
+    assert not tracker.complete
+    assert not tracker.encountered_error
+
+    # Start: running
+    manager_id = 55555
+    tracker.start(manager_id=manager_id, job_count=2)
+    assert tracker.running
+    assert not tracker.complete
+    assert not tracker.encountered_error
+
+    # In progress: still running
+    tracker.stop(manager_id=manager_id)
+    assert tracker.running
+    assert not tracker.complete
+    assert not tracker.encountered_error
+
+    # Complete: not running, complete
+    tracker.stop(manager_id=manager_id)
+    assert not tracker.running
+    assert tracker.complete
+    assert not tracker.encountered_error
+
+
+def test_processing_tracker_error_state_transitions(tmp_path):
+    """Verifies correct state transitions when the error occurs.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test validates error handling state machine behavior.
+    """
+    tracker_file = tmp_path / TrackerFiles.FORGING
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    # Start pipeline
+    manager_id = 66666
+    tracker.start(manager_id=manager_id, job_count=5)
+    assert tracker.running
+
+    # Do some work
+    tracker.stop(manager_id=manager_id)
+    tracker.stop(manager_id=manager_id)
+    assert tracker.running
+
+    # Encounter error
+    tracker.error(manager_id=manager_id)
+    assert not tracker.running
+    assert not tracker.complete
+    assert tracker.encountered_error
+
+
+# Tests for ProcessingPipelines and ProcessingStatus enumerations
+
+
+def test_processing_pipelines_enum_values():
+    """Verifies all ProcessingPipelines enumeration values.
+
+    This test ensures the enumeration contains all expected pipeline types.
+    """
+    assert ProcessingPipelines.MANIFEST == "manifest generation"
+    assert ProcessingPipelines.CHECKSUM == "checksum resolution"
+    assert ProcessingPipelines.TRANSFER == "data transfer"
+    assert ProcessingPipelines.BEHAVIOR == "behavior processing"
+    assert ProcessingPipelines.SUITE2P == "single-day suite2p processing"
+    assert ProcessingPipelines.VIDEO == "video processing"
+    assert ProcessingPipelines.MULTIDAY == "multi-day suite2p processing"
+    assert ProcessingPipelines.FORGING == "dataset forging"
+
+
+def test_processing_status_enum_values():
+    """Verifies all ProcessingStatus enumeration values.
+
+    This test ensures the enumeration contains all expected status codes.
+    """
+    assert ProcessingStatus.RUNNING == 0
+    assert ProcessingStatus.SUCCEEDED == 1
+    assert ProcessingStatus.FAILED == 2
+    assert ProcessingStatus.ABORTED == 3
+
+
+def test_tracker_files_enum_values():
+    """Verifies all TrackerFiles enumeration values.
+
+    This test ensures the enumeration contains all expected tracker filenames.
+    """
+    assert TrackerFiles.MANIFEST == "manifest_generation_tracker.yaml"
+    assert TrackerFiles.CHECKSUM == "checksum_resolution_tracker.yaml"
+    assert TrackerFiles.TRANSFER == "data_transfer_tracker.yaml"
+    assert TrackerFiles.BEHAVIOR == "behavior_processing_tracker.yaml"
+    assert TrackerFiles.SUITE2P == "suite2p_processing_tracker.yaml"
+    assert TrackerFiles.VIDEO == "video_processing_tracker.yaml"
+    assert TrackerFiles.MULTIDAY == "multiday_processing_tracker.yaml"
+    assert TrackerFiles.FORGING == "dataset_forging_tracker.yaml"

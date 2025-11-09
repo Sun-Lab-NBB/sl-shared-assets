@@ -311,9 +311,6 @@ class SessionData(YamlConfig):
         # preprocessing.
         instance.save()
 
-        # Also saves the SystemConfiguration and ExperimentConfiguration instances to the same directory using the paths
-        # resolved for the RawData instance above.
-
         # Dumps the acquisition system's configuration data to the session's directory
         acquisition_system.save(path=instance.raw_data.system_configuration_path)
 
@@ -402,9 +399,9 @@ class SessionData(YamlConfig):
         origin = copy.deepcopy(self)
 
         # Resets all path fields to Null (None) before saving the instance to disk.
-        origin.raw_data = None
-        origin.processed_data = None
-        origin.tracking_data = None
+        origin.raw_data = None  # type: ignore[assignment]
+        origin.processed_data = None  # type: ignore[assignment]
+        origin.tracking_data = None  # type: ignore[assignment]
 
         # Converts StringEnum instances to strings.
         origin.session_type = str(origin.session_type)
@@ -454,11 +451,15 @@ class SessionLock(YamlConfig):
 
     def _save_state(self) -> None:
         """Saves the current lock state to the .yaml file."""
-        # Creates a copy without file paths for clean serialization
-        original = copy.deepcopy(self)
-        original.file_path = None
-        original.lock_path = None
-        original.to_yaml(file_path=self.file_path)
+        # Resets the lock_path and file_path to None before dumping the data to .YAML to avoid issues with loading it
+        # back.
+        temp_file_path, temp_lock_path = self.file_path, self.lock_path
+        try:
+            self.file_path = None  # type: ignore[assignment]
+            self.lock_path = None  # type: ignore[assignment]
+            self.to_yaml(file_path=temp_file_path)
+        finally:
+            self.file_path, self.lock_path = temp_file_path, temp_lock_path
 
     def acquire(self, manager_id: int) -> None:
         """Acquires exclusive access to the session's data.
@@ -525,8 +526,8 @@ class SessionLock(YamlConfig):
 
         Notes:
             This method should only be used for emergency recovery from improper processing shutdowns. It can be called
-            by any process to unlock any session, but it does not attempt to terminate the processes that the lock's
-            owner might have deployed to work with the session's data.
+            by any process to unlock any session, but it does not attempt to terminate the processes that the current
+            lock's owner might have deployed to work with the session's data.
 
         Raises:
             TimeoutError: If the .lock file cannot be acquired for a long period of time due to being held by another

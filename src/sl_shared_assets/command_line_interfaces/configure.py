@@ -7,12 +7,11 @@ from pathlib import Path  # pragma: no cover
 import click  # pragma: no cover
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists  # pragma: no cover
 
-from ..server import generate_server_credentials  # pragma: no cover
 from ..data_classes import (
     AcquisitionSystems,
-    get_working_directory,
     set_working_directory,
     set_google_credentials_path,
+    create_server_configuration_file,
     create_system_configuration_file,
 )  # pragma: no cover
 
@@ -22,9 +21,7 @@ CONTEXT_SETTINGS = {"max_content_width": 120}  # pragma: no cover
 
 @click.group("configure", context_settings=CONTEXT_SETTINGS)
 def configure() -> None:  # pragma: no cover
-    """This Command-Line Interface (CLI) allows configuring major components of the Sun lab data acquisition,
-    processing, and analysis workflow, such as acquisition systems and compute server(s).
-    """
+    """This Command-Line Interface allows configuring major components of the Sun lab data workflow."""
 
 
 @configure.command("directory")
@@ -36,20 +33,12 @@ def configure() -> None:  # pragma: no cover
     help="The absolute path to the directory where to cache Sun lab configuration and local runtime data.",
 )
 def configure_directory(directory: Path) -> None:  # pragma: no cover
-    """Sets the input directory as the Sun lab working directory, creating any missing path components.
-
-    This command as the initial entry-point for setting up any machine (PC) to work with Sun lab libraries and data.
-    After the working directory is configured, all calls to this and all other Sun lab libraries automatically use this
-    directory to store the configuration and runtime data required to perform any requested task. This allows all Sun
-    lab libraries to behave consistently across different user machines and runtime contexts.
-    """
+    """Sets the input directory as the local Sun lab's working directory."""
     # Creates the directory if it does not exist
     ensure_directory_exists(directory)
 
     # Sets the directory as the local working directory
     set_working_directory(path=directory)
-
-    console.echo(message=f"Sun lab working directory set to: {directory}.", level=LogLevel.SUCCESS)
 
 
 @configure.command("server")
@@ -73,8 +62,8 @@ def configure_directory(directory: Path) -> None:  # pragma: no cover
     is_flag=True,
     default=False,
     help=(
-        "Determines whether the credentials' file is created for a service account. This determines the name of the "
-        "generated file. Do not provide this flag unless creating a service credentials file."
+        "Determines whether the server configuration file should use the shared service account for accessing the "
+        "server."
     ),
 )
 @click.option(
@@ -93,10 +82,7 @@ def configure_directory(directory: Path) -> None:  # pragma: no cover
     required=True,
     show_default=True,
     default="/local/storage",
-    help=(
-        "The absolute path to to the root storage server directory. Typically, this is the path to the "
-        "top-level (root) directory of the HDD RAID volume."
-    ),
+    help="The absolute path to to the server's slow HDD RAID volume.",
 )
 @click.option(
     "-wr",
@@ -105,11 +91,7 @@ def configure_directory(directory: Path) -> None:  # pragma: no cover
     required=True,
     show_default=True,
     default="/local/workdir",
-    help=(
-        "The absolute path to the root working server directory. Typically, this is the path to the top-level "
-        "(root) directory of the NVME RAID volume. If the server uses the same volume for both storing and working "
-        "with data, set this to the same path as the 'storage-root' argument."
-    ),
+    help="The absolute path to to the server's fast NVME RAID volume.",
 )
 @click.option(
     "-sd",
@@ -118,9 +100,9 @@ def configure_directory(directory: Path) -> None:  # pragma: no cover
     required=True,
     show_default=True,
     default="sun_data",
-    help="The name of the shared directory used to store all Sun lab project data on all server volumes.",
+    help="The name of the shared directory used to store all Sun lab's projects on both server's volumes.",
 )
-def generate_server_credentials_file(
+def generate_server_configuration_file(
     username: str,
     password: str,
     host: str,
@@ -130,19 +112,9 @@ def generate_server_credentials_file(
     *,
     service: bool,
 ) -> None:  # pragma: no cover
-    """Generates a service or user server access credentials' file.
-
-    This command is used to set up access to the lab's remote compute server(s). The Server class uses the data stored
-    inside the generated credentials .yaml file to connect to and execute remote jobs on the target compute server(s).
-    Depending on the configuration, this command generates either the 'user_credentials.yaml' or
-    'service_credentials.yaml' file.
-    """
-    # Resolves the path to the local Sun lab working directory.
-    output_directory = get_working_directory()
-
+    """Creates the requested service or user server configuration file."""
     # Generates the requested credentials' file.
-    generate_server_credentials(
-        output_directory=output_directory,
+    create_server_configuration_file(
         username=username,
         password=password,
         service=service,
@@ -161,35 +133,23 @@ def generate_server_credentials_file(
     show_default=True,
     required=True,
     default=AcquisitionSystems.MESOSCOPE_VR,
-    help="The type (name) of the data acquisition system for which to generate the configuration file.",
+    help="The type (name) of the data acquisition system for which to create the configuration file.",
 )
 def generate_system_configuration_file(system: AcquisitionSystems) -> None:  # pragma: no cover
-    """Generates the configuration file for the specified data acquisition system.
-
-    This command is typically used when setting up new data acquisition systems in the lab. The sl-experiment library
-    uses the created file to load the acquisition system configuration data during data acquisition runtimes. The
-    system configuration only needs to be created on the machine (PC) that runs the sl-experiment library and manages
-    the acquisition runtime if the system uses multiple machines (PCs). Once the system configuration .yaml file is
-    created via this command, edit the file to modify the acquisition system configuration at any time.
-    """
+    """Creates the specified data acquisition system's configuration file."""
     create_system_configuration_file(system=system)
 
 
-@configure.command("sheets")
+@configure.command("google")
 @click.option(
     "-c",
     "--credentials",
     type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
     required=True,
-    help="The absolute path to the Google Sheets service account credentials .JSON file.",
+    help="The absolute path to the Google service account credentials .JSON file.",
 )
-def configure_google_sheets(credentials: Path) -> None:  # pragma: no cover
-    """Sets the path to the Google Sheets service account credentials file.
-
-    This command is used to configure access to the lab's Google Sheets files used for tracking surgical procedures,
-    water restriction logs, and other experimental metadata. The configured credentials file path is cached locally and
-    used by all Sun lab libraries that require Google Sheets access.
-    """
+def configure_google_credentials(credentials: Path) -> None:  # pragma: no cover
+    """Sets the path to the Google service account credentials file."""
     # Sets the Google Sheets credentials path
     set_google_credentials_path(path=credentials)
 

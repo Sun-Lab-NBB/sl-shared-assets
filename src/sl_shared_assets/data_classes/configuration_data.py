@@ -13,7 +13,7 @@ from ataraxis_data_structures import YamlConfig
 class AcquisitionSystems(StrEnum):
     """Defines the data acquisition systems currently used in the Sun lab."""
 
-    MESOSCOPE_VR = "mesoscope-vr"
+    MESOSCOPE_VR = "mesoscope"
     """This system is built around the 2-Photon Random Access Mesoscope (2P-RAM) and relies on Virtual Reality (VR) 
     environments running in Unity game engine to conduct experiments."""
 
@@ -86,7 +86,7 @@ class MesoscopeFileSystem:
     """The absolute path to the directory where all projects are stored on the main data acquisition system PC."""
     server_directory: Path = Path()
     """The absolute path to the local-filesystem-mounted directory where all projects are stored on the remote compute 
-    server's storage volume."""
+    server."""
     nas_directory: Path = Path()
     """The absolute path to the local-filesystem-mounted directory where all projects are stored on the NAS backup 
     storage volume."""
@@ -283,10 +283,12 @@ class MesoscopeSystemConfiguration(YamlConfig):
         original = deepcopy(self)
 
         # Converts all Path objects to strings before dumping the data, as .YAML encoder does not recognize Path objects
-        original.filesystem.root_directory = str(original.filesystem.root_directory)
-        original.filesystem.server_directory = str(original.filesystem.server_directory)
-        original.filesystem.nas_directory = str(original.filesystem.nas_directory)
-        original.filesystem.mesoscope_directory = str(original.filesystem.mesoscope_directory)
+        original.filesystem.root_directory = str(original.filesystem.root_directory)  # type: ignore[assignment]
+        original.filesystem.server_directory = str(original.filesystem.server_directory)  # type: ignore[assignment]
+        original.filesystem.nas_directory = str(original.filesystem.nas_directory)  # type: ignore[assignment]
+        original.filesystem.mesoscope_directory = str(  # type: ignore[assignment]
+            original.filesystem.mesoscope_directory
+        )
 
         # Converts valve calibration data into dictionary format
         if isinstance(original.microcontrollers.valve_calibration_data, tuple):
@@ -297,68 +299,51 @@ class MesoscopeSystemConfiguration(YamlConfig):
 
 
 @dataclass()
-class ServerCredentials(YamlConfig):
-    """Stores the access credentials that allow interfacing with Sun lab's remote compute servers."""
+class ServerConfiguration(YamlConfig):
+    """Defines the access credentials and the filesystem layout of the Sun lab's remote compute server."""
 
-    username: str = "YourNetID"
+    username: str = ""
     """The username to use for server authentication."""
-    password: str = "YourPassword"
+    password: str = ""
     """The password to use for server authentication."""
     host: str = "cbsuwsun.biohpc.cornell.edu"
     """The hostname or IP address of the server to connect to."""
     storage_root: str = "/local/storage"
-    """The path to the root storage (slow) server directory. Typically, this is the path to the top-level (root) 
-    directory of the HDD RAID volume."""
+    """The path to the server's storage (slow) HDD RAID volume."""
     working_root: str = "/local/workdir"
-    """The path to the root working (fast) server directory. Typically, this is the path to the top-level (root) 
-    directory of the NVME RAID volume. If the server uses the same volume for both storage and working directories, 
-    enter the same path under both 'storage_root' and 'working_root'."""
+    """The path to the server's working (fast) NVME RAID volume."""
     shared_directory_name: str = "sun_data"
-    """Stores the name of the shared directory used to store all Sun lab project data on the storage and working 
-    server volumes."""
-    raw_data_root: str = field(init=False, default_factory=lambda: "/local/storage/sun_data")
-    """The path to the root directory used to store the raw data from all Sun lab projects on the target server."""
-    processed_data_root: str = field(init=False, default_factory=lambda: "/local/workdir/sun_data")
-    """The path to the root directory used to store the processed data from all Sun lab projects on the target 
-    server."""
+    """The name of the shared directory that stores Sun lab's project data on both server volumes."""
+    shared_storage_root: str = field(init=False, default_factory=lambda: "/local/storage/sun_data")
+    """The path to the root Sun lab's shared directory on the storage server's volume."""
+    shared_working_root: str = field(init=False, default_factory=lambda: "/local/workdir/sun_data")
+    """The path to the root Sun lab's shared directory on the working server's volume."""
     user_data_root: str = field(init=False, default_factory=lambda: "/local/storage/YourNetID")
-    """The path to the root directory of the user on the target server. Unlike raw and processed data roots, which are 
-    shared between all Sun lab users, each user_data directory is unique for every server user."""
+    """The path to the root user's directory on the storage server's volume."""
     user_working_root: str = field(init=False, default_factory=lambda: "/local/workdir/YourNetID")
-    """The path to the root user working directory on the target server. This directory is unique for every user."""
+    """The path to the root user's directory on the working server's volume."""
 
     def __post_init__(self) -> None:
-        """Statically resolves the paths to end-point directories using provided root directories."""
-        # Shared Sun Lab directories statically use 'sun_data' root names
-        self.raw_data_root = str(Path(self.storage_root).joinpath(self.shared_directory_name))
-        self.processed_data_root = str(Path(self.working_root).joinpath(self.shared_directory_name))
-
-        # User directories exist at the same level as the 'shared' root project directories, but user user-ids as names.
+        """Resolves all server-side directory paths."""
+        # Stores directory paths as strings as this is used by the paramiko bindings in the Server class from the
+        # sl-forgery library.
+        self.shared_storage_root = str(Path(self.storage_root).joinpath(self.shared_directory_name))
+        self.shared_working_root = str(Path(self.working_root).joinpath(self.shared_directory_name))
         self.user_data_root = str(Path(self.storage_root).joinpath(f"{self.username}"))
         self.user_working_root = str(Path(self.working_root).joinpath(f"{self.username}"))
 
 
 def set_working_directory(path: Path) -> None:
-    """Sets the specified directory as the Sun lab working directory for the local machine (PC).
+    """Sets the specified directory as the Sun lab's working directory for the local machine (PC).
 
     Notes:
-        This function caches the path to the working directory to the user's data directory.
+        This function caches the path to the working directory in the user's data directory.
 
         If the input path does not point to an existing directory, the function creates the requested directory.
 
     Args:
-        path: The path to the directory to set as the local Sun lab working directory.
+        path: The path to the directory to set as the local Sun lab's working directory.
     """
-    # If the directory specified by the 'path' does not exist, generates the specified directory tree. As part of this
-    # process, also generate the precursor server_credentials.yaml file to use for accessing the remote server used to
-    # store project data.
-    if not path.exists():
-        message = (
-            f"The specified working directory ({path}) does not exist. Generating the directory at the "
-            f"specified path..."
-        )
-        console.echo(message=message, level=LogLevel.INFO)
-
     # Resolves the path to the static .txt file used to store the path to the system configuration file
     app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
     path_file = app_dir.joinpath("working_directory_path.txt")
@@ -369,13 +354,18 @@ def set_working_directory(path: Path) -> None:
     # Ensures that the input path's directory exists
     ensure_directory_exists(path)
 
+    # Also ensures that the working directory contains the 'configuration' subdirectory.
+    ensure_directory_exists(path.joinpath("configuration"))
+
     # Replaces the contents of the working_directory_path.txt file with the provided path
     with path_file.open("w") as f:
         f.write(str(path))
 
+    console.echo(message=f"Sun lab's working directory set to: {path}.", level=LogLevel.SUCCESS)
+
 
 def get_working_directory() -> Path:
-    """Resolves and returns the path to the local Sun lab working directory.
+    """Resolves and returns the path to the local Sun lab's working directory.
 
     Returns:
         The path to the local working directory.
@@ -387,24 +377,24 @@ def get_working_directory() -> Path:
     app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
     path_file = app_dir.joinpath("working_directory_path.txt")
 
-    # If the cache file or the Sun lab data directory does not exist, aborts with an error
+    # If the cache file or the Sun lab's data directory does not exist, aborts with an error
     if not path_file.exists():
         message = (
-            "Unable to resolve the path to the local Sun lab working directory, as it has not been set. "
+            "Unable to resolve the path to the local Sun lab's working directory, as it has not been set. "
             "Set the local working directory by using the 'sl-configure directory' CLI command."
         )
         console.error(message=message, error=FileNotFoundError)
 
-    # Once the location of the path storage file is resolved, reads the file path from the file
+    # Loads the path to the local working directory
     with path_file.open() as f:
         working_directory = Path(f.read().strip())
 
     # If the configuration file does not exist, also aborts with an error
     if not working_directory.exists():
         message = (
-            "Unable to resolve the path to the local Sun lab working directory, as the currently configured directory "
-            "does not exist at the expected path. Set a new working directory by using the 'sl-configure directory' "
-            "CLI command."
+            "Unable to resolve the path to the local Sun lab's working directory, as the currently configured "
+            "directory does not exist at the expected path. Set a new working directory by using the 'sl-configure "
+            "directory' CLI command."
         )
         console.error(message=message, error=FileNotFoundError)
 
@@ -412,42 +402,37 @@ def get_working_directory() -> Path:
     return working_directory
 
 
-# Maps supported file names to configuration classes. This is used when loading the configuration data into memory.
-_supported_configuration_files = {
-    "mesoscope-vr_configuration.yaml": MesoscopeSystemConfiguration,
-}
-
-
 def create_system_configuration_file(system: AcquisitionSystems | str) -> None:
-    """Creates the .YAML configuration file for the requested Sun lab data acquisition system and configures the local
+    """Creates the .YAML configuration file for the requested Sun lab's data acquisition system and configures the local
     machine (PC) to use this file for all future acquisition-system-related calls.
 
     Notes:
-        This function creates the configuration file inside the shared Sun lab working directory on the local machine.
+        This function creates the configuration file inside the local Sun lab's working directory.
 
     Args:
-        system: The name (type) of the data acquisition system for which to create the configuration file. Must be one
-            of the valid members of the AcquisitionSystems enumeration.
+        system: The name (type) of the data acquisition system for which to create the configuration file.
 
     Raises:
         ValueError: If the input acquisition system name (type) is not recognized.
     """
-    # Resolves the path to the local Sun lab working directory.
+    # Resolves the path to the local Sun lab's working directory.
     directory = get_working_directory()
+    directory = directory.joinpath("configuration")  # Navigates to the 'configuration' subdirectory
 
-    # Removes any existing configuration files to ensure only one configuration exists on each configured machine
-    existing_configs = tuple(directory.glob("*_configuration.yaml"))
+    # Removes any existing system configuration files to ensure only one system configuration exists on each configured
+    # machine
+    existing_configs = tuple(directory.glob("*_system_configuration.yaml"))
     for config_file in existing_configs:
-        console.echo(f"Removing existing configuration file: {config_file.name}...")
+        console.echo(f"Removing the existing configuration file {config_file.name}...")
         config_file.unlink()
 
     if system == AcquisitionSystems.MESOSCOPE_VR:
         # Creates the precursor configuration file for the mesoscope-vr system
         configuration = MesoscopeSystemConfiguration()
-        configuration_path = directory.joinpath(f"{system}_configuration.yaml")
+        configuration_path = directory.joinpath(f"{system}_system_configuration.yaml")
         configuration.save(path=configuration_path)
 
-        # Forces the user to finish configuring the system by editing the parameters inside the configuration file
+        # Prompts the user to finish configuring the system by editing the parameters inside the configuration file
         message = (
             f"Mesoscope-VR data acquisition system configuration file: Saved to {configuration_path}. Edit the "
             f"default parameters inside the configuration file to finish configuring the system."
@@ -471,23 +456,28 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
     a SystemConfiguration instance.
 
     Returns:
-        The initialized SystemConfiguration class instance for the local data acquisition system that stores the loaded
-        configuration parameters.
+        The initialized SystemConfiguration class instance that stores the loaded configuration parameters.
 
     Raises:
         FileNotFoundError: If the local machine does not have a valid data acquisition system configuration file.
     """
-    # Resolves the path to the local Sun lab working directory.
-    directory = get_working_directory()
+    # Maps supported file names to configuration classes.
+    _supported_configuration_files = {
+        f"{AcquisitionSystems.MESOSCOPE_VR}_system_configuration.yaml": MesoscopeSystemConfiguration,
+    }
 
-    # Finds all configuration files stored in the local working directory
-    config_files = tuple(directory.glob("*_configuration.yaml"))
+    # Resolves the path to the local Sun lab's working directory.
+    directory = get_working_directory()
+    directory = directory.joinpath("configuration")  # Navigates to the 'configuration' subdirectory
+
+    # Finds all configuration files stored in the local working directory.
+    config_files = tuple(directory.glob("*_system_configuration.yaml"))
 
     # Ensures exactly one configuration file exists in the working directory
     if len(config_files) != 1:
         file_names = [f.name for f in config_files]
         message = (
-            f"Expected a single data acquisition system configuration file to be found inside the local Sun lab "
+            f"Expected a single data acquisition system configuration file to be found inside the local Sun lab's "
             f"working directory ({directory}), but found {len(config_files)} files ({', '.join(file_names)}). Call the "
             f"'sl-configure system' CLI command to reconfigure the host-machine to only contain a single data "
             f"acquisition system configuration file."
@@ -503,7 +493,7 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
     # Ensures that the file name is supported
     if file_name not in _supported_configuration_files:
         message = (
-            f"The data acquisition system configuration file '{file_name}' stored in the local Sun lab working "
+            f"The data acquisition system configuration file '{file_name}' stored in the local Sun lab's working "
             f"directory is not recognized. Call the 'sl-configure system' CLI command to reconfigure the host-machine "
             f"to use a supported configuration file."
         )
@@ -517,8 +507,8 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
 
 
 def set_google_credentials_path(path: Path) -> None:
-    """Sets the path to the Google Sheets service account credentials .JSON file for the local machine (PC) and
-    configures all future interactions with the Google Sheets API to use this file.
+    """Configures the local machine (PC) to use the provided Google Sheets service account credentials .JSON file for
+    all future interactions with the Google's API.
 
     Notes:
         This function caches the path to the Google Sheets credentials file in the user's data directory.
@@ -558,14 +548,14 @@ def set_google_credentials_path(path: Path) -> None:
 
 
 def get_google_credentials_path() -> Path:
-    """Resolves and returns the path to the Google Sheets service account credentials .JSON file.
+    """Resolves and returns the path to the Google service account credentials .JSON file.
 
     Returns:
-        The path to the Google Sheets service account credentials .JSON file.
+        The path to the Google service account credentials .JSON file.
 
     Raises:
-        FileNotFoundError: If the Google Sheets credentials path has not been configured for the host-machine, or if
-            the previously configured credentials file no longer exists at the expected path.
+        FileNotFoundError: If the Google service account credentials path has not been configured for the host-machine,
+            or if the previously configured credentials file no longer exists at the expected path.
     """
     # Uses appdirs to locate the user data directory and resolve the path to the credentials' path cache file
     app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
@@ -574,8 +564,8 @@ def get_google_credentials_path() -> Path:
     # If the cache file does not exist, aborts with an error
     if not path_file.exists():
         message = (
-            "Unable to resolve the path to the Google Sheets credentials file, as it has not been set. "
-            "Set the Google Sheets credentials path by using the 'sl-configure sheets' CLI command."
+            "Unable to resolve the path to the Google account credentials file, as it has not been set. "
+            "Set the Google service account credentials path by using the 'sl-configure google' CLI command."
         )
         console.error(message=message, error=FileNotFoundError)
 
@@ -586,9 +576,9 @@ def get_google_credentials_path() -> Path:
     # If the credentials' file does not exist at the cached path, aborts with an error
     if not credentials_path.exists():
         message = (
-            "Unable to resolve the path to the Google Sheets credentials file, as the previously configured "
+            "Unable to resolve the path to the Google account credentials file, as the previously configured "
             f"credentials file does not exist at the expected path ({credentials_path}). Set a new credentials path "
-            "by using the 'sl-configure sheets' CLI command."
+            "by using the 'sl-configure google' CLI command."
         )
         console.error(message=message, error=FileNotFoundError)
 
@@ -596,129 +586,126 @@ def get_google_credentials_path() -> Path:
     return credentials_path
 
 
-def generate_server_credentials(
-    output_directory: Path,
+def create_server_configuration_file(
     username: str,
     password: str,
-    service: bool = False,
     host: str = "cbsuwsun.biopic.cornell.edu",
     storage_root: str = "/local/workdir",
     working_root: str = "/local/storage",
     shared_directory_name: str = "sun_data",
+    *,
+    service: bool = False,
 ) -> None:
-    """Generates the server access credentials .yaml file under the specified directory, using input information.
+    """Creates the .YAML configuration file for the requested Sun lab compute server and configures the local machine
+    (PC) to use this file for all future server-related calls.
 
-    This function provides a convenience interface for generating new server access credential files. Depending on
-    configuration, it either creates user access credentials files or service access credentials files.
+    Notes:
+        This function creates the configuration file inside the shared Sun lab's working directory on the local machine.
 
     Args:
-        output_directory: The directory where to save the generated server_credentials.yaml file.
         username: The username to use for server authentication.
         password: The password to use for server authentication.
-        service: Determines whether the generated credentials file stores the data for a user or a service account.
+        service: Determines whether the generated configuration file should access the server as a user or as a shared
+            service account.
         host: The hostname or IP address of the server to connect to.
-        storage_root: The path to the root storage (slow) server directory. Typically, this is the path to the
-            top-level (root) directory of the HDD RAID volume.
-        working_root: The path to the root working (fast) server directory. Typically, this is the path to the
-            top-level (root) directory of the NVME RAID volume. If the server uses the same volume for both storage and
-            working directories, enter the same path under both 'storage_root' and 'working_root'.
-        shared_directory_name: The name of the shared directory used to store all Sun lab project data on the storage
-            and working server volumes.
+        storage_root: The path to the server's storage (slow) HDD RAID volume.
+        working_root: The path to the server's working (fast) NVME RAID volume.
+        shared_directory_name: The name of the shared directory that stores Sun lab's project data on both server
+            volumes.
     """
+    output_directory = get_working_directory().joinpath("configuration")
     if service:
-        ServerCredentials(
+        ServerConfiguration(
             username=username,
             password=password,
             host=host,
             storage_root=storage_root,
             working_root=working_root,
             shared_directory_name=shared_directory_name,
-        ).to_yaml(file_path=output_directory.joinpath("service_credentials.yaml"))
-        console.echo(message="Service server access credentials file: Created.", level=LogLevel.SUCCESS)
+        ).to_yaml(file_path=output_directory.joinpath("service_server_configuration.yaml"))
+        console.echo(message="Service server configuration file: Created.", level=LogLevel.SUCCESS)
     else:
-        ServerCredentials(
+        ServerConfiguration(
             username=username,
             password=password,
             host=host,
             storage_root=storage_root,
             working_root=working_root,
             shared_directory_name=shared_directory_name,
-        ).to_yaml(file_path=output_directory.joinpath("user_credentials.yaml"))
-        console.echo(message="User server access credentials file: Created.", level=LogLevel.SUCCESS)
+        ).to_yaml(file_path=output_directory.joinpath("user_server_configuration.yaml"))
+        console.echo(message="User server configuration file: Created.", level=LogLevel.SUCCESS)
 
 
-def get_credentials_file_path(service: bool = False) -> Path:
-    """Resolves and returns the path to the requested .YAML file that stores the remote compute server's access
-    credentials.
-
-    Depending on the configuration, either returns the path to the 'user_credentials.yaml' file (default) or the
-    'service_credentials.yaml' file.
+def get_server_configuration(*, service: bool = False) -> ServerConfiguration:
+    """Resolves and returns the requested Sun lab compute server's configuration data as a ServerConfiguration instance.
 
     Args:
-        service: Determines whether this function must evaluate and return the path to the
-            'service_credentials.yaml' file (if true) or the 'user_credentials.yaml' file (if false).
+        service: Determines whether this function is called to load the user or the service configuration file.
+
+    Returns:
+        The loaded and validated server configuration data, stored in a ServerConfiguration instance.
 
     Raises:
-        FileNotFoundError: If either the requested credentials file does not exist in the local Sun lab working
-            directory.
-        ValueError: If the requested credentials file exists, but is not properly configured.
+        FileNotFoundError: If the requested configuration file does not exist in the local Sun lab's working directory.
+        ValueError: If the requested configuration file exists, but is not properly configured.
     """
     # Gets the path to the local working directory.
-    working_directory = get_working_directory()
+    working_directory = get_working_directory().joinpath("configuration")
 
     # Resolves the paths to the credential files.
-    service_path = working_directory.joinpath("service_credentials.yaml")
-    user_path = working_directory.joinpath("user_credentials.yaml")
+    service_path = working_directory.joinpath("service_server_configuration.yaml")
+    user_path = working_directory.joinpath("user_server_configuration.yaml")
 
-    # If the caller requires the service account, evaluates the service credentials file.
+    # If the caller requires the service account, evaluates the service configuration file.
     if service:
-        # Ensures that the credentials' file exists.
+        # Ensures that the configuration file exists.
         if not service_path.exists():
             message = (
-                f"Unable to locate the 'service_credentials.yaml' file in the Sun lab working directory "
-                f"{service_path}. Call the 'sl-configure server -s' CLI command to create the service server access "
-                f"credentials file."
+                f"Unable to locate the 'service_server_configuration.yaml' file in the Sun lab's working directory "
+                f"{service_path}. Call the 'sl-configure server -s' CLI command to create the service server "
+                f"configuration file."
             )
             console.error(message=message, error=FileNotFoundError)
             raise FileNotFoundError(message)  # Fallback to appease mypy, should not be reachable
 
-        credentials: ServerCredentials = ServerCredentials.from_yaml(file_path=service_path)
+        configuration = ServerConfiguration.from_yaml(file_path=service_path)
 
         # If the service account is not configured, aborts with an error.
-        if credentials.username == "YourNetID" or credentials.password == "YourPassword":
+        if configuration.username == "" or configuration.password == "":
             message = (
-                "The 'service_credentials.yaml' file appears to be unconfigured or contains placeholder credentials. "
-                "Call the 'sl-configure server -s' CLI command to reconfigure the server credentials file."
+                "The 'service_server_configuration.yaml' file appears to be unconfigured or contains placeholder "
+                "access credentials. Call the 'sl-configure server -s' CLI command to reconfigure the server access "
+                "credentials."
             )
             console.error(message=message, error=ValueError)
             raise ValueError(message)  # Fallback to appease mypy, should not be reachable
 
-        # If the service account is configured, returns the path to the service credentials file to caller
-        message = f"Server access credentials: Resolved. Using the service {credentials.username} account."
+        # If the service account is configured, returns the loaded configuration data to caller
+        message = f"Service server configuration: Resolved. Using the service {configuration.username} account."
         console.echo(message=message, level=LogLevel.SUCCESS)
-        return service_path
+        return configuration
 
     if not user_path.exists():
         message = (
-            f"Unable to locate the 'user_credentials.yaml' file in the Sun lab working directory {user_path}. Call "
-            f"the 'sl-configure server' CLI command to create the user server access credentials file."
+            f"Unable to locate the 'user_server_configuration.yaml' file in the Sun lab's working directory "
+            f"{user_path}. Call the 'sl-configure server' CLI command to create the user server configuration file."
         )
         console.error(message=message, error=FileNotFoundError)
         raise FileNotFoundError(message)  # Fallback to appease mypy, should not be reachable
 
-    # Otherwise, evaluates the user credentials file.
-    credentials: ServerCredentials = ServerCredentials.from_yaml(file_path=user_path)
+    # Otherwise, evaluates the user configuration file.
+    configuration = ServerConfiguration.from_yaml(file_path=user_path)
 
     # If the user account is not configured, aborts with an error.
-    if credentials.username == "YourNetID" or credentials.password == "YourPassword":
+    if configuration.username == "" or configuration.password == "":
         message = (
-            "The 'user_credentials.yaml' file appears to be unconfigured or contains placeholder credentials. "
-            "Call the 'sl-configure server' CLI command to reconfigure the server credentials file."
+            "The 'user_server_configuration.yaml' file appears to be unconfigured or contains placeholder access "
+            "credentials. Call the 'sl-configure server' CLI command to reconfigure the server access credentials."
         )
         console.error(message=message, error=ValueError)
         raise ValueError(message)  # Fallback to appease mypy, should not be reachable
 
-    # Otherwise, returns the path to the user credentials file to caller
-    message = f"Server access credentials: Resolved. Using the {credentials.username} account."
+    # Otherwise, returns the user's service configuration data to the caller.
+    message = f"User server configuration: Resolved. Using the {configuration.username} account."
     console.echo(message=message, level=LogLevel.SUCCESS)
-    return user_path
+    return configuration
