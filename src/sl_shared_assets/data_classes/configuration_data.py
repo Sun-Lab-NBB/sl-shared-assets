@@ -296,6 +296,48 @@ class MesoscopeSystemConfiguration(YamlConfig):
         original.to_yaml(file_path=path)
 
 
+@dataclass()
+class ServerCredentials(YamlConfig):
+    """Stores the access credentials that allow interfacing with Sun lab's remote compute servers."""
+
+    username: str = "YourNetID"
+    """The username to use for server authentication."""
+    password: str = "YourPassword"
+    """The password to use for server authentication."""
+    host: str = "cbsuwsun.biohpc.cornell.edu"
+    """The hostname or IP address of the server to connect to."""
+    storage_root: str = "/local/storage"
+    """The path to the root storage (slow) server directory. Typically, this is the path to the top-level (root) 
+    directory of the HDD RAID volume."""
+    working_root: str = "/local/workdir"
+    """The path to the root working (fast) server directory. Typically, this is the path to the top-level (root) 
+    directory of the NVME RAID volume. If the server uses the same volume for both storage and working directories, 
+    enter the same path under both 'storage_root' and 'working_root'."""
+    shared_directory_name: str = "sun_data"
+    """Stores the name of the shared directory used to store all Sun lab project data on the storage and working 
+    server volumes."""
+    raw_data_root: str = field(init=False, default_factory=lambda: "/local/storage/sun_data")
+    """The path to the root directory used to store the raw data from all Sun lab projects on the target server."""
+    processed_data_root: str = field(init=False, default_factory=lambda: "/local/workdir/sun_data")
+    """The path to the root directory used to store the processed data from all Sun lab projects on the target 
+    server."""
+    user_data_root: str = field(init=False, default_factory=lambda: "/local/storage/YourNetID")
+    """The path to the root directory of the user on the target server. Unlike raw and processed data roots, which are 
+    shared between all Sun lab users, each user_data directory is unique for every server user."""
+    user_working_root: str = field(init=False, default_factory=lambda: "/local/workdir/YourNetID")
+    """The path to the root user working directory on the target server. This directory is unique for every user."""
+
+    def __post_init__(self) -> None:
+        """Statically resolves the paths to end-point directories using provided root directories."""
+        # Shared Sun Lab directories statically use 'sun_data' root names
+        self.raw_data_root = str(Path(self.storage_root).joinpath(self.shared_directory_name))
+        self.processed_data_root = str(Path(self.working_root).joinpath(self.shared_directory_name))
+
+        # User directories exist at the same level as the 'shared' root project directories, but user user-ids as names.
+        self.user_data_root = str(Path(self.storage_root).joinpath(f"{self.username}"))
+        self.user_working_root = str(Path(self.working_root).joinpath(f"{self.username}"))
+
+
 def set_working_directory(path: Path) -> None:
     """Sets the specified directory as the Sun lab working directory for the local machine (PC).
 
@@ -552,3 +594,131 @@ def get_google_credentials_path() -> Path:
 
     # Returns the path to the credentials' file
     return credentials_path
+
+
+def generate_server_credentials(
+    output_directory: Path,
+    username: str,
+    password: str,
+    service: bool = False,
+    host: str = "cbsuwsun.biopic.cornell.edu",
+    storage_root: str = "/local/workdir",
+    working_root: str = "/local/storage",
+    shared_directory_name: str = "sun_data",
+) -> None:
+    """Generates the server access credentials .yaml file under the specified directory, using input information.
+
+    This function provides a convenience interface for generating new server access credential files. Depending on
+    configuration, it either creates user access credentials files or service access credentials files.
+
+    Args:
+        output_directory: The directory where to save the generated server_credentials.yaml file.
+        username: The username to use for server authentication.
+        password: The password to use for server authentication.
+        service: Determines whether the generated credentials file stores the data for a user or a service account.
+        host: The hostname or IP address of the server to connect to.
+        storage_root: The path to the root storage (slow) server directory. Typically, this is the path to the
+            top-level (root) directory of the HDD RAID volume.
+        working_root: The path to the root working (fast) server directory. Typically, this is the path to the
+            top-level (root) directory of the NVME RAID volume. If the server uses the same volume for both storage and
+            working directories, enter the same path under both 'storage_root' and 'working_root'.
+        shared_directory_name: The name of the shared directory used to store all Sun lab project data on the storage
+            and working server volumes.
+    """
+    if service:
+        ServerCredentials(
+            username=username,
+            password=password,
+            host=host,
+            storage_root=storage_root,
+            working_root=working_root,
+            shared_directory_name=shared_directory_name,
+        ).to_yaml(file_path=output_directory.joinpath("service_credentials.yaml"))
+        console.echo(message="Service server access credentials file: Created.", level=LogLevel.SUCCESS)
+    else:
+        ServerCredentials(
+            username=username,
+            password=password,
+            host=host,
+            storage_root=storage_root,
+            working_root=working_root,
+            shared_directory_name=shared_directory_name,
+        ).to_yaml(file_path=output_directory.joinpath("user_credentials.yaml"))
+        console.echo(message="User server access credentials file: Created.", level=LogLevel.SUCCESS)
+
+
+def get_credentials_file_path(service: bool = False) -> Path:
+    """Resolves and returns the path to the requested .YAML file that stores the remote compute server's access
+    credentials.
+
+    Depending on the configuration, either returns the path to the 'user_credentials.yaml' file (default) or the
+    'service_credentials.yaml' file.
+
+    Args:
+        service: Determines whether this function must evaluate and return the path to the
+            'service_credentials.yaml' file (if true) or the 'user_credentials.yaml' file (if false).
+
+    Raises:
+        FileNotFoundError: If either the requested credentials file does not exist in the local Sun lab working
+            directory.
+        ValueError: If the requested credentials file exists, but is not properly configured.
+    """
+    # Gets the path to the local working directory.
+    working_directory = get_working_directory()
+
+    # Resolves the paths to the credential files.
+    service_path = working_directory.joinpath("service_credentials.yaml")
+    user_path = working_directory.joinpath("user_credentials.yaml")
+
+    # If the caller requires the service account, evaluates the service credentials file.
+    if service:
+        # Ensures that the credentials' file exists.
+        if not service_path.exists():
+            message = (
+                f"Unable to locate the 'service_credentials.yaml' file in the Sun lab working directory "
+                f"{service_path}. Call the 'sl-configure server -s' CLI command to create the service server access "
+                f"credentials file."
+            )
+            console.error(message=message, error=FileNotFoundError)
+            raise FileNotFoundError(message)  # Fallback to appease mypy, should not be reachable
+
+        credentials: ServerCredentials = ServerCredentials.from_yaml(file_path=service_path)
+
+        # If the service account is not configured, aborts with an error.
+        if credentials.username == "YourNetID" or credentials.password == "YourPassword":
+            message = (
+                "The 'service_credentials.yaml' file appears to be unconfigured or contains placeholder credentials. "
+                "Call the 'sl-configure server -s' CLI command to reconfigure the server credentials file."
+            )
+            console.error(message=message, error=ValueError)
+            raise ValueError(message)  # Fallback to appease mypy, should not be reachable
+
+        # If the service account is configured, returns the path to the service credentials file to caller
+        message = f"Server access credentials: Resolved. Using the service {credentials.username} account."
+        console.echo(message=message, level=LogLevel.SUCCESS)
+        return service_path
+
+    if not user_path.exists():
+        message = (
+            f"Unable to locate the 'user_credentials.yaml' file in the Sun lab working directory {user_path}. Call "
+            f"the 'sl-configure server' CLI command to create the user server access credentials file."
+        )
+        console.error(message=message, error=FileNotFoundError)
+        raise FileNotFoundError(message)  # Fallback to appease mypy, should not be reachable
+
+    # Otherwise, evaluates the user credentials file.
+    credentials: ServerCredentials = ServerCredentials.from_yaml(file_path=user_path)
+
+    # If the user account is not configured, aborts with an error.
+    if credentials.username == "YourNetID" or credentials.password == "YourPassword":
+        message = (
+            "The 'user_credentials.yaml' file appears to be unconfigured or contains placeholder credentials. "
+            "Call the 'sl-configure server' CLI command to reconfigure the server credentials file."
+        )
+        console.error(message=message, error=ValueError)
+        raise ValueError(message)  # Fallback to appease mypy, should not be reachable
+
+    # Otherwise, returns the path to the user credentials file to caller
+    message = f"Server access credentials: Resolved. Using the {credentials.username} account."
+    console.echo(message=message, level=LogLevel.SUCCESS)
+    return user_path

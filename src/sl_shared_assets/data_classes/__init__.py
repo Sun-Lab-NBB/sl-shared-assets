@@ -2,6 +2,13 @@
 pipelines making up the lab's data workflow.
 """
 
+from processing_data import (
+    ProcessingStatus,
+    TrackerFileNames,
+    ProcessingTracker,
+    ProcessingPipelines,
+)
+
 from .runtime_data import (
     ZaberPositions,
     MesoscopePositions,
@@ -29,6 +36,7 @@ from .surgery_data import (
 )
 from .configuration_data import (
     MesoscopeCameras,
+    ServerCredentials,
     AcquisitionSystems,
     MesoscopeFileSystem,
     MesoscopeGoogleSheets,
@@ -40,6 +48,8 @@ from .configuration_data import (
     MesoscopeExperimentConfiguration,
     get_working_directory,
     set_working_directory,
+    get_credentials_file_path,
+    generate_server_credentials,
     get_google_credentials_path,
     set_google_credentials_path,
     get_system_configuration_data,
@@ -66,17 +76,24 @@ __all__ = [
     "MesoscopeSystemConfiguration",
     "ProcedureData",
     "ProcessedData",
+    "ProcessingPipelines",
+    "ProcessingStatus",
+    "ProcessingTracker",
     "RawData",
     "RunTrainingDescriptor",
+    "ServerCredentials",
     "SessionData",
     "SessionLock",
     "SessionTypes",
     "SubjectData",
     "SurgeryData",
+    "TrackerFileNames",
     "TrackingData",
     "WindowCheckingDescriptor",
     "ZaberPositions",
     "create_system_configuration_file",
+    "generate_server_credentials",
+    "get_credentials_file_path",
     "get_google_credentials_path",
     "get_system_configuration_data",
     "get_working_directory",
