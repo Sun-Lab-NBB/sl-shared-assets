@@ -137,9 +137,6 @@ class MesoscopeMicroControllers:
     """The USB port used by the Sensor Microcontroller."""
     encoder_port: str = "/dev/ttyACM2"
     """The USB port used by the Encoder Microcontroller."""
-    debug: bool = False
-    """Determines whether the acquisition system is running in the 'debug' mode. This mode should be disabled for all 
-    production runtimes."""
     minimum_brake_strength_g_cm: float = 43.2047
     """The torque applied by the running wheel brake at the minimum operational voltage, in gram centimeter."""
     maximum_brake_strength_g_cm: float = 1152.1246
@@ -147,21 +144,22 @@ class MesoscopeMicroControllers:
     wheel_diameter_cm: float = 15.0333
     """The diameter of the running wheel, in centimeters."""
     lick_threshold_adc: int = 600
-    """The threshold voltage, in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC), interpreted 
-    as the animal's tongue contacting the lick sensor."""
+    """The threshold voltage, in raw analog units recorded by a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC), 
+    interpreted as the animal's tongue contacting the lick sensor."""
     lick_signal_threshold_adc: int = 300
-    """The minimum voltage, in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC), reported to the
-    PC as a non-zero value. Voltages below this level are interpreted as 'no-lick' noise and are pulled to 0."""
+    """The minimum voltage, in raw analog units recorded by a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC), 
+    reported to the PC as a non-zero value. Voltages below this level are interpreted as 'no-lick' noise and are 
+    pulled to 0."""
     lick_delta_threshold_adc: int = 300
-    """The minimum absolute difference between two consecutive lick sensor readouts, in raw analog units recorded by a 
-    12-bit Analog-to-Digital-Converter (ADC), for the change to be reported to the PC."""
+    """The minimum absolute difference between two consecutive lick sensor readouts, in raw analog units recorded by 
+    a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC), for the change to be reported to the PC."""
     lick_averaging_pool_size: int = 2
     """The number of lick sensor readouts to average together to produce the final lick sensor readout value."""
     torque_baseline_voltage_adc: int = 2046
-    """The voltage level, in raw analog units measured by a 12-bit Analog-to-Digital-Converter (ADC) after the AD620 
-    amplifier, that corresponds to no torque (0) readout."""
+    """The voltage level, in raw analog units measured by a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC) after the 
+    AD620 amplifier, that corresponds to no torque (0) readout."""
     torque_maximum_voltage_adc: int = 2750
-    """The voltage level, in raw analog units measured by a 12-bit Analog-to-Digital-Converter (ADC) 
+    """The voltage level, in raw analog units measured by a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC) 
     after the AD620 amplifier, that corresponds to the absolute maximum torque detectable by the sensor."""
     torque_sensor_capacity_g_cm: float = 720.0779
     """The maximum torque detectable by the sensor, in grams centimeter (g cm)."""
@@ -170,11 +168,11 @@ class MesoscopeMicroControllers:
     torque_report_ccw: bool = True
     """Determines whether the sensor should report torque in the Counter-Clockwise (CCW) direction."""
     torque_signal_threshold_adc: int = 100
-    """The minimum voltage, in raw analog units recorded by a 12-bit Analog-to-Digital-Converter (ADC), reported to the
-    PC as a non-zero value. Voltages below this level are interpreted as noise and are pulled to 0."""
+    """The minimum voltage, in raw analog units recorded by a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC), 
+    reported to the PC as a non-zero value. Voltages below this level are interpreted as noise and are pulled to 0."""
     torque_delta_threshold_adc: int = 70
     """The minimum absolute difference between two consecutive torque sensor readouts, in raw analog units recorded by 
-    a 12-bit Analog-to-Digital-Converter (ADC), for the change to be reported to the PC."""
+    a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC), for the change to be reported to the PC."""
     torque_averaging_pool_size: int = 4
     """The number of torque sensor readouts to average together to produce the final torque sensor readout value."""
     wheel_encoder_ppr: int = 8192
@@ -192,10 +190,6 @@ class MesoscopeMicroControllers:
     """The length of each Virtual Reality (VR) environment's distance 'unit' (Unity unit) in real-world centimeters."""
     screen_trigger_pulse_duration_ms: int = 500
     """The duration, in milliseconds, of the TTL pulse used to toggle the VR screen power state."""
-    auditory_tone_duration_ms: int = 300
-    """The duration, in milliseconds, of the auditory tone emitted when water rewards are delivered to the animal."""
-    valve_calibration_pulse_count: int = 200
-    """The number of times to pulse the valve during each calibration runtime."""
     sensor_polling_delay_ms: int = 1
     """The delay, in milliseconds, between any two successive readouts of any sensor other than the encoder."""
     valve_calibration_data: dict[int | float, int | float] | tuple[tuple[int | float, int | float], ...] = (
