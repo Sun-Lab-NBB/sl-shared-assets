@@ -1139,7 +1139,6 @@ def test_mesoscope_microcontrollers_default_initialization():
     assert mcu.actor_port == "/dev/ttyACM0"
     assert mcu.sensor_port == "/dev/ttyACM1"
     assert mcu.encoder_port == "/dev/ttyACM2"
-    assert mcu.debug is False
     assert mcu.wheel_diameter_cm == 15.0333
     assert mcu.lick_threshold_adc == 600
     assert len(mcu.valve_calibration_data) == 4

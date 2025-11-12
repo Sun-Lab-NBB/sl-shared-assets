@@ -46,8 +46,6 @@ class MesoscopeExperimentTrial:
     experiment's MesoscopeExperimentConfiguration instance."""
     trial_length_cm: float
     """The length of the trial cue sequence in centimeters."""
-    trial_reward_size_ul: float
-    """The volume of water, in microliters, dispensed when the animal successfully completes the trial's task."""
     reward_zone_start_cm: float
     """The position of the trial reward zone starting boundary, in centimeters."""
     reward_zone_end_cm: float
@@ -55,6 +53,10 @@ class MesoscopeExperimentTrial:
     guidance_trigger_location_cm: float
     """The location of the invisible boundary (wall) with which the animal must collide to trigger water reward 
     delivery during guided trials."""
+    trial_reward_size_ul: float = 5.0
+    """The volume of water, in microliters, dispensed when the animal successfully completes the trial's task."""
+    reward_tone_duration_ms: int = 300
+    """The duration, in milliseconds, to sound the auditory tone when delivering water rewards."""
 
 
 # noinspection PyArgumentList
