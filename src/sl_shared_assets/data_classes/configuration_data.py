@@ -194,6 +194,9 @@ class MesoscopeMicroControllers:
     """The duration, in milliseconds, of the TTL pulse used to toggle the VR screen power state."""
     sensor_polling_delay_ms: int = 1
     """The delay, in milliseconds, between any two successive readouts of any sensor other than the encoder."""
+    mesoscope_frame_averaging_pool_size = 0
+    """The number of digital pin readouts to average together when determining the current logic level of the incoming 
+    TTL signal sent by the mesoscope at the onset of each frame's acquisition."""
     valve_calibration_data: dict[int | float, int | float] | tuple[tuple[int | float, int | float], ...] = (
         (15000, 1.10),
         (30000, 3.00),

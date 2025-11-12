@@ -64,6 +64,11 @@ class LickTrainingDescriptor(YamlConfig):  # pragma: no cover
     """The maximum number of consecutive rewards that can be delivered without the animal consuming them. If 
     the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal 
     consumes the delivered rewards."""
+    water_reward_size_ul: float = 5.0
+    """The volume of water, in microliters, dispensed to the animal when it achieves the required running speed and 
+    duration thresholds."""
+    reward_tone_duration_ms: int = 300
+    """The duration, in milliseconds, of the auditory tone played to the animal when it receives water rewards."""
     dispensed_water_volume_ml: float = 0.0
     """The total water volume, in milliliters, dispensed during runtime. This excludes the water volume 
     dispensed during the paused (idle) state."""
@@ -118,6 +123,11 @@ class RunTrainingDescriptor(YamlConfig):  # pragma: no cover
     """The maximum time, in seconds, the animal can dip below the running speed threshold to still receive the 
     reward. This allows animals that 'run' by taking a series of large steps, briefly dipping below speed threshold at 
     the end of each step, to still get water rewards."""
+    water_reward_size_ul: float = 5.0
+    """The volume of water, in microliters, dispensed to the animal when it achieves the required running speed and 
+    duration thresholds."""
+    reward_tone_duration_ms: int = 300
+    """The duration, in milliseconds, of the auditory tone played to the animal when it receives water rewards."""
     dispensed_water_volume_ml: float = 0.0
     """The total water volume, in milliliters, dispensed during runtime. This excludes the water volume 
     dispensed during the paused (idle) state."""
