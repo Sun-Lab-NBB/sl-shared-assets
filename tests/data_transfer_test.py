@@ -602,8 +602,6 @@ def test_calculate_directory_checksum_excludes_service_files(tmp_path):
 
     (test_dir / "regular_file.txt").write_text("content")
     (test_dir / "ax_checksum.txt").write_text("should_be_excluded")
-    (test_dir / "ubiquitin.bin").write_bytes(b"excluded_binary")
-    (test_dir / "telomere.bin").write_bytes(b"excluded_binary")
     (test_dir / "nk.bin").write_bytes(b"excluded_binary")
 
     checksum_with_service = calculate_directory_checksum(directory=test_dir, save_checksum=False)

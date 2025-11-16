@@ -215,8 +215,6 @@ def test_raw_data_resolve_paths(tmp_path):
     assert raw_data.zaber_positions_path == root_path / "zaber_positions.yaml"
     assert raw_data.session_descriptor_path == root_path / "session_descriptor.yaml"
     assert raw_data.session_data_path == root_path / "session_data.yaml"
-    assert raw_data.telomere_path == root_path / "telomere.bin"
-    assert raw_data.ubiquitin_path == root_path / "ubiquitin.bin"
     assert raw_data.nk_path == root_path / "nk.bin"
 
 

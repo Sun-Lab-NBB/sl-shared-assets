@@ -76,10 +76,6 @@ class RawData:
     checksum_path: Path = Path()
     """The path to the ax_checksum.txt file that stores the xxHash-128 checksum of the data used to verify its 
     integrity during transmission."""
-    telomere_path: Path = Path()
-    """The path to the telomere.bin file that marks the sessions suitable for unsupervised data processing."""
-    ubiquitin_path: Path = Path()
-    """The path to the ubiquitin.bin file used to mark session data directories for deletion (purging)."""
     nk_path: Path = Path()
     """The path to the nk.bin file used by the sl-experiment library to mark sessions undergoing runtime initialization.
     """
@@ -105,8 +101,6 @@ class RawData:
         self.window_screenshot_path = self.raw_data_path.joinpath("window_screenshot.png")
         self.checksum_path = self.raw_data_path.joinpath("ax_checksum.txt")
         self.system_configuration_path = self.raw_data_path.joinpath("system_configuration.yaml")
-        self.telomere_path = self.raw_data_path.joinpath("telomere.bin")
-        self.ubiquitin_path = self.raw_data_path.joinpath("ubiquitin.bin")
         self.nk_path = self.raw_data_path.joinpath("nk.bin")
 
     def make_directories(self) -> None:

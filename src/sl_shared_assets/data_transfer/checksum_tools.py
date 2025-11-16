@@ -13,8 +13,6 @@ import xxhash
 # data that should remain permanently unchanged.
 _excluded_files = {
     "ax_checksum.txt",
-    "ubiquitin.bin",
-    "telomere.bin",
     "nk.bin",
 }
 
