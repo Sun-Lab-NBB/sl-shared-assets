@@ -9,8 +9,12 @@ from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists  
 
 from ..data_classes import (
     AcquisitionSystems,
+    MesoscopeExperimentState,
+    MesoscopeExperimentTrial,
+    MesoscopeExperimentConfiguration,
     set_working_directory,
     set_google_credentials_path,
+    get_system_configuration_data,
     create_server_configuration_file,
     create_system_configuration_file,
 )  # pragma: no cover
@@ -155,5 +159,125 @@ def configure_google_credentials(credentials: Path) -> None:  # pragma: no cover
 
     console.echo(
         message=f"Google Sheets credentials path set to: {credentials.resolve()}.",
+        level=LogLevel.SUCCESS,
+    )
+
+
+@configure.command("project")
+@click.option(
+    "-p",
+    "--project",
+    type=str,
+    required=True,
+    help="The name of the project to be created.",
+)
+def configure_project(project: str) -> None:  # pragma: no cover
+    """Configures the local data acquisition system to acquire data for the specified project."""
+    # Queries the local data acquisition system configuration.
+    system_configuration = get_system_configuration_data()
+    project_path = system_configuration.filesystem.root_directory.joinpath(project, "configuration")
+
+    # Generates the project directory hierarchy
+    ensure_directory_exists(project_path)
+    console.echo(message=f"Project {project} data structure: generated.", level=LogLevel.SUCCESS)
+
+
+@configure.command("experiment")
+@click.option(
+    "-p",
+    "--project",
+    type=str,
+    required=True,
+    help="The name of the project for which to generate the new experiment configuration file.",
+)
+@click.option(
+    "-e",
+    "--experiment",
+    type=str,
+    required=True,
+    help="The name of the experiment for which to create the configuration file.",
+)
+@click.option(
+    "-sc",
+    "--state_count",
+    type=int,
+    required=True,
+    help="The number of runtime states supported by the experiment.",
+)
+@click.option(
+    "-tc",
+    "--trial_count",
+    type=int,
+    required=True,
+    help="The number of trial types supported by the experiment.",
+)
+def generate_experiment_configuration_file(
+    project: str, experiment: str, state_count: int, trial_count: int
+) -> None:  # pragma: no cover
+    """Configures the local data acquisition system to execute the specified project's experiment."""
+    # Resolves the acquisition system configuration. Uses the path to the local project directory and the project name
+    # to determine where to save the experiment configuration file.
+    acquisition_system = get_system_configuration_data()
+    file_path = acquisition_system.filesystem.root_directory.joinpath(project, "configuration", f"{experiment}.yaml")
+
+    if not acquisition_system.filesystem.root_directory.joinpath(project).exists():
+        message = (
+            f"Unable to generate the {experiment} experiment's configuration file as the {acquisition_system.name} "
+            f"data acquisition system is currently not configured to acquire data for the {project} project. Use the "
+            f"'sl-configure project' CLI command to create the project before creating new experiment configuration(s)."
+        )
+        console.error(message=message, error=ValueError)
+        # Fallback to appease mypy, should not be reachable
+        raise ValueError(message)
+
+    # Generates a precursor experiment state field inside the 'states' dictionary for each requested experiment state.
+    states = {}
+    for state in range(state_count):
+        states[f"state_{state + 1}"] = MesoscopeExperimentState(
+            experiment_state_code=state + 1,  # Assumes experiment state sequences are 1-based
+            system_state_code=0,
+            state_duration_s=60,
+            initial_guided_trials=3,
+            recovery_failed_trial_threshold=9,
+            recovery_guided_trials=3,
+        )
+
+    # Generates a precursor trial type field inside the 'trials' dictionary for each requested experiment state.
+    trials = {}
+    for trial in range(trial_count):
+        trials[f"trial_type_{trial + 1}"] = MesoscopeExperimentTrial(
+            cue_sequence=[1, 0, 2, 0, 3, 0, 4, 0],
+            trial_length_cm=240,
+            trial_reward_size_ul=5.0,
+            reward_zone_start_cm=208.0,
+            reward_zone_end_cm=222.0,
+            guidance_trigger_location_cm=208.0,
+        )
+
+    # Depending on the acquisition system, packs the resolved data into the experiment configuration class and
+    # saves it to the project's configuration directory as a .yaml file.
+    if acquisition_system.name == "mesoscope-vr":
+        experiment_configuration = MesoscopeExperimentConfiguration(
+            experiment_states=states,
+            trial_structures=trials,
+            cue_map={0: 30.0, 1: 30.0, 2: 30.0, 3: 30.0, 4: 30.0},
+            cue_offset_cm=10.0,
+            unity_scene_name="",
+        )
+
+    else:
+        message = (
+            f"Unable to generate the {experiment} experiment's configuration file for the {project} project, as the "
+            f"local data acquisition system {acquisition_system.name} is not recognized (not supported). Currently, "
+            f"only the following acquisition systems are supported: {','.join(list(AcquisitionSystems))}."
+        )
+        console.error(message=message, error=ValueError)
+        # Fallback to appease mypy, should not be reachable
+        raise ValueError(message)
+
+    experiment_configuration.to_yaml(file_path=file_path)
+    console.echo(
+        message=f"{experiment} experiment's configuration file: created under the {project} project's "
+        f"'configuration' directory.",
         level=LogLevel.SUCCESS,
     )

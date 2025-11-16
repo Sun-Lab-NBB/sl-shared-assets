@@ -4,8 +4,12 @@ from _typeshed import Incomplete
 
 from ..data_classes import (
     AcquisitionSystems as AcquisitionSystems,
+    MesoscopeExperimentState as MesoscopeExperimentState,
+    MesoscopeExperimentTrial as MesoscopeExperimentTrial,
+    MesoscopeExperimentConfiguration as MesoscopeExperimentConfiguration,
     set_working_directory as set_working_directory,
     set_google_credentials_path as set_google_credentials_path,
+    get_system_configuration_data as get_system_configuration_data,
     create_server_configuration_file as create_server_configuration_file,
     create_system_configuration_file as create_system_configuration_file,
 )
@@ -26,3 +30,7 @@ def generate_server_configuration_file(
 ) -> None: ...
 def generate_system_configuration_file(system: AcquisitionSystems) -> None: ...
 def configure_google_credentials(credentials: Path) -> None: ...
+def configure_project(project: str) -> None: ...
+def generate_experiment_configuration_file(
+    project: str, experiment: str, state_count: int, trial_count: int
+) -> None: ...
