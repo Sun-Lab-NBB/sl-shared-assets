@@ -139,7 +139,7 @@ class MesoscopeMicroControllers:
     """The USB port used by the Sensor Microcontroller."""
     encoder_port: str = "/dev/ttyACM2"
     """The USB port used by the Encoder Microcontroller."""
-    keepalive_interval_ms: int = 1000,
+    keepalive_interval_ms: int = 500
     """The interval, in milliseconds, at which the microcontrollers are expected to receive and send the keepalive 
     messages used to ensure that all controllers function as expected during runtime."""
     minimum_brake_strength_g_cm: float = 43.2047
