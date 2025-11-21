@@ -52,13 +52,13 @@ class LickTrainingDescriptor(YamlConfig):  # pragma: no cover
     """The ID of the experimenter running the session."""
     mouse_weight_g: float
     """The weight of the animal, in grams, at the beginning of the session."""
-    minimum_reward_delay_s: int
+    minimum_reward_delay_s: int = 6
     """The minimum delay, in seconds, that can separate the delivery of two consecutive water rewards."""
-    maximum_reward_delay_s: int
+    maximum_reward_delay_s: int = 18
     """The maximum delay, in seconds, that can separate the delivery of two consecutive water rewards."""
-    maximum_water_volume_ml: float
+    maximum_water_volume_ml: float = 1.0
     """The maximum volume of water the system is allowed to dispense during training."""
-    maximum_training_time_m: int
+    maximum_training_time_min: int = 20
     """The maximum time, in minutes, the system is allowed to run the training."""
     maximum_unconsumed_rewards: int = 1
     """The maximum number of consecutive rewards that can be delivered without the animal consuming them. If 
@@ -80,7 +80,7 @@ class LickTrainingDescriptor(YamlConfig):  # pragma: no cover
     preferred_session_water_volume_ml: float = 0.0
     """The volume of water, in milliliters, the animal should be receiving during the session runtime if its 
     performance matches experimenter-specified threshold."""
-    incomplete: bool = False
+    incomplete: bool = True
     """Tracks whether the session's data is complete and eligible for unsupervised data processing."""
     experimenter_notes: str = "Replace this with your notes."
     """Stores the experimenter's notes made during runtime."""
@@ -94,32 +94,32 @@ class RunTrainingDescriptor(YamlConfig):  # pragma: no cover
     """The ID of the experimenter running the session."""
     mouse_weight_g: float
     """The weight of the animal, in grams, at the beginning of the session."""
-    final_run_speed_threshold_cm_s: float
+    final_run_speed_threshold_cm_s: float = 1.5
     """The running speed threshold, in centimeters per second, at the end of training."""
-    final_run_duration_threshold_s: float
+    final_run_duration_threshold_s: float = 1.5
     """The running duration threshold, in seconds, at the end of training."""
-    initial_run_speed_threshold_cm_s: float
+    initial_run_speed_threshold_cm_s: float = 1.5
     """The initial running speed threshold, in centimeters per second."""
-    initial_run_duration_threshold_s: float
+    initial_run_duration_threshold_s: float = 1.5
     """The initial running duration threshold, in seconds."""
-    increase_threshold_ml: float
+    increase_threshold_ml: float = 0.1
     """The threshold volume of water delivered to the animal, in milliliters, that triggers the increase in the running 
     speed and duration thresholds."""
-    run_speed_increase_step_cm_s: float
+    run_speed_increase_step_cm_s: float = 0.1
     """The value, in centimeters per second, used by the system to increment the running speed threshold each 
     time the animal receives 'increase_threshold' volume of water."""
-    run_duration_increase_step_s: float
+    run_duration_increase_step_s: float = 0.1
     """The value, in seconds, used by the system to increment the duration threshold each time the animal 
     receives 'increase_threshold' volume of water."""
-    maximum_water_volume_ml: float
+    maximum_water_volume_ml: float = 1.0
     """The maximum volume of water the system is allowed to dispense during training."""
-    maximum_training_time_m: int
+    maximum_training_time_min: int = 40
     """The maximum time, in minutes, the system is allowed to run the training."""
     maximum_unconsumed_rewards: int = 1
     """The maximum number of consecutive rewards that can be delivered without the animal consuming them. If 
     the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal 
     consumes the delivered rewards."""
-    maximum_idle_time_s: float = 0.0
+    maximum_idle_time_s: float = 0.3
     """The maximum time, in seconds, the animal can dip below the running speed threshold to still receive the 
     reward. This allows animals that 'run' by taking a series of large steps, briefly dipping below speed threshold at 
     the end of each step, to still get water rewards."""
@@ -139,7 +139,7 @@ class RunTrainingDescriptor(YamlConfig):  # pragma: no cover
     preferred_session_water_volume_ml: float = 0.0
     """The volume of water, in milliliters, the animal should be receiving during the session runtime if its 
     performance matches experimenter-specified threshold."""
-    incomplete: bool = False
+    incomplete: bool = True
     """Tracks whether the session's data is complete and eligible for unsupervised data processing."""
     experimenter_notes: str = "Replace this with your notes."
     """Stores the experimenter's notes made during runtime."""
@@ -168,7 +168,7 @@ class MesoscopeExperimentDescriptor(YamlConfig):  # pragma: no cover
     preferred_session_water_volume_ml: float = 0.0
     """The volume of water, in milliliters, the animal should be receiving during the session runtime if its 
     performance matches experimenter-specified threshold."""
-    incomplete: bool = False
+    incomplete: bool = True
     """Tracks whether the session's data is complete and eligible for unsupervised data processing."""
     experimenter_notes: str = "Replace this with your notes."
     """Stores the experimenter's notes made during runtime."""
