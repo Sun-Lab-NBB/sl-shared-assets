@@ -14,7 +14,6 @@ from .runtime_data import (
 from .session_data import (
     RawData,
     SessionData,
-    SessionLock,
     SessionTypes,
     TrackingData,
     ProcessedData,
@@ -82,7 +81,6 @@ __all__ = [
     "RunTrainingDescriptor",
     "ServerConfiguration",
     "SessionData",
-    "SessionLock",
     "SessionTypes",
     "SubjectData",
     "SurgeryData",
