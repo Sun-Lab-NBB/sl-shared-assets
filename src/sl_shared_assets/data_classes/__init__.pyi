@@ -10,7 +10,6 @@ from .runtime_data import (
 from .session_data import (
     RawData as RawData,
     SessionData as SessionData,
-    SessionLock as SessionLock,
     SessionTypes as SessionTypes,
     TrackingData as TrackingData,
     ProcessedData as ProcessedData,
@@ -24,10 +23,8 @@ from .surgery_data import (
     ProcedureData as ProcedureData,
 )
 from .processing_data import (
-    TrackerFiles as TrackerFiles,
     ProcessingStatus as ProcessingStatus,
     ProcessingTracker as ProcessingTracker,
-    ProcessingPipelines as ProcessingPipelines,
 )
 from .configuration_data import (
     MesoscopeCameras as MesoscopeCameras,
@@ -71,18 +68,15 @@ __all__ = [
     "MesoscopeSystemConfiguration",
     "ProcedureData",
     "ProcessedData",
-    "ProcessingPipelines",
     "ProcessingStatus",
     "ProcessingTracker",
     "RawData",
     "RunTrainingDescriptor",
     "ServerConfiguration",
     "SessionData",
-    "SessionLock",
     "SessionTypes",
     "SubjectData",
     "SurgeryData",
-    "TrackerFiles",
     "TrackingData",
     "WindowCheckingDescriptor",
     "ZaberPositions",

@@ -1,142 +1,108 @@
-"""This module provides the assets for running data processing pipelines on the Sun lab's compute servers."""
+"""This module provides the assets for running data processing pipelines."""
 
+import os
 import copy
-from enum import IntEnum, StrEnum
-from pathlib import Path
+from enum import IntEnum
+from pathlib import Path  # noqa: TC003
 from dataclasses import field, dataclass
 
+import xxhash
 from filelock import FileLock
 from ataraxis_base_utilities import console
 from ataraxis_data_structures import YamlConfig
 
 
-class TrackerFiles(StrEnum):
-    """Defines the set of files used by Sun lab's data processing pipelines to track their runtime progress."""
-
-    MANIFEST = "manifest_generation_tracker.yaml"
-    """Tracks the state of the project manifest generation pipeline."""
-    CHECKSUM = "checksum_resolution_tracker.yaml"
-    """Tracks the state of the session's checksum resolution pipeline."""
-    TRANSFER = "data_transfer_tracker.yaml"
-    """Tracks the state of the session's transfer (migration) pipeline."""
-    BEHAVIOR = "behavior_processing_tracker.yaml"
-    """Tracks the state of the session's behavior log processing pipeline."""
-    SUITE2P = "suite2p_processing_tracker.yaml"
-    """Tracks the state of the session's single-day suite2p processing pipeline."""
-    VIDEO = "video_processing_tracker.yaml"
-    """Tracks the state of the session's video (DeepLabCut) processing pipeline."""
-    MULTIDAY = "multiday_processing_tracker.yaml"
-    """Tracks the state of the dataset's multiday suite2p processing pipeline."""
-    FORGING = "dataset_forging_tracker.yaml"
-    """Tracks the state of the dataset's creation (forging) pipeline."""
-
-
-class ProcessingPipelines(StrEnum):
-    """Defines the set of data processing pipelines currently used in the Sun lab."""
-
-    MANIFEST = "manifest generation"
-    """Regenerates the target project's manifest .feather file."""
-    CHECKSUM = "checksum resolution"
-    """Generates or verifies the target session's data integrity checksum."""
-    TRANSFER = "data transfer"
-    """Transfers the target session's data directory from the source directory to the target directory."""
-    BEHAVIOR = "behavior processing"
-    """Extracts the session's behavior data from the .npz log archives generated during the target session's runtime."""
-    SUITE2P = "single-day suite2p processing"
-    """Extracts the cell activity data from the 2-photon imaging TIFF files generated during the target session's 
-    runtime."""
-    VIDEO = "video processing"
-    """Extracts the animal pose estimation data from the MP4 video frames acquired during the target session's 
-    runtime."""
-    MULTIDAY = "multi-day suite2p processing"
-    """Tracks the cells imaged during every session that makes up the dataset across days."""
-    FORGING = "dataset forging"
-    """Extracts and integrates the processed data from all sources and sessions making up the dataset into the unified 
-    dataset.feather file."""
-
-
 class ProcessingStatus(IntEnum):
-    """Defines the status codes used to communicate the runtime state of all Sun lab processing pipelines.
-
-    Notes:
-        The status codes from this enumeration track the state of the pipeline as a whole, instead of tracking the
-        state of the individual jobs that make up the pipeline.
+    """Defines the status codes used by the ProcessingTracker instances to communicate the runtime state of each
+    job making up the managed data processing pipeline.
     """
 
-    RUNNING = 0
-    """The pipeline is currently running on the remote server. It may be executed (in progress) or waiting for 
-    the required resources to become available (queued)."""
-    SUCCEEDED = 1
-    """The server has successfully completed the processing pipeline."""
-    FAILED = 2
-    """The server has failed to complete the pipeline due to a runtime error."""
-    ABORTED = 3
-    """The pipeline execution has been aborted prematurely, either by the manager process or due to an overriding 
-    request from another user."""
+    SCHEDULED = 0
+    """The job is scheduled for execution."""
+    RUNNING = 1
+    """The job is currently being executed."""
+    SUCCEEDED = 2
+    """The job has been completed."""
+    FAILED = 3
+    """The job encountered a runtime error and was not completed."""
+
+
+@dataclass
+class JobState:
+    """Stores the metadata and the current runtime status of a single job in the processing pipeline."""
+
+    status: ProcessingStatus = ProcessingStatus.SCHEDULED
+    """The current status of the job."""
+    slurm_job_id: int | None = None
+    """The SLURM-assigned job ID, if running on a SLURM cluster."""
 
 
 @dataclass()
 class ProcessingTracker(YamlConfig):
     """Tracks the state of a data processing pipeline and provides tools for communicating this state between multiple
-    processes in a thread-safe manner.
+    processes and host-machines.
 
     Note:
-        A 'manager process' is the highest-level process that manages the tracked pipeline. When a pipeline runs on
-        remote compute servers, the manager process is typically the process running on the user PC that submits the
-        remote processing jobs to the compute server.
-
-        The processing trackers work similar to '.lock' files. When a pipeline starts running on the remote server, its
-        tracker is switched to the 'running' (locked) state until the pipeline completes, aborts, or encounters an
-        error. When the tracker is locked, all modifications to the tracker have to originate from the manager process
-        that started the pipeline.
+        All modifications to the tracker file require the acquisition of the .lock file, which ensures exclusive
+        access to the tracker's data, allowing multiple independent processes (jobs) to safely work with the same
+        tracker file.
     """
 
     file_path: Path
-    """The path to the .YAML file used to cache the tracker data on disk."""
-    _complete: bool = False
-    """Tracks whether the processing pipeline managed by this tracker has finished successfully."""
-    _encountered_error: bool = False
-    """Tracks whether the processing pipeline managed by this tracker has encountered a runtime error."""
-    _running: bool = False
-    """Tracks whether the processing pipeline managed by this tracker is currently running."""
-    _manager_id: int = -1
-    """The unique identifier of the manager process that started the pipeline's execution."""
+    """The path to the .YAML file used to cache the tracker's data on disk."""
+    _jobs: dict[str, JobState] = field(default_factory=dict)
+    """Maps the unique identifiers of the jobs that make up the processing pipeline to their current state and 
+    metadata."""
     lock_path: str = field(init=False)
     """The path to the .LOCK file used to ensure thread-safe access to the tracker's data."""
-    _job_count: int = 1
-    """The total number of jobs to be executed as part of the tracked pipeline."""
-    _completed_jobs: int = 0
-    """The total number of jobs completed by the tracked pipeline."""
 
     def __post_init__(self) -> None:
         """Resolves the .LOCK file for the managed tracker .YAML file."""
         # Generates the .lock file path for the target tracker .yaml file.
         if self.file_path is not None:
             self.lock_path = str(self.file_path.with_suffix(self.file_path.suffix + ".lock"))
-
-            # Ensures that the input processing tracker file name is supported.
-            if self.file_path.name not in tuple(TrackerFiles):
-                message = (
-                    f"Unsupported processing tracker file encountered when instantiating a ProcessingTracker "
-                    f"instance: {self.file_path}. Currently, only the following tracker filenames are "
-                    f"supported: {', '.join(tuple(TrackerFiles))}."
-                )
-                console.error(message=message, error=ValueError)
-
         else:
             self.lock_path = ""
 
+        # Converts integer status values back to ProcessingStatus enumeration instances. The conversion to integers is
+        # necessary for .YAML saving compatibility.
+        for job_state in self._jobs.values():
+            if isinstance(job_state.status, int):
+                job_state.status = ProcessingStatus(job_state.status)
+
+    @staticmethod
+    def generate_job_id(session_path: Path, job_name: str) -> str:
+        """Generates a unique hexadecimal job identifier based on the session's data path and the job's name using the
+        xxHash64 checksum generator.
+
+        Args:
+            session_path: The path to the processed session's data directory.
+            job_name: The unique name for the processing job.
+
+        Returns:
+            The unique hexadecimal identifier for the target job.
+        """
+        # Combines session path and job name into a single string for hashing
+        combined = f"{session_path.resolve()}:{job_name}"
+        # Generates and returns the xxHash64 hash
+        return xxhash.xxh64(combined.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _get_slurm_job_id() -> int | None:
+        """Retrieves the SLURM-assigned job's ID from the environment, if available.
+
+        Returns:
+            The SLURM-assigned job's ID if running in a SLURM environment, None otherwise.
+        """
+        slurm_id = os.environ.get("SLURM_JOB_ID") or os.environ.get("SLURM_JOBID")
+        return int(slurm_id) if slurm_id else None
+
     def _load_state(self) -> None:
-        """Reads the current processing state from the wrapped .YAML file."""
+        """Reads the processing pipeline's runtime state from the cached .YAML file."""
         if self.file_path.exists():
             # Loads the data for the state values but does not replace the file path or lock attributes.
             instance: ProcessingTracker = self.from_yaml(self.file_path)
-            self._complete = copy.copy(instance._complete)
-            self._encountered_error = copy.copy(instance._encountered_error)
-            self._running = copy.copy(instance._running)
-            self._manager_id = copy.copy(instance._manager_id)
-            self._job_count = copy.copy(instance._job_count)
-            self._completed_jobs = copy.copy(instance._completed_jobs)
+            self._jobs = copy.deepcopy(instance._jobs)
         else:
             # Otherwise, if the tracker file does not exist, generates a new .yaml file using default instance values
             # and saves it to disk using the specified tracker file path.
@@ -144,189 +110,208 @@ class ProcessingTracker(YamlConfig):
 
     def _save_state(self) -> None:
         """Caches the current processing state stored inside the instance's attributes as a.YAML file."""
-        # Resets the lock_path and file_path to None before dumping the data to .YAML to avoid issues with loading it
-        # back.
-        temp_file_path, temp_lock_path = self.file_path, self.lock_path
+        # Resets the lock_path and file_path to None and jobs to a dictionary of integers before dumping the data to
+        # .YAML to avoid issues with loading it back.
+        temp_file_path, temp_lock_path, temp_jobs = self.file_path, self.lock_path, self._jobs
+
+        # Converts enums to int for YAML serialization
+        converted_jobs = {}
+        for job_id, job_state in self._jobs.items():
+            converted_jobs[job_id] = JobState(
+                status=int(job_state.status),  # type: ignore[arg-type]
+                slurm_job_id=job_state.slurm_job_id,
+            )
+
         try:
             self.file_path = None  # type: ignore[assignment]
             self.lock_path = None  # type: ignore[assignment]
+            self._jobs = converted_jobs
             self.to_yaml(file_path=temp_file_path)
         finally:
-            self.file_path, self.lock_path = temp_file_path, temp_lock_path
+            self.file_path, self.lock_path, self.jobs = temp_file_path, temp_lock_path, temp_jobs
 
-    def start(self, manager_id: int, job_count: int = 1) -> None:
-        """Configures the tracker file to indicate that the tracked processing pipeline is currently running.
+    def initialize_jobs(self, job_ids: list[str]) -> None:
+        """Configures the tracker with the list of jobs to be executed during the pipeline's runtime.
 
         Args:
-            manager_id: The unique identifier of the manager process starting the pipeline execution.
-            job_count: The total number of jobs to be executed as part of the tracked pipeline's runtime.
+            job_ids: The list of unique identifiers for all jobs that make up the tracked pipeline.
 
         Raises:
             TimeoutError: If the .LOCK file for the tracker .YAML file cannot be acquired within the timeout period.
-            PermissionError: If another manager process is currently holding exclusive access to the pipeline's tracker.
         """
-        # Acquires the lock
         lock = FileLock(self.lock_path)
         with lock.acquire(timeout=10.0):
-            # Loads tracker state from the .yaml file
+            # Loads tracker's state from the .yaml file
             self._load_state()
 
-            # If the pipeline is already running from a different process, aborts with an error.
-            if self._running and manager_id != self._manager_id:
-                message = (
-                    f"Unable to start the processing pipeline from the manager process with id {manager_id}. The "
-                    f"{self.file_path.name} tracker file indicates that the manager process with id {self._manager_id} "
-                    f"is currently executing the pipeline. Only a single manager process is allowed to execute "
-                    f"the pipeline at the same time."
-                )
-                console.error(message=message, error=PermissionError)
-                # Fallback to appease mypy, should not be reachable
-                raise PermissionError(message)  # pragma: no cover
+            # Initialize all jobs as SCHEDULED if they don't already exist
+            for job_id in job_ids:
+                if job_id not in self._jobs:
+                    self._jobs[job_id] = JobState(status=ProcessingStatus.SCHEDULED)
 
-            # Otherwise, if the pipeline is already running for the current manager process, returns without modifying
-            # the tracker data.
-            if self._running and manager_id == self._manager_id:
-                return
-
-            # Otherwise, locks the pipeline for the current manager process and updates the cached tracker data
-            self._running = True
-            self._manager_id = manager_id
-            self._complete = False
-            self._encountered_error = False
-            self._job_count = job_count
-            self._completed_jobs = 0
             self._save_state()
 
-    def error(self, manager_id: int) -> None:
-        """Configures the tracker file to indicate that the tracked processing pipeline encountered a runtime error.
+    def start_job(self, job_id: str) -> None:
+        """Marks the target job as running and captures the SLURM-assigned job's ID from the environment, if called
+        under the SLURM job manager.
 
         Args:
-            manager_id: The unique identifier of the manager process reporting the pipeline's runtime error.
+            job_id: The unique identifier of the job mark as started.
 
         Raises:
-            TimeoutError: If the .Lock file for the tracker .YAML file cannot be acquired within the timeout period.
-            PermissionError: If another manager process is currently holding exclusive access to the pipeline's tracker.
+            TimeoutError: If the .LOCK file for the tracker .YAML file cannot be acquired within the timeout period.
+            ValueError: If the specified job ID is not found in the managed tracker file.
         """
         lock = FileLock(self.lock_path)
         with lock.acquire(timeout=10.0):
             # Loads tracker state from the .yaml file
             self._load_state()
 
-            # If the pipeline is not running, returns without doing anything
-            if not self._running:
-                return
-
-            # Ensures that only the active manager process can report pipeline errors using the tracker file
-            if manager_id != self._manager_id:
+            # Verifies that the tracker is configured to track the specified job
+            if job_id not in self._jobs:
                 message = (
-                    f"Unable to report that the processing pipeline has encountered an error from the manager process "
-                    f"with id {manager_id}. The {self.file_path.name} tracker file indicates that the pipeline is "
-                    f"managed by the process with id {self._manager_id}, preventing other processes from interfacing "
-                    f"with the pipeline."
+                    f"The ProcessingTracker instance is not configured to track the state of the job with ID "
+                    f"'{job_id}'. The instance is currently configured to track jobs with IDs: "
+                    f"{', '.join(self._jobs.keys())}."
                 )
-                console.error(message=message, error=PermissionError)
+                console.error(message=message, error=ValueError)
                 # Fallback to appease mypy, should not be reachable
-                raise PermissionError(message)  # pragma: no cover
+                raise ValueError(message)  # pragma: no cover
 
-            # Indicates that the pipeline aborted with an error
-            self._running = False
-            self._manager_id = -1
-            self._complete = False
-            self._encountered_error = True
+            # Updates job status and captures the SLURM-assigned job ID
+            job_info = self._jobs[job_id]
+            job_info.status = ProcessingStatus.RUNNING
+            job_info.slurm_job_id = self._get_slurm_job_id()
+
             self._save_state()
 
-    def stop(self, manager_id: int) -> None:
-        """Configures the tracker file to increment the completed job counter and, if all jobs have been completed,
-        indicate that the tracked processing pipeline has been completed.
+    def complete_job(self, job_id: str) -> None:
+        """Marks a target job as successfully completed.
 
         Args:
-            manager_id: The unique identifier of the manager process reporting the pipeline's progress.
+            job_id: The unique identifier of the job to mark as complete.
 
         Raises:
-            TimeoutError: If the .Lock file for the tracker .YAML file cannot be acquired within the timeout period.
-            PermissionError: If another manager process is currently holding exclusive access to the pipeline's tracker.
+            TimeoutError: If the .LOCK file for the tracker .YAML file cannot be acquired within the timeout period.
+            ValueError: If the specified job ID is not found in the managed tracker file.
         """
         lock = FileLock(self.lock_path)
         with lock.acquire(timeout=10.0):
             # Loads tracker state from the .yaml file
             self._load_state()
 
-            # If the pipeline is not running, does not do anything
-            if not self._running:
-                return
-
-            # Ensures that only the active manager process can report pipeline completion using the tracker file
-            if manager_id != self._manager_id:
+            # Verifies that the tracker is configured to track the specified job
+            if job_id not in self._jobs:
                 message = (
-                    f"Unable to report that the processing pipeline has completed from the manager "
-                    f"process with id {manager_id}. The {self.file_path.name} tracker file indicates that the pipeline "
-                    f"is managed by the process with id {self._manager_id}, preventing other processes from "
-                    f"interfacing with the pipeline."
+                    f"The ProcessingTracker instance is not configured to track the state of the job with ID "
+                    f"'{job_id}'. The instance is currently configured to track jobs with IDs: "
+                    f"{', '.join(self._jobs.keys())}."
                 )
-                console.error(message=message, error=PermissionError)
+                console.error(message=message, error=ValueError)
                 # Fallback to appease mypy, should not be reachable
-                raise PermissionError(message)  # pragma: no cover
+                raise ValueError(message)  # pragma: no cover
 
-            # Increments completed job tracker
-            self._completed_jobs += 1
+            # Updates the job's status.
+            job_info = self._jobs[job_id]
+            job_info.status = ProcessingStatus.SUCCEEDED
 
-            # If the pipeline has completed all required jobs, marks the pipeline as complete (stopped)
-            if self._completed_jobs >= self._job_count:
-                self._running = False
-                self._manager_id = -1
-                self._complete = True
-                self._encountered_error = False
-                self._save_state()
-            else:
-                # Otherwise, updates the completed job counter, but does not change any other state variables.
-                self._save_state()
+            self._save_state()
 
-    def abort(self) -> None:
-        """Resets the tracker file to the default state, clearing all state and ownership information.
+    def fail_job(self, job_id: str) -> None:
+        """Marks the target job as failed.
 
-        Notes:
-            This method should only be used for emergency recovery from improper processing shutdowns. It can be called
-            by any process to reset any tracker file, but it does not attempt to terminate the processes that the
-            current tracker's owner might have deployed to work with the session's data.
+        Args:
+            job_id: The unique identifier of the job to mark as failed.
+
+        Raises:
+            TimeoutError: If the .LOCK file for the tracker .YAML file cannot be acquired within the timeout period.
+            ValueError: If the specified job ID is not found in the managed tracker file.
         """
+        lock = FileLock(self.lock_path)
+        with lock.acquire(timeout=10.0):
+            # Loads tracker state from the .yaml file
+            self._load_state()
+
+            # Verifies that the tracker is configured to track the specified job
+            if job_id not in self._jobs:
+                message = (
+                    f"The ProcessingTracker instance is not configured to track the state of the job with ID "
+                    f"'{job_id}'. The instance is currently configured to track jobs with IDs: "
+                    f"{', '.join(self._jobs.keys())}."
+                )
+                console.error(message=message, error=ValueError)
+                # Fallback to appease mypy, should not be reachable
+                raise ValueError(message)  # pragma: no cover
+
+            # Updates the job's status.
+            job_info = self._jobs[job_id]
+            job_info.status = ProcessingStatus.FAILED
+
+            self._save_state()
+
+    def get_job_status(self, job_id: str) -> ProcessingStatus:
+        """Queries the current runtime status of the target job.
+
+        Args:
+            job_id: The unique identifier of the job for which to query the runtime status.
+
+        Returns:
+            The current runtime status of the job.
+
+        Raises:
+            TimeoutError: If the .LOCK file for the tracker .YAML file cannot be acquired within the timeout period.
+            ValueError: If the specified job ID is not found in the managed tracker file.
+        """
+        lock = FileLock(self.lock_path)
+        with lock.acquire(timeout=10.0):
+            self._load_state()
+
+            # Verifies that the tracker is configured to track the specified job
+            if job_id not in self._jobs:
+                message = (
+                    f"The ProcessingTracker instance is not configured to track the state of the job with ID "
+                    f"'{job_id}'. The instance is currently configured to track jobs with IDs: "
+                    f"{', '.join(self._jobs.keys())}."
+                )
+                console.error(message=message, error=ValueError)
+                # Fallback to appease mypy, should not be reachable
+                raise ValueError(message)  # pragma: no cover
+
+            return self._jobs[job_id].status
+
+    def reset(self) -> None:
+        """Resets the tracker file to the default state."""
         lock = FileLock(self.lock_path)
         with lock.acquire(timeout=10.0):
             # Loads tracker state from the .yaml file.
             self._load_state()
 
-            # Resets the tracker file to the default state. Note, does not indicate that the pipeline completed nor
-            # that it has encountered an error.
-            self._running = False
-            self._manager_id = -1
-            self._completed_jobs = 0
-            self._job_count = 1
-            self._complete = False
-            self._encountered_error = False
+            # Resets the tracker file to the default state.
+            self._jobs.clear()
             self._save_state()
 
     @property
     def complete(self) -> bool:
-        """Returns True if the tracked processing pipeline has been completed successfully."""
+        """Returns True if the tracked processing pipeline has been completed successfully.
+
+        Notes:
+            The pipeline is considered complete if all jobs have been marked as succeeded.
+        """
         lock = FileLock(self.lock_path)
         with lock.acquire(timeout=10.0):
-            # Loads tracker state from the .yaml file
             self._load_state()
-            return self._complete
+            if not self._jobs:
+                return False
+            return all(job.status == ProcessingStatus.SUCCEEDED for job in self._jobs.values())
 
     @property
     def encountered_error(self) -> bool:
-        """Returns True if the tracked processing pipeline has been terminated due to a runtime error."""
-        lock = FileLock(self.lock_path)
-        with lock.acquire(timeout=10.0):
-            # Loads tracker state from the .yaml file
-            self._load_state()
-            return self._encountered_error
+        """Returns True if the tracked processing pipeline has been terminated due to a runtime error.
 
-    @property
-    def running(self) -> bool:
-        """Returns True if the tracked processing pipeline is currently running."""
+        Note:
+            The pipeline is considered to have encountered an error if any job has been marked as failed.
+        """
         lock = FileLock(self.lock_path)
         with lock.acquire(timeout=10.0):
-            # Loads tracker state from the .yaml file
             self._load_state()
-            return self._running
+            return any(job.status == ProcessingStatus.FAILED for job in self._jobs.values())

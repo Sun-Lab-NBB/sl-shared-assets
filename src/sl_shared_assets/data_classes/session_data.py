@@ -8,7 +8,6 @@ import shutil as sh
 from pathlib import Path
 from dataclasses import field, dataclass
 
-from filelock import FileLock
 from ataraxis_base_utilities import console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import TimestampFormats, get_timestamp
@@ -151,15 +150,12 @@ class ProcessedData:
 
 @dataclass()
 class TrackingData:
-    """Provides the paths to the directories that store the ProcessingTracker files and .lock files for pipelines and
-    tasks used to work with the session's data after acquisition.
+    """Provides the path to the directory that stores the .yaml and .lock files used by ProcessingTracker instances to
+    track the runtime status of the data processing pipelines working with the session's data.
     """
 
     tracking_data_path: Path = Path()
     """The path to the root directory that stores the session's tracking data."""
-    session_lock_path: Path = Path()
-    """The path to the session's session_lock.yaml file used to ensure that only a single manager process has exclusive
-    access to the session's data at the same time."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -169,7 +165,6 @@ class TrackingData:
         """
         # Generates the managed paths
         self.tracking_data_path = root_directory_path
-        self.session_lock_path = self.tracking_data_path.joinpath("session_lock.yaml")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
@@ -236,7 +231,7 @@ class SessionData(YamlConfig):
         python_version: str,
         sl_experiment_version: str,
         experiment_name: str | None = None,
-    ) -> "SessionData":
+    ) -> SessionData:
         """Initializes a new data acquisition session and creates its data structure on the host-machine's filesystem.
 
         Notes:
@@ -324,7 +319,7 @@ class SessionData(YamlConfig):
         return instance
 
     @classmethod
-    def load(cls, session_path: Path) -> "SessionData":
+    def load(cls, session_path: Path) -> SessionData:
         """Loads the target session's data from the specified session_data.yaml file.
 
         Notes:
@@ -403,154 +398,3 @@ class SessionData(YamlConfig):
 
         # Saves instance data as a .YAML file.
         origin.to_yaml(file_path=self.raw_data.session_data_path)
-
-
-@dataclass()
-class SessionLock(YamlConfig):
-    """Provides thread-safe session locking to ensure exclusive access during data processing.
-
-    This class manages a lock file that tracks which manager process currently has exclusive access to the processed
-    session's data.
-
-    Notes:
-        The lock owner is identified by a manager process ID, allowing distributed processing across multiple jobs
-        (processes) while maintaining data integrity.
-    """
-
-    file_path: Path
-    """The absolute path to the .yaml file that stores the lock's state."""
-
-    _manager_id: int = -1
-    """The unique identifier of the manager process that holds the lock. A value of -1 indicates that the lock is not 
-    held by any process."""
-
-    lock_path: str = field(init=False)
-    """The absolute path to the .lock file ensuring thread-safe access to the lock's state."""
-
-    def __post_init__(self) -> None:
-        """Initializes the .lock file used to ensure exclusive access to the session_lock.yaml file."""
-        if self.file_path is not None:
-            self.lock_path = str(self.file_path.with_suffix(self.file_path.suffix + ".lock"))
-        else:
-            self.lock_path = ""
-
-    def _load_state(self) -> None:
-        """Loads the current lock state from the .yaml file."""
-        if self.file_path.exists():
-            instance: SessionLock = self.from_yaml(self.file_path)
-            self._manager_id = copy.copy(instance._manager_id)
-        else:
-            # Creates a new lock file with the default state (unlocked)
-            self._save_state()
-
-    def _save_state(self) -> None:
-        """Saves the current lock state to the .yaml file."""
-        # Resets the lock_path and file_path to None before dumping the data to .YAML to avoid issues with loading it
-        # back.
-        temp_file_path, temp_lock_path = self.file_path, self.lock_path
-        try:
-            self.file_path = None  # type: ignore[assignment]
-            self.lock_path = None  # type: ignore[assignment]
-            self.to_yaml(file_path=temp_file_path)
-        finally:
-            self.file_path, self.lock_path = temp_file_path, temp_lock_path
-
-    def acquire(self, manager_id: int) -> None:
-        """Acquires exclusive access to the session's data.
-
-        Args:
-            manager_id: The unique identifier of the manager process requesting the exclusive access.
-
-        Raises:
-            TimeoutError: If the .lock file cannot be acquired for a long period of time due to being held by another
-                process.
-            PermissionError: If the session's data lock is held by another process.
-        """
-        lock = FileLock(self.lock_path)
-        with lock.acquire(timeout=10.0):
-            self._load_state()
-
-            # Checks if the session is already locked by another process
-            if self._manager_id not in {-1, manager_id}:
-                message = (
-                    f"Unable to acquire the exclusive access to the {self.file_path.parents[1].name} session's data "
-                    f"for the manager with id {manager_id}. The lock file indicates that the exclusive access is "
-                    f"already held by the process with id {self._manager_id}."
-                )
-                console.error(message=message, error=PermissionError)
-                # Fallback to appease mypy, should not be reachable
-                raise PermissionError(message)  # pragma: no cover
-
-            # The lock is free or already owned by this manager. If the lock is free, locks the session for the current
-            # manager. If it is already owned by this manager, it does nothing.
-            self._manager_id = manager_id
-            self._save_state()
-
-    def release(self, manager_id: int) -> None:
-        """Releases the exclusive access to the session's data.
-
-        Args:
-            manager_id: The unique identifier of the manager process releasing the exclusive access.
-
-        Raises:
-            TimeoutError: If the .lock file cannot be acquired for a long period of time due to being held by another
-                process.
-            PermissionError: If the session's data lock is held by another process.
-        """
-        lock = FileLock(self.lock_path)
-        with lock.acquire(timeout=10.0):
-            self._load_state()
-
-            if self._manager_id != manager_id:
-                message = (
-                    f"Unable to release the exclusive access to the {self.file_path.parents[1].name} session's data "
-                    f"from the manager with id {manager_id}. The lock file indicates that the exclusive access is "
-                    f"currently held by the process with id {self._manager_id}."
-                )
-                console.error(message=message, error=PermissionError)
-                # Fallback to appease mypy, should not be reachable
-                raise PermissionError(message)  # pragma: no cover
-
-            # Releases the lock
-            self._manager_id = -1
-            self._save_state()
-
-    def force_release(self) -> None:
-        """Forcibly releases the exclusive access to the session's data regardless of ownership.
-
-        Notes:
-            This method should only be used for emergency recovery from improper processing shutdowns. It can be called
-            by any process to unlock any session, but it does not attempt to terminate the processes that the current
-            lock's owner might have deployed to work with the session's data.
-
-        Raises:
-            TimeoutError: If the .lock file cannot be acquired for a long period of time due to being held by another
-                process.
-        """
-        lock = FileLock(self.lock_path)
-        with lock.acquire(timeout=10.0):
-            # Hard reset
-            self._manager_id = -1
-            self._save_state()
-
-    def check_owner(self, manager_id: int) -> None:
-        """Ensures that the specified manager process has exclusive access to the session's data.
-
-        Args:
-            manager_id: The unique identifier of the manager process attempting to access the session's data.
-
-        Raises:
-            TimeoutError: If the .lock file cannot be acquired for a long period of time due to being held by another
-                process.
-            ValueError: If a different manager process has exclusive access to the session's data.
-        """
-        lock = FileLock(self.lock_path)
-        with lock.acquire(timeout=10.0):
-            self._load_state()
-            if self._manager_id != manager_id:
-                message = (
-                    f"Unable to access the {self.file_path.parents[1].name} session's data from manager process "
-                    f"{manager_id}, as another manager process with ID {self._manager_id} currently has exclusive "
-                    f"access to the session's data."
-                )
-                console.error(message=message, error=ValueError)

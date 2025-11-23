@@ -11,7 +11,7 @@ class MesoscopeHardwareState(YamlConfig):  # pragma: no cover
     experiment runtimes.
 
     Notes:
-        All hardware parameters are stored using appropriate floating point precision and rounding methods that ensure
+        All hardware parameters are stored using the appropriate datatypes and rounding methods that ensure
         their complete equivalence to the values used by the data acquisition system during runtime.
     """
 

@@ -81,8 +81,8 @@ Developers working on integrating sl-shared-assets into other libraries should s
 [API documentation](https://sl-shared-assets-api-docs.netlify.app/) for the detailed description of the methods and 
 classes exposed by components of this library.
 
-**Note!** The API documentation includes important information about configuration Command-Line Interface (CLI) exposed
-by this library as part of installation into a Python environment.
+**Note!** The API documentation includes important information about the 'configuration' Command-Line Interface (CLI) 
+exposed by this library.
 
 ___
 
