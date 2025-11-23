@@ -1,7 +1,4 @@
-"""This module provides tools for packaging data for transmission. Although this module is primarily used when
-transmitting data over the network, it also works for local (within-machine) transfers. The tools from
-this module work in tandem with tools offered by transfer_tools.py to ensure the integrity of the transferred data.
-"""
+"""This module provides the assets for computing data integrity checksums."""
 
 import os
 from pathlib import Path
@@ -16,27 +13,20 @@ import xxhash
 # data that should remain permanently unchanged.
 _excluded_files = {
     "ax_checksum.txt",
-    "ubiquitin.bin",
-    "telomere.bin",
     "nk.bin",
 }
 
 
-def _calculate_file_checksum(base_directory: Path, file_path: Path) -> tuple[str, bytes]:
-    """Calculates xxHash3-128 checksum for the target file and its path relative to the base directory.
-
-    This function is passed to parallel workers used by the calculate_directory_hash() method that iteratively
-    calculates the checksum for all files inside a directory. Each call to this function returns the checksum for the
-    target file, which reflects both the contents of the file and its path relative to the base directory.
+def _calculate_file_checksum(base_directory: Path, file_path: Path) -> tuple[str, bytes]:  # pragma: no cover
+    """Calculates the xxHash3-128 checksum for the target file and its path relative to the base directory.
 
     Args:
-        base_directory: The path to the base (root) directory which is being checksummed by the main
-            'calculate_directory_checksum' function.
-        file_path: The absolute path to the target file.
+        base_directory: The path to the directory being processed by the 'calculate_directory_checksum' function.
+        file_path: The path to the target file relative to the base directory.
 
     Returns:
         A tuple with two elements. The first element is the path to the file relative to the base directory. The second
-        element is the xxHash3-128 checksum that covers the relative path and the contents of the file.
+        element is the xxHash3-128 checksum that reflects the file's path and data.
     """
     # Initializes the hashsum object.
     checksum = xxhash.xxh3_128()
@@ -59,29 +49,24 @@ def _calculate_file_checksum(base_directory: Path, file_path: Path) -> tuple[str
 
 
 def calculate_directory_checksum(
-    directory: Path, num_processes: int | None = None, batch: bool = False, save_checksum: bool = True
+    directory: Path, num_processes: int | None = None, *, progress: bool = False, save_checksum: bool = True
 ) -> str:
-    """Calculates xxHash3-128 checksum for the input directory, which includes the data of all contained files and
-    the directory structure information.
-
-    Checksums are used to verify the data integrity during transmission within machines (from one storage volume to
-    another) and between machines. The function can be configured to write the generated checksum as a hexadecimal
-    string to the ax_checksum.txt file stored at the highest level of the input directory.
+    """Calculates the xxHash3-128 checksum for the input directory.
 
     Note:
-        This function uses multiprocessing to efficiently parallelize checksum calculation for multiple files. In
-        combination with xxHash3, this achieves a significant speedup over other common checksum options, such as MD5
-        and SHA256. Note that xxHash3 is not suitable for security purposes and is only used to ensure data integrity.
+        The function can be configured to write the generated checksum as a hexadecimal string to the ax_checksum.txt
+        file stored at the highest level of the input directory.
+
+        The xxHash3 checksum is not suitable for security purposes and is only used to ensure data integrity.
 
         The returned checksum accounts for both the contents of each file and the layout of the input directory
         structure.
 
     Args:
-        directory: The Path to the directory to be checksummed.
-        num_processes: The number of CPU processes to use for parallelizing checksum calculation. If set to None, the
-            function defaults to using (logical CPU count - 4).
-        batch: Determines whether the function is called as part of batch-processing multiple directories. This is used
-            to optimize progress reporting to avoid cluttering the terminal.
+        directory: The path to the directory for which to generate the checksum.
+        num_processes: The number of processes to use for parallelizing checksum calculation. If set to None, the
+            function uses all available CPU cores.
+        progress: Determines whether to track the checksum calculation progress using a progress bar.
         save_checksum: Determines whether the checksum should be saved (written to) a .txt file.
 
     Returns:
@@ -89,17 +74,16 @@ def calculate_directory_checksum(
     """
     # Determines the number of parallel processes to use.
     if num_processes is None:
-        num_processes = max(1, os.cpu_count() - 4)  # type: ignore
+        num_processes = max(1, os.cpu_count())  # type: ignore[type-var]
 
     # Determines the path to each file inside the input directory structure and sorts them for consistency
-    path: Path
     files = sorted(
         path
         for path in directory.rglob("*")
         if path.is_file() and f"{path.stem}{path.suffix}" not in _excluded_files  # Excludes service files
     )
 
-    # Precreates the directory checksum
+    # Pre-creates the directory checksum
     checksum = xxhash.xxh3_128()
 
     # Process files in parallel
@@ -113,9 +97,9 @@ def calculate_directory_checksum(
 
         # Collects results as they complete
         results = []
-        if not batch:
+        if not progress:
             with tqdm(
-                total=len(files), desc=f"Calculating checksum for {Path(*directory.parts[-6:])}", unit="files"
+                total=len(files), desc=f"Calculating checksum for {Path(*directory.parts[-6:])}", unit="file"
             ) as pbar:
                 for future in as_completed(future_to_path):
                     results.append(future.result())
@@ -130,12 +114,12 @@ def calculate_directory_checksum(
             checksum.update(file_path.encode())
             checksum.update(file_checksum)
 
-    checksum_hexstr = checksum.hexdigest()
+    checksum_hexstring = checksum.hexdigest()
 
     # Writes the hash to ax_checksum.txt in the root directory
     if save_checksum:
         checksum_path = directory.joinpath("ax_checksum.txt")
         with checksum_path.open("w") as f:
-            f.write(checksum_hexstr)
+            f.write(checksum_hexstring)
 
-    return checksum_hexstr
+    return checksum_hexstring

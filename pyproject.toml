@@ -1,16 +1,16 @@
 # Defines the build system used for the project.
 [build-system]
-requires = ["hatchling==1.27.0"]
+requires = ["hatchling>=1,<2"]
 build-backend = "hatchling.build"
 
 # Project metdata section. Provides the genral ID information about the project.
 [project]
 name = "sl-shared-assets"
-version = "5.1.2"
+version = "6.0.1rc6"
 description = "Provides data acquisition and processing assets shared between Sun (NeuroAI) lab libraries."
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.11"
+requires-python = ">=3.13,<3.15"
 authors = [
     { name = "Ivan Kondratyev" },
     { name = "Kushaan Gupta" },
@@ -31,9 +31,8 @@ classifiers = [
     # License
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     # Supported Python Versions
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     # Supported OS systems
     "Operating System :: OS Independent",
     # Typing
@@ -42,21 +41,14 @@ classifiers = [
 
 # Runtime project dependencies.
 dependencies = [
-    "ataraxis-time>=3,<4",
-    "ataraxis-base-utilities>=3,<4",
-    "ataraxis-data-structures>=3,<4",
-    "numpy>=2,<3",
+    "ataraxis-time>=5,<6",
+    "ataraxis-base-utilities>=5,<6",
+    "ataraxis-data-structures>=5,<6",
     "appdirs>=1,<2",
     "tqdm>=4,<5",
     "xxhash>=3,<4",
-    "paramiko>=4,<5",
-    "simple-slurm>=0,<1",
     "click>=8,<9",
-    "natsort>=8,<9",
-    "polars>=1,<2",
-    "pyarrow>=21,<22",
     "filelock>=3,<4",
-    "pytz>=2025,<2026",
 ]
 
 [project.urls]
@@ -74,19 +66,17 @@ dev = [
     "tox-uv>=1,<2",
 
     # Development Automation
-    "ataraxis-automation>=6.0.1,<7",
+    "ataraxis-automation>=7,<8",
 
     # Types
     "types-appdirs>=1,<2",
     "types-tqdm>=4,<5",
-    "types-paramiko>=4,<5",
     "types-filelock>=3,<4",
-    "types-pytz>=2025,<2026",
+    "types-xxhash>=3,<4",
 ]
 
-# Exports CLIs upon library installation into an environment
+# Exports the CLI for configuring various components of the Sun lab's data workflow on the host-machine.
 [project.scripts]
-sl-manage = "sl_shared_assets.command_line_interfaces.manage:manage"
 sl-configure = "sl_shared_assets.command_line_interfaces.configure:configure"
 
 # Specifies files that should not be included in the source-code distribution but are also not part of gitignore.
@@ -101,7 +91,7 @@ packages = ["src/sl_shared_assets"]
 [tool.ruff]
 line-length = 120         # The maximum column length is set to 120 for this project.
 indent-width = 4          # Same as black, indents are 4 spaces
-target-version = "py311"  # Targets the lowest supported version of python
+target-version = "py313"  # Targets the lowest supported version of python
 src = ["src"]             # The name of the source directory
 
 # Excludes 'service' .py files, such as the sphinx configuration file, from linting.
@@ -112,6 +102,15 @@ lint.select = ["ALL"]
 
 # General ignore directives
 lint.ignore = [
+    "W291",  # Conflicts with docstring formatting
+    "TID252",  # Relative imports are important for the correct asset management in this library
+    "BLE001", # Catching b lind excepts is required for some library functionalities
+    "ANN401",  # While suboptimal, ANY is a helpful type when used with caution
+    "C901",  # Sometimes complex functions are necessary
+    "PLR0913",  # Sometimes complex functions are necessary
+    "PLR0912",  # Sometimes complex functions are necessary
+    "PLR0915",  # Sometimes complex type defenitions are necessary
+    "PLR0911", # Sometimes complex return graphs are necessary
     "COM812", # Conflicts with the formatter
     "ISC001", # Conflicts with the formatter
     "PT001", # https://github.com/astral-sh/ruff/issues/8796#issuecomment-182590771
@@ -174,3 +173,15 @@ source = ["src/", ".tox/*/lib/python*/site-packages/"]
 # Same as above, specifies the output directory for the coverage .html report
 [tool.coverage.html]
 directory = "reports/coverage_html"
+
+# Specifies additional ignore directives
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "def __del__",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+]
