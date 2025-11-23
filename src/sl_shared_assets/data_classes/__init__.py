@@ -27,10 +27,8 @@ from .surgery_data import (
     ProcedureData,
 )
 from .processing_data import (
-    TrackerFiles,
     ProcessingStatus,
     ProcessingTracker,
-    ProcessingPipelines,
 )
 from .configuration_data import (
     MesoscopeCameras,
@@ -74,7 +72,6 @@ __all__ = [
     "MesoscopeSystemConfiguration",
     "ProcedureData",
     "ProcessedData",
-    "ProcessingPipelines",
     "ProcessingStatus",
     "ProcessingTracker",
     "RawData",
@@ -84,7 +81,6 @@ __all__ = [
     "SessionTypes",
     "SubjectData",
     "SurgeryData",
-    "TrackerFiles",
     "TrackingData",
     "WindowCheckingDescriptor",
     "ZaberPositions",

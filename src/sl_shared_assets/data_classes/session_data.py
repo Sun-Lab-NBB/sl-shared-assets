@@ -150,15 +150,12 @@ class ProcessedData:
 
 @dataclass()
 class TrackingData:
-    """Provides the paths to the directories that store the ProcessingTracker files and .lock files for pipelines and
-    tasks used to work with the session's data after acquisition.
+    """Provides the path to the directory that stores the .yaml and .lock files used by ProcessingTracker instances to
+    track the runtime status of the data processing pipelines working with the session's data.
     """
 
     tracking_data_path: Path = Path()
     """The path to the root directory that stores the session's tracking data."""
-    session_lock_path: Path = Path()
-    """The path to the session's session_lock.yaml file used to ensure that only a single manager process has exclusive
-    access to the session's data at the same time."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -168,7 +165,6 @@ class TrackingData:
         """
         # Generates the managed paths
         self.tracking_data_path = root_directory_path
-        self.session_lock_path = self.tracking_data_path.joinpath("session_lock.yaml")
 
     def make_directories(self) -> None:
         """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
@@ -235,7 +231,7 @@ class SessionData(YamlConfig):
         python_version: str,
         sl_experiment_version: str,
         experiment_name: str | None = None,
-    ) -> "SessionData":
+    ) -> SessionData:
         """Initializes a new data acquisition session and creates its data structure on the host-machine's filesystem.
 
         Notes:
@@ -323,7 +319,7 @@ class SessionData(YamlConfig):
         return instance
 
     @classmethod
-    def load(cls, session_path: Path) -> "SessionData":
+    def load(cls, session_path: Path) -> SessionData:
         """Loads the target session's data from the specified session_data.yaml file.
 
         Notes:

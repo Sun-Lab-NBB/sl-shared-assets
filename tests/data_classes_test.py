@@ -19,13 +19,10 @@ from sl_shared_assets import (
     ProcessedData,
     TrackingData,
     SessionData,
-    SessionLock,
     get_working_directory,
     get_system_configuration_data,
     ProcessingTracker,
-    TrackerFiles,
     ProcessingStatus,
-    ProcessingPipelines,
     get_google_credentials_path,
     get_server_configuration,
     ServerConfiguration,
@@ -303,7 +300,6 @@ def test_tracking_data_default_initialization():
     tracking_data = TrackingData()
 
     assert tracking_data.tracking_data_path == Path()
-    assert tracking_data.session_lock_path == Path()
 
 
 def test_tracking_data_resolve_paths(tmp_path):
@@ -320,7 +316,6 @@ def test_tracking_data_resolve_paths(tmp_path):
     tracking_data.resolve_paths(root_directory_path=root_path)
 
     assert tracking_data.tracking_data_path == root_path
-    assert tracking_data.session_lock_path == root_path / "session_lock.yaml"
 
 
 def test_tracking_data_make_directories(tmp_path):
@@ -733,198 +728,6 @@ def test_session_data_save_does_not_include_path_objects(sample_session_hierarch
     assert "raw_data: null" in content
     assert "processed_data: null" in content
     assert "tracking_data: null" in content
-
-
-# Tests for SessionLock dataclass
-
-
-def test_session_lock_initialization(tmp_path):
-    """Verifies basic initialization of SessionLock.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures the lock file path is properly initialized.
-    """
-    lock_file = tmp_path / "session_lock.yaml"
-    session_lock = SessionLock(file_path=lock_file)
-
-    assert session_lock.file_path == lock_file
-    assert session_lock._manager_id == -1
-    assert session_lock.lock_path == str(lock_file.with_suffix(".yaml.lock"))
-
-
-def test_session_lock_acquire_creates_lock_file(tmp_path):
-    """Verifies that acquire() creates the lock file with the correct manager ID.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures the lock acquisition mechanism works correctly.
-    """
-    lock_file = tmp_path / "session_lock.yaml"
-    session_lock = SessionLock(file_path=lock_file)
-
-    manager_id = 12345
-    session_lock.acquire(manager_id=manager_id)
-
-    assert lock_file.exists()
-    content = lock_file.read_text()
-    assert f"_manager_id: {manager_id}" in content
-
-
-def test_session_lock_acquire_raises_error_if_locked_by_another_manager(tmp_path):
-    """Verifies that acquire() raises PermissionError when locked by another manager.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures exclusive lock ownership is enforced.
-    Note: This test creates separate SessionLock instances to simulate different processes.
-    """
-    lock_file = tmp_path / "session_lock.yaml"
-
-    # The first manager acquires lock (simulates the first process)
-    session_lock_1 = SessionLock(file_path=lock_file)
-    session_lock_1.acquire(manager_id=100)
-
-    # The second manager attempts to acquire lock (simulates the second process)
-    session_lock_2 = SessionLock(file_path=lock_file)
-    with pytest.raises(PermissionError):
-        session_lock_2.acquire(manager_id=200)
-
-
-def test_session_lock_acquire_allows_reacquisition_by_same_manager(tmp_path):
-    """Verifies that acquire() allows the same manager to reacquire the lock.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures that calling the lock acquisition method multiple times does not do anything for the owner.
-    Note: This test creates separate SessionLock instances to simulate the same process reacquiring the lock after
-    reloading state.
-    """
-    lock_file = tmp_path / "session_lock.yaml"
-
-    # First acquisition
-    session_lock_1 = SessionLock(file_path=lock_file)
-    manager_id = 12345
-    session_lock_1.acquire(manager_id=manager_id)
-
-    # The same manager reacquires lock (simulates the same process reloading state)
-    session_lock_2 = SessionLock(file_path=lock_file)
-    session_lock_2.acquire(manager_id=manager_id)  # Should not raise error
-
-    # Verifies the lock is still held by the same manager
-    session_lock_2._load_state()
-    assert session_lock_2._manager_id == manager_id
-
-
-def test_session_lock_release_removes_lock_ownership(tmp_path):
-    """Verifies that release() removes lock ownership.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures the lock release mechanism works correctly.
-    """
-    lock_file = tmp_path / "session_lock.yaml"
-    session_lock = SessionLock(file_path=lock_file)
-
-    manager_id = 12345
-    session_lock.acquire(manager_id=manager_id)
-    session_lock.release(manager_id=manager_id)
-
-    # Reloads state to verify
-    session_lock._load_state()
-    assert session_lock._manager_id == -1
-
-
-def test_session_lock_release_raises_error_if_not_owner(tmp_path):
-    """Verifies that release() raises PermissionError when called by a non-owner.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures only the lock owner can release the lock.
-    Note: This test creates separate SessionLock instances to simulate different processes.
-    """
-    lock_file = tmp_path / "session_lock.yaml"
-
-    # First manager acquires a lock
-    session_lock_1 = SessionLock(file_path=lock_file)
-    session_lock_1.acquire(manager_id=100)
-
-    # Different manager attempts to release a lock
-    session_lock_2 = SessionLock(file_path=lock_file)
-    with pytest.raises(PermissionError):
-        session_lock_2.release(manager_id=200)
-
-
-def test_session_lock_force_release_clears_any_lock(tmp_path):
-    """Verifies that force_release() clears the lock regardless of ownership.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures the emergency lock release mechanism works correctly.
-    """
-    lock_file = tmp_path / "session_lock.yaml"
-
-    # Manager acquires lock
-    session_lock_1 = SessionLock(file_path=lock_file)
-    session_lock_1.acquire(manager_id=12345)
-
-    # Force release from any process (simulated by different instance)
-    session_lock_2 = SessionLock(file_path=lock_file)
-    session_lock_2.force_release()
-
-    # Reloads state to verify
-    session_lock_2._load_state()
-    assert session_lock_2._manager_id == -1
-
-
-def test_session_lock_check_owner_passes_for_correct_owner(tmp_path):
-    """Verifies that check_owner() passes when called by the lock owner.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures ownership verification works correctly for valid owners.
-    Note: This test creates separate SessionLock instances to simulate a process
-    checking its ownership after reloading state.
-    """
-    lock_file = tmp_path / "session_lock.yaml"
-
-    # Manager acquires lock
-    session_lock_1 = SessionLock(file_path=lock_file)
-    manager_id = 12345
-    session_lock_1.acquire(manager_id=manager_id)
-
-    # The same manager checks ownership (simulated by different instance loading state)
-    session_lock_2 = SessionLock(file_path=lock_file)
-    session_lock_2.check_owner(manager_id=manager_id)  # Should not raise error
-
-
-def test_session_lock_check_owner_raises_error_for_wrong_owner(tmp_path):
-    """Verifies that check_owner() raises ValueError when called by a non-owner.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures ownership verification rejects non-owners.
-    Note: This test creates separate SessionLock instances to simulate different processes.
-    """
-    lock_file = tmp_path / "session_lock.yaml"
-
-    # First manager acquires a lock
-    session_lock_1 = SessionLock(file_path=lock_file)
-    session_lock_1.acquire(manager_id=100)
-
-    # Different manager checks ownership
-    session_lock_2 = SessionLock(file_path=lock_file)
-    with pytest.raises(ValueError):
-        session_lock_2.check_owner(manager_id=200)
 
 
 # Tests for MesoscopeExperimentState dataclass
@@ -1975,9 +1778,6 @@ def test_get_system_configuration_data_valve_calibration_tuple(
     assert all(isinstance(item, tuple) for item in loaded_config.microcontrollers.valve_calibration_data)
 
 
-# Add this test after the existing SessionData.create tests
-
-
 def test_session_data_create_raises_error_if_project_does_not_exist(
     clean_working_directory, sample_mesoscope_config, monkeypatch
 ):
@@ -2483,673 +2283,395 @@ def test_processing_tracker_initialization(tmp_path):
 
     This test ensures the tracker initializes with default values.
     """
-    tracker_file = tmp_path / TrackerFiles.MANIFEST
+    tracker_file = tmp_path / "test_tracker.yaml"
     tracker = ProcessingTracker(file_path=tracker_file)
 
     assert tracker.file_path == tracker_file
-    assert tracker._complete is False
-    assert tracker._encountered_error is False
-    assert tracker._running is False
-    assert tracker._manager_id == -1
-    assert tracker._job_count == 1
-    assert tracker._completed_jobs == 0
+    assert tracker._jobs == {}
     assert tracker.lock_path == str(tracker_file.with_suffix(".yaml.lock"))
 
 
-def test_processing_tracker_post_init_validates_filename(tmp_path):
-    """Verifies that __post_init__ validates the tracker filename.
+def test_processing_tracker_generate_job_id():
+    """Verifies that generate_job_id produces consistent hash-based IDs.
+
+    This test ensures the job ID generation is deterministic.
+    """
+    session_path = Path("/data/project/animal/session")
+    job_name = "suite2p_processing"
+
+    # Generate the same ID multiple times
+    id1 = ProcessingTracker.generate_job_id(session_path, job_name)
+    id2 = ProcessingTracker.generate_job_id(session_path, job_name)
+
+    # Should be consistent
+    assert id1 == id2
+    # Should be a hexadecimal string
+    assert len(id1) == 16
+    assert all(c in "0123456789abcdef" for c in id1)
+
+
+def test_processing_tracker_generate_job_id_unique():
+    """Verifies that different jobs produce different IDs.
+
+    This test ensures job IDs are unique for different inputs.
+    """
+    session_path = Path("/data/project/animal/session")
+
+    id1 = ProcessingTracker.generate_job_id(session_path, "job1")
+    id2 = ProcessingTracker.generate_job_id(session_path, "job2")
+
+    assert id1 != id2
+
+
+def test_processing_tracker_initialize_jobs(tmp_path):
+    """Verifies that initialize_jobs creates scheduled job entries.
 
     Args:
         tmp_path: Pytest fixture providing a temporary directory path.
 
-    This test ensures only supported tracker filenames are accepted.
+    This test ensures jobs are properly initialized.
     """
-    invalid_tracker = tmp_path / "invalid_tracker.yaml"
+    tracker_file = tmp_path / "tracker.yaml"
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    session_path = Path("/data/session")
+    job_ids = [
+        ProcessingTracker.generate_job_id(session_path, "job1"),
+        ProcessingTracker.generate_job_id(session_path, "job2"),
+        ProcessingTracker.generate_job_id(session_path, "job3"),
+    ]
+
+    tracker.initialize_jobs(job_ids=job_ids)
+
+    # Reload to verify persistence
+    tracker._load_state()
+    assert len(tracker._jobs) == 3
+    for job_id in job_ids:
+        assert job_id in tracker._jobs
+        assert tracker._jobs[job_id].status == ProcessingStatus.SCHEDULED
+        assert tracker._jobs[job_id].slurm_job_id is None
+
+
+def test_processing_tracker_initialize_jobs_preserves_existing(tmp_path):
+    """Verifies that initialize_jobs doesn't overwrite existing job entries.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures reinitializing doesn't lose progress.
+    """
+    tracker_file = tmp_path / "tracker.yaml"
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    session_path = Path("/data/session")
+    job_ids = [
+        ProcessingTracker.generate_job_id(session_path, "job1"),
+        ProcessingTracker.generate_job_id(session_path, "job2"),
+    ]
+
+    # Initialize first time
+    tracker.initialize_jobs(job_ids=job_ids)
+
+    # Start one job
+    tracker.start_job(job_ids[0])
+
+    # Reinitialize with the same jobs
+    tracker.initialize_jobs(job_ids=job_ids)
+
+    # Verify the first job's status is preserved
+    tracker._load_state()
+    assert tracker._jobs[job_ids[0]].status == ProcessingStatus.RUNNING
+    assert tracker._jobs[job_ids[1]].status == ProcessingStatus.SCHEDULED
+
+
+def test_processing_tracker_start_job(tmp_path, monkeypatch):
+    """Verifies that start_job marks a job as running.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+        monkeypatch: Pytest fixture for environment modification.
+
+    This test ensures jobs' transition to RUNNING status.
+    """
+    # Mock SLURM environment
+    monkeypatch.setenv("SLURM_JOB_ID", "12345")
+
+    tracker_file = tmp_path / "tracker.yaml"
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    session_path = Path("/data/session")
+    job_id = ProcessingTracker.generate_job_id(session_path, "test_job")
+
+    tracker.initialize_jobs(job_ids=[job_id])
+    tracker.start_job(job_id)
+
+    tracker._load_state()
+    assert tracker._jobs[job_id].status == ProcessingStatus.RUNNING
+    assert tracker._jobs[job_id].slurm_job_id == 12345
+
+
+def test_processing_tracker_start_job_without_slurm(tmp_path):
+    """Verifies that start_job works without a SLURM environment.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the tracker works in non-SLURM environments.
+    """
+    tracker_file = tmp_path / "tracker.yaml"
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    session_path = Path("/data/session")
+    job_id = ProcessingTracker.generate_job_id(session_path, "test_job")
+
+    tracker.initialize_jobs(job_ids=[job_id])
+    tracker.start_job(job_id)
+
+    tracker._load_state()
+    assert tracker._jobs[job_id].status == ProcessingStatus.RUNNING
+    assert tracker._jobs[job_id].slurm_job_id is None
+
+
+def test_processing_tracker_start_job_raises_for_unknown_job(tmp_path):
+    """Verifies that start_job raises ValueError for unknown job IDs.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures proper error handling for invalid job IDs.
+    """
+    tracker_file = tmp_path / "tracker.yaml"
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    unknown_job_id = "nonexistent_job_id"
 
     with pytest.raises(ValueError) as exc_info:
-        ProcessingTracker(file_path=invalid_tracker)
+        tracker.start_job(unknown_job_id)
 
-    assert "Unsupported processing tracker file" in str(exc_info.value)
-    assert "invalid_tracker.yaml" in str(exc_info.value)
-
-
-def test_processing_tracker_post_init_accepts_valid_filenames(tmp_path):
-    """Verifies that __post_init__ accepts all TrackerFiles enum values.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures all official tracker filenames are supported.
-    """
-    for tracker_file_name in TrackerFiles:
-        tracker_path = tmp_path / tracker_file_name
-        tracker = ProcessingTracker(file_path=tracker_path)
-        assert tracker.file_path == tracker_path
+    assert "not configured to track" in str(exc_info.value)
 
 
-def test_processing_tracker_load_state_creates_file_if_missing(tmp_path):
-    """Verifies that _load_state() creates the tracker file if it doesn't exist.
+def test_processing_tracker_complete_job(tmp_path):
+    """Verifies that complete_job marks a job as succeeded.
 
     Args:
         tmp_path: Pytest fixture providing a temporary directory path.
 
-    This test ensures the tracker auto-creates its state file.
+    This test ensures jobs' transition to SUCCEEDED status.
     """
-    tracker_file = tmp_path / TrackerFiles.MANIFEST
+    tracker_file = tmp_path / "tracker.yaml"
     tracker = ProcessingTracker(file_path=tracker_file)
 
-    # Initially the file should not exist
-    assert not tracker_file.exists()
+    session_path = Path("/data/session")
+    job_id = ProcessingTracker.generate_job_id(session_path, "test_job")
 
-    # Calling _load_state should create it
+    tracker.initialize_jobs(job_ids=[job_id])
+    tracker.start_job(job_id)
+    tracker.complete_job(job_id)
+
     tracker._load_state()
-
-    assert tracker_file.exists()
-
-
-def test_processing_tracker_load_state_reads_existing_file(tmp_path):
-    """Verifies that _load_state() correctly reads from the existing file.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures the tracker loads state from the disk correctly.
-    """
-    tracker_file = tmp_path / TrackerFiles.CHECKSUM
-
-    # Create the first tracker and set some state
-    tracker1 = ProcessingTracker(file_path=tracker_file)
-    tracker1._running = True
-    tracker1._manager_id = 12345
-    tracker1._job_count = 5
-    tracker1._completed_jobs = 3
-    tracker1._save_state()
-
-    # Create second tracker and load state
-    tracker2 = ProcessingTracker(file_path=tracker_file)
-    tracker2._load_state()
-
-    assert tracker2._running is True
-    assert tracker2._manager_id == 12345
-    assert tracker2._job_count == 5
-    assert tracker2._completed_jobs == 3
+    assert tracker._jobs[job_id].status == ProcessingStatus.SUCCEEDED
 
 
-def test_processing_tracker_save_state_preserves_file_and_lock_paths(tmp_path):
-    """Verifies that _save_state() doesn't modify file_path and lock_path.
+def test_processing_tracker_fail_job(tmp_path):
+    """Verifies that fail_job marks a job as failed.
 
     Args:
         tmp_path: Pytest fixture providing a temporary directory path.
 
-    This test ensures the refactored _save_state() correctly preserves paths.
+    This test ensures jobs can be marked as FAILED.
     """
-    tracker_file = tmp_path / TrackerFiles.TRANSFER
+    tracker_file = tmp_path / "tracker.yaml"
     tracker = ProcessingTracker(file_path=tracker_file)
 
-    original_file_path = tracker.file_path
-    original_lock_path = tracker.lock_path
+    session_path = Path("/data/session")
+    job_id = ProcessingTracker.generate_job_id(session_path, "test_job")
 
-    tracker._save_state()
+    tracker.initialize_jobs(job_ids=[job_id])
+    tracker.start_job(job_id)
+    tracker.fail_job(job_id)
 
-    # Verify paths are unchanged
-    assert tracker.file_path == original_file_path
-    assert tracker.lock_path == original_lock_path
-    assert isinstance(tracker.file_path, Path)
-    assert isinstance(tracker.lock_path, str)
+    tracker._load_state()
+    assert tracker._jobs[job_id].status == ProcessingStatus.FAILED
 
 
-def test_processing_tracker_start_locks_pipeline(tmp_path):
-    """Verifies that start() correctly locks the pipeline.
+def test_processing_tracker_get_job_status(tmp_path):
+    """Verifies that get_job_status returns the correct status.
 
     Args:
         tmp_path: Pytest fixture providing a temporary directory path.
 
-    This test ensures start() sets the running state and manager ID.
+    This test ensures status queries work correctly.
     """
-    tracker_file = tmp_path / TrackerFiles.BEHAVIOR
+    tracker_file = tmp_path / "tracker.yaml"
     tracker = ProcessingTracker(file_path=tracker_file)
 
-    manager_id = 99999
-    job_count = 10
+    session_path = Path("/data/session")
+    job_id = ProcessingTracker.generate_job_id(session_path, "test_job")
 
-    tracker.start(manager_id=manager_id, job_count=job_count)
+    tracker.initialize_jobs(job_ids=[job_id])
 
-    # Reload state to verify persistence
-    tracker._load_state()
+    # Check scheduled status
+    assert tracker.get_job_status(job_id) == ProcessingStatus.SCHEDULED
 
-    assert tracker._running is True
-    assert tracker._manager_id == manager_id
-    assert tracker._job_count == job_count
-    assert tracker._completed_jobs == 0
-    assert tracker._complete is False
-    assert tracker._encountered_error is False
+    # Start and check the running status
+    tracker.start_job(job_id)
+    assert tracker.get_job_status(job_id) == ProcessingStatus.RUNNING
 
-
-def test_processing_tracker_start_prevents_different_manager(tmp_path):
-    """Verifies that start() prevents different manager from acquiring lock.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures exclusive lock ownership.
-    """
-    tracker_file = tmp_path / TrackerFiles.SUITE2P
-
-    # First manager starts pipeline
-    tracker1 = ProcessingTracker(file_path=tracker_file)
-    tracker1.start(manager_id=100, job_count=5)
-
-    # The second manager attempts to start the pipeline
-    tracker2 = ProcessingTracker(file_path=tracker_file)
-
-    with pytest.raises(PermissionError) as exc_info:
-        tracker2.start(manager_id=200, job_count=3)
-
-    assert "Unable to start the processing pipeline" in str(exc_info.value)
-    assert "manager process with id 100" in str(exc_info.value)
+    # Complete and check succeeded status
+    tracker.complete_job(job_id)
+    assert tracker.get_job_status(job_id) == ProcessingStatus.SUCCEEDED
 
 
-def test_processing_tracker_start_allows_same_manager_reacquisition(tmp_path):
-    """Verifies that start() allows the same manager to reacquire lock with no adverse side effects.
+def test_processing_tracker_reset(tmp_path):
+    """Verifies that reset clears all jobs.
 
     Args:
         tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures the reset method works correctly.
     """
-    tracker_file = tmp_path / TrackerFiles.VIDEO
+    tracker_file = tmp_path / "tracker.yaml"
     tracker = ProcessingTracker(file_path=tracker_file)
 
-    manager_id = 12345
+    session_path = Path("/data/session")
+    job_ids = [
+        ProcessingTracker.generate_job_id(session_path, "job1"),
+        ProcessingTracker.generate_job_id(session_path, "job2"),
+    ]
 
-    # First start
-    tracker.start(manager_id=manager_id, job_count=5)
+    tracker.initialize_jobs(job_ids=job_ids)
+    tracker.start_job(job_ids[0])
 
-    # Second start (should not raise error or modify state)
-    tracker.start(manager_id=manager_id, job_count=10)  # Note: job_count shouldn't change
-
-    tracker._load_state()
-    assert tracker._running is True
-    assert tracker._manager_id == manager_id
-    assert tracker._job_count == 5  # Original job count preserved
-
-
-def test_processing_tracker_stop_increments_completed_jobs(tmp_path):
-    """Verifies that stop() increments the completed job counter.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures job progress is tracked correctly.
-    """
-    tracker_file = tmp_path / TrackerFiles.MULTIDAY
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    manager_id = 55555
-    tracker.start(manager_id=manager_id, job_count=3)
-
-    # Stop first job
-    tracker.stop(manager_id=manager_id)
-    tracker._load_state()
-    assert tracker._completed_jobs == 1
-    assert tracker._running is True  # Still running
-
-    # Stop the second job
-    tracker.stop(manager_id=manager_id)
-    tracker._load_state()
-    assert tracker._completed_jobs == 2
-    assert tracker._running is True  # Still running
-
-
-def test_processing_tracker_stop_completes_pipeline_when_all_jobs_done(tmp_path):
-    """Verifies that stop() marks the pipeline complete when all jobs finish.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures the pipeline completes after all jobs are done.
-    """
-    tracker_file = tmp_path / TrackerFiles.FORGING
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    manager_id = 77777
-    job_count = 2
-    tracker.start(manager_id=manager_id, job_count=job_count)
-
-    # Complete the first job
-    tracker.stop(manager_id=manager_id)
-    tracker._load_state()
-    assert tracker._running is True
-
-    # Complete the second (final) job
-    tracker.stop(manager_id=manager_id)
-    tracker._load_state()
-
-    assert tracker._running is False
-    assert tracker._complete is True
-    assert tracker._encountered_error is False
-    assert tracker._manager_id == -1
-
-
-def test_processing_tracker_stop_prevents_wrong_manager(tmp_path):
-    """Verifies that stop() prevents non-owner from reporting completion.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures only the owning manager can stop the pipeline.
-    """
-    tracker_file = tmp_path / TrackerFiles.MANIFEST
-
-    # Manager 1 starts the pipeline
-    tracker1 = ProcessingTracker(file_path=tracker_file)
-    tracker1.start(manager_id=100, job_count=5)
-
-    # Manager 2 attempts to stop the pipeline
-    tracker2 = ProcessingTracker(file_path=tracker_file)
-
-    with pytest.raises(PermissionError) as exc_info:
-        tracker2.stop(manager_id=200)
-
-    assert "Unable to report that the processing pipeline has completed" in str(exc_info.value)
-
-
-def test_processing_tracker_stop_ignores_if_not_running(tmp_path):
-    """Verifies that stop() safely ignores calls when the pipeline not running.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures stop() is safe to call on non-running pipelines.
-    """
-    tracker_file = tmp_path / TrackerFiles.CHECKSUM
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    # Don't start the pipeline
-    tracker.stop(manager_id=12345)  # Should not raise error
+    # Reset
+    tracker.reset()
 
     tracker._load_state()
-    assert tracker._completed_jobs == 0
-
-
-def test_processing_tracker_error_marks_pipeline_failed(tmp_path):
-    """Verifies that error() correctly marks the pipeline as failed.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures the error state is properly recorded.
-    """
-    tracker_file = tmp_path / TrackerFiles.TRANSFER
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    manager_id = 88888
-    tracker.start(manager_id=manager_id, job_count=5)
-
-    # Report error
-    tracker.error(manager_id=manager_id)
-
-    tracker._load_state()
-    assert tracker._running is False
-    assert tracker._encountered_error is True
-    assert tracker._complete is False
-    assert tracker._manager_id == -1
-
-
-def test_processing_tracker_error_prevents_wrong_manager(tmp_path):
-    """Verifies that error() prevents non-owner from reporting errors.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures only the owning manager can report errors.
-    """
-    tracker_file = tmp_path / TrackerFiles.BEHAVIOR
-
-    # Manager 1 starts the pipeline
-    tracker1 = ProcessingTracker(file_path=tracker_file)
-    tracker1.start(manager_id=100, job_count=5)
-
-    # Manager 2 attempts to report an error
-    tracker2 = ProcessingTracker(file_path=tracker_file)
-
-    with pytest.raises(PermissionError) as exc_info:
-        tracker2.error(manager_id=200)
-
-    assert "Unable to report that the processing pipeline has encountered an error" in str(exc_info.value)
-
-
-def test_processing_tracker_error_ignores_if_not_running(tmp_path):
-    """Verifies that error() safely ignores calls when the pipeline not running.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures error() is safe to call on non-running pipelines.
-    """
-    tracker_file = tmp_path / TrackerFiles.SUITE2P
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    # Don't start the pipeline
-    tracker.error(manager_id=12345)  # Should not raise error
-
-    tracker._load_state()
-    assert tracker._encountered_error is False
-
-
-def test_processing_tracker_abort_resets_all_state(tmp_path):
-    """Verifies that abort() resets tracker to default state.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures abort() provides emergency recovery.
-    """
-    tracker_file = tmp_path / TrackerFiles.VIDEO
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    # Starts the pipeline and do some work
-    tracker.start(manager_id=12345, job_count=10)
-    tracker.stop(manager_id=12345)
-    tracker.stop(manager_id=12345)
-
-    # Abort from any process
-    tracker2 = ProcessingTracker(file_path=tracker_file)
-    tracker2.abort()
-
-    # Verify complete reset
-    tracker2._load_state()
-    assert tracker2._running is False
-    assert tracker2._manager_id == -1
-    assert tracker2._completed_jobs == 0
-    assert tracker2._job_count == 1
-    assert tracker2._complete is False
-    assert tracker2._encountered_error is False
-
-
-def test_processing_tracker_abort_allows_any_process(tmp_path):
-    """Verifies that abort() can be called by any process.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures abort() provides emergency override capability.
-    """
-    tracker_file = tmp_path / TrackerFiles.MULTIDAY
-
-    # Manager 1 locks the pipeline
-    tracker1 = ProcessingTracker(file_path=tracker_file)
-    tracker1.start(manager_id=100, job_count=5)
-
-    # Manager 2 aborts (should succeed)
-    tracker2 = ProcessingTracker(file_path=tracker_file)
-    tracker2.abort()  # Should not raise error
-
-    tracker2._load_state()
-    assert tracker2._running is False
-    assert tracker2._manager_id == -1
+    assert len(tracker._jobs) == 0
 
 
 def test_processing_tracker_complete_property(tmp_path):
-    """Verifies that the complete property correctly reports completion status.
+    """Verifies that the complete property returns True when all jobs succeed.
 
     Args:
         tmp_path: Pytest fixture providing a temporary directory path.
 
-    This test ensures the completion property accessor works correctly.
+    This test ensures pipeline completion detection works.
     """
-    tracker_file = tmp_path / TrackerFiles.FORGING
+    tracker_file = tmp_path / "tracker.yaml"
     tracker = ProcessingTracker(file_path=tracker_file)
 
-    # Initially not complete
-    assert tracker.complete is False
+    session_path = Path("/data/session")
+    job_ids = [
+        ProcessingTracker.generate_job_id(session_path, "job1"),
+        ProcessingTracker.generate_job_id(session_path, "job2"),
+    ]
 
-    # Start and complete the pipeline
-    manager_id = 11111
-    tracker.start(manager_id=manager_id, job_count=1)
-    assert tracker.complete is False
+    tracker.initialize_jobs(job_ids=job_ids)
+    assert not tracker.complete
 
-    tracker.stop(manager_id=manager_id)
-    assert tracker.complete is True
+    # Completes the first job
+    tracker.start_job(job_ids[0])
+    tracker.complete_job(job_ids[0])
+    assert not tracker.complete
+
+    # Completes the second job
+    tracker.start_job(job_ids[1])
+    tracker.complete_job(job_ids[1])
+    assert tracker.complete
 
 
 def test_processing_tracker_encountered_error_property(tmp_path):
-    """Verifies that encountered_error property correctly reports error status.
+    """Verifies that the encountered_error property returns True when any job fails.
 
     Args:
         tmp_path: Pytest fixture providing a temporary directory path.
 
-    This test ensures the error property accessor works correctly.
+    This test ensures error detection works.
     """
-    tracker_file = tmp_path / TrackerFiles.MANIFEST
+    tracker_file = tmp_path / "tracker.yaml"
     tracker = ProcessingTracker(file_path=tracker_file)
 
-    # Initially no error
-    assert tracker.encountered_error is False
+    session_path = Path("/data/session")
+    job_ids = [
+        ProcessingTracker.generate_job_id(session_path, "job1"),
+        ProcessingTracker.generate_job_id(session_path, "job2"),
+    ]
 
-    # Start pipeline
-    manager_id = 22222
-    tracker.start(manager_id=manager_id, job_count=5)
-    assert tracker.encountered_error is False
-
-    # Report error
-    tracker.error(manager_id=manager_id)
-    assert tracker.encountered_error is True
-
-
-def test_processing_tracker_running_property(tmp_path):
-    """Verifies that the running property correctly reports running status.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures the running property accessor works correctly.
-    """
-    tracker_file = tmp_path / TrackerFiles.CHECKSUM
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    # Initially not running
-    assert tracker.running is False
-
-    # Start pipeline
-    manager_id = 33333
-    tracker.start(manager_id=manager_id, job_count=3)
-    assert tracker.running is True
-
-    # Complete pipeline
-    for _ in range(3):
-        tracker.stop(manager_id=manager_id)
-
-    assert tracker.running is False
-
-
-def test_processing_tracker_properties_reload_state(tmp_path):
-    """Verifies that properties reload state from the disk on each access.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures properties always return current state from disk.
-    """
-    tracker_file = tmp_path / TrackerFiles.TRANSFER
-
-    # Create two tracker instances pointing to the same file
-    tracker1 = ProcessingTracker(file_path=tracker_file)
-    tracker2 = ProcessingTracker(file_path=tracker_file)
-
-    # Start the pipeline using tracker1
-    tracker1.start(manager_id=44444, job_count=2)
-
-    # Verify tracker2 sees the change via property access
-    assert tracker2.running is True
-    assert tracker2.complete is False
-
-    # Complete via tracker1
-    tracker1.stop(manager_id=44444)
-    tracker1.stop(manager_id=44444)
-
-    # Verify tracker2 sees completion
-    assert tracker2.running is False
-    assert tracker2.complete is True
-
-
-def test_processing_tracker_concurrent_access_via_locks(tmp_path):
-    """Verifies that file locks prevent race conditions in concurrent access.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures the locking mechanism works for process safety.
-    Note: This is a basic test; true concurrency testing would require multiprocessing.
-    """
-    tracker_file = tmp_path / TrackerFiles.BEHAVIOR
-
-    # Simulate two processes accessing the same tracker
-    tracker1 = ProcessingTracker(file_path=tracker_file)
-    tracker2 = ProcessingTracker(file_path=tracker_file)
-
-    # Both try to start with different manager IDs
-    tracker1.start(manager_id=100, job_count=5)
-
-    # Second should fail
-    with pytest.raises(PermissionError):
-        tracker2.start(manager_id=200, job_count=3)
-
-    # Only first manager can modify state
-    tracker1.stop(manager_id=100)
-
-    with pytest.raises(PermissionError):
-        tracker2.stop(manager_id=200)
-
-
-def test_processing_tracker_yaml_round_trip(tmp_path):
-    """Verifies that tracker state survives YAML serialization round trip.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures YAML serialization preserves all state correctly.
-    """
-    tracker_file = tmp_path / TrackerFiles.SUITE2P
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    # Set the complex state
-    tracker.start(manager_id=99999, job_count=7)
-    tracker.stop(manager_id=99999)
-    tracker.stop(manager_id=99999)
-
-    # Create new instance and verify state loaded correctly
-    tracker2 = ProcessingTracker(file_path=tracker_file)
-    tracker2._load_state()
-
-    assert tracker2._running is True
-    assert tracker2._manager_id == 99999
-    assert tracker2._job_count == 7
-    assert tracker2._completed_jobs == 2
-    assert tracker2._complete is False
-    assert tracker2._encountered_error is False
-
-
-def test_processing_tracker_job_count_validation(tmp_path):
-    """Verifies behavior when job_count is 0 or negative.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test documents edge case behavior for invalid job counts.
-    Note: Current implementation doesn't validate job_count, but should it?
-    """
-    tracker_file = tmp_path / TrackerFiles.VIDEO
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    # Start with job_count of 0
-    tracker.start(manager_id=11111, job_count=0)
-
-    # Verify it completes immediately on the first stop
-    tracker.stop(manager_id=11111)
-
-    tracker._load_state()
-    assert tracker._complete is True
-
-
-def test_processing_tracker_state_transitions(tmp_path):
-    """Verifies correct state transitions through the pipeline lifecycle.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test validates the full state machine behavior.
-    """
-    tracker_file = tmp_path / TrackerFiles.MULTIDAY
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    # Initial state
-    assert not tracker.running
-    assert not tracker.complete
+    tracker.initialize_jobs(job_ids=job_ids)
     assert not tracker.encountered_error
 
-    # Start: running
-    manager_id = 55555
-    tracker.start(manager_id=manager_id, job_count=2)
-    assert tracker.running
-    assert not tracker.complete
+    # Complete the first job successfully
+    tracker.start_job(job_ids[0])
+    tracker.complete_job(job_ids[0])
     assert not tracker.encountered_error
 
-    # In progress: still running
-    tracker.stop(manager_id=manager_id)
-    assert tracker.running
-    assert not tracker.complete
-    assert not tracker.encountered_error
-
-    # Complete: not running, complete
-    tracker.stop(manager_id=manager_id)
-    assert not tracker.running
-    assert tracker.complete
-    assert not tracker.encountered_error
-
-
-def test_processing_tracker_error_state_transitions(tmp_path):
-    """Verifies correct state transitions when the error occurs.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test validates error handling state machine behavior.
-    """
-    tracker_file = tmp_path / TrackerFiles.FORGING
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    # Start pipeline
-    manager_id = 66666
-    tracker.start(manager_id=manager_id, job_count=5)
-    assert tracker.running
-
-    # Do some work
-    tracker.stop(manager_id=manager_id)
-    tracker.stop(manager_id=manager_id)
-    assert tracker.running
-
-    # Encounter error
-    tracker.error(manager_id=manager_id)
-    assert not tracker.running
-    assert not tracker.complete
+    # Fail second job
+    tracker.start_job(job_ids[1])
+    tracker.fail_job(job_ids[1])
     assert tracker.encountered_error
 
 
-# Tests for ProcessingPipelines and ProcessingStatus enumerations
+def test_processing_tracker_concurrent_access(tmp_path):
+    """Verifies that file locks prevent race conditions.
 
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
 
-def test_processing_pipelines_enum_values():
-    """Verifies all ProcessingPipelines enumeration values.
-
-    This test ensures the enumeration contains all expected pipeline types.
+    This test ensures thread-safe operation.
     """
-    assert ProcessingPipelines.MANIFEST == "manifest generation"
-    assert ProcessingPipelines.CHECKSUM == "checksum resolution"
-    assert ProcessingPipelines.TRANSFER == "data transfer"
-    assert ProcessingPipelines.BEHAVIOR == "behavior processing"
-    assert ProcessingPipelines.SUITE2P == "single-day suite2p processing"
-    assert ProcessingPipelines.VIDEO == "video processing"
-    assert ProcessingPipelines.MULTIDAY == "multi-day suite2p processing"
-    assert ProcessingPipelines.FORGING == "dataset forging"
+    tracker_file = tmp_path / "tracker.yaml"
+
+    # Simulate two processes
+    tracker1 = ProcessingTracker(file_path=tracker_file)
+    tracker2 = ProcessingTracker(file_path=tracker_file)
+
+    session_path = Path("/data/session")
+    job_id = ProcessingTracker.generate_job_id(session_path, "test_job")
+
+    # Initialize from the first process
+    tracker1.initialize_jobs(job_ids=[job_id])
+
+    # The second process can see the job
+    assert tracker2.get_job_status(job_id) == ProcessingStatus.SCHEDULED
+
+    # The first process starts the job
+    tracker1.start_job(job_id)
+
+    # The second process sees the update
+    assert tracker2.get_job_status(job_id) == ProcessingStatus.RUNNING
+
+
+def test_processing_tracker_yaml_serialization(tmp_path):
+    """Verifies that the tracker state is properly serialized to YAML.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+
+    This test ensures YAML round-trip works correctly.
+    """
+    tracker_file = tmp_path / "tracker.yaml"
+    tracker = ProcessingTracker(file_path=tracker_file)
+
+    session_path = Path("/data/session")
+    job_ids = [
+        ProcessingTracker.generate_job_id(session_path, "job1"),
+        ProcessingTracker.generate_job_id(session_path, "job2"),
+    ]
+
+    tracker.initialize_jobs(job_ids=job_ids)
+    tracker.start_job(job_ids[0])
+
+    # Creates a new instance and verify it loads correctly
+    tracker2 = ProcessingTracker(file_path=tracker_file)
+    tracker2._load_state()
+
+    assert len(tracker2._jobs) == 2
+    assert tracker2._jobs[job_ids[0]].status == ProcessingStatus.RUNNING
+    assert tracker2._jobs[job_ids[1]].status == ProcessingStatus.SCHEDULED
+
+
+# Tests for ProcessingStatus enumeration
 
 
 def test_processing_status_enum_values():
@@ -3157,22 +2679,7 @@ def test_processing_status_enum_values():
 
     This test ensures the enumeration contains all expected status codes.
     """
-    assert ProcessingStatus.RUNNING == 0
-    assert ProcessingStatus.SUCCEEDED == 1
-    assert ProcessingStatus.FAILED == 2
-    assert ProcessingStatus.ABORTED == 3
-
-
-def test_tracker_files_enum_values():
-    """Verifies all TrackerFiles enumeration values.
-
-    This test ensures the enumeration contains all expected tracker filenames.
-    """
-    assert TrackerFiles.MANIFEST == "manifest_generation_tracker.yaml"
-    assert TrackerFiles.CHECKSUM == "checksum_resolution_tracker.yaml"
-    assert TrackerFiles.TRANSFER == "data_transfer_tracker.yaml"
-    assert TrackerFiles.BEHAVIOR == "behavior_processing_tracker.yaml"
-    assert TrackerFiles.SUITE2P == "suite2p_processing_tracker.yaml"
-    assert TrackerFiles.VIDEO == "video_processing_tracker.yaml"
-    assert TrackerFiles.MULTIDAY == "multiday_processing_tracker.yaml"
-    assert TrackerFiles.FORGING == "dataset_forging_tracker.yaml"
+    assert ProcessingStatus.SCHEDULED == 0
+    assert ProcessingStatus.RUNNING == 1
+    assert ProcessingStatus.SUCCEEDED == 2
+    assert ProcessingStatus.FAILED == 3
