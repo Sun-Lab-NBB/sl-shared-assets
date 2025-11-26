@@ -160,10 +160,10 @@ class MesoscopeMicroControllers:
     a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC), for the change to be reported to the PC."""
     lick_averaging_pool_size: int = 2
     """The number of lick sensor readouts to average together to produce the final lick sensor readout value."""
-    torque_baseline_voltage_adc: int = 2046
+    torque_baseline_voltage_adc: int = 2048
     """The voltage level, in raw analog units measured by a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC) after the 
     AD620 amplifier, that corresponds to no torque (0) readout."""
-    torque_maximum_voltage_adc: int = 2750
+    torque_maximum_voltage_adc: int = 3443
     """The voltage level, in raw analog units measured by a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC) 
     after the AD620 amplifier, that corresponds to the absolute maximum torque detectable by the sensor."""
     torque_sensor_capacity_g_cm: float = 720.0779
@@ -172,10 +172,10 @@ class MesoscopeMicroControllers:
     """Determines whether the torque sensor should report torques in the Clockwise (CW) direction."""
     torque_report_ccw: bool = True
     """Determines whether the sensor should report torque in the Counter-Clockwise (CCW) direction."""
-    torque_signal_threshold_adc: int = 100
+    torque_signal_threshold_adc: int = 150
     """The minimum voltage, in raw analog units recorded by a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC), 
     reported to the PC as a non-zero value. Voltages below this level are interpreted as noise and are pulled to 0."""
-    torque_delta_threshold_adc: int = 70
+    torque_delta_threshold_adc: int = 100
     """The minimum absolute difference between two consecutive torque sensor readouts, in raw analog units recorded by 
     a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC), for the change to be reported to the PC."""
     torque_averaging_pool_size: int = 4
@@ -202,9 +202,9 @@ class MesoscopeMicroControllers:
     TTL signal sent by the mesoscope at the onset of each frame's acquisition."""
     valve_calibration_data: dict[int | float, int | float] | tuple[tuple[int | float, int | float], ...] = (
         (15000, 1.10),
-        (30000, 3.00),
-        (45000, 6.25),
-        (60000, 10.90),
+        (30000, 3.65),
+        (45000, 7.00),
+        (60000, 11.10),
     )
     """Maps water delivery solenoid valve open times, in microseconds, to the dispensed volumes of water, in 
     microliters."""
