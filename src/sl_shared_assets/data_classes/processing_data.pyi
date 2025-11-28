@@ -18,7 +18,7 @@ class JobState:
 @dataclass()
 class ProcessingTracker(YamlConfig):
     file_path: Path
-    _jobs: dict[str, JobState] = field(default_factory=dict)
+    jobs: dict[str, JobState] = field(default_factory=dict)
     lock_path: str = field(init=False)
     def __post_init__(self) -> None: ...
     @staticmethod

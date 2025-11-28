@@ -2287,7 +2287,7 @@ def test_processing_tracker_initialization(tmp_path):
     tracker = ProcessingTracker(file_path=tracker_file)
 
     assert tracker.file_path == tracker_file
-    assert tracker._jobs == {}
+    assert tracker.jobs == {}
     assert tracker.lock_path == str(tracker_file.with_suffix(".yaml.lock"))
 
 
@@ -2345,11 +2345,11 @@ def test_processing_tracker_initialize_jobs(tmp_path):
 
     # Reload to verify persistence
     tracker._load_state()
-    assert len(tracker._jobs) == 3
+    assert len(tracker.jobs) == 3
     for job_id in job_ids:
-        assert job_id in tracker._jobs
-        assert tracker._jobs[job_id].status == ProcessingStatus.SCHEDULED
-        assert tracker._jobs[job_id].slurm_job_id is None
+        assert job_id in tracker.jobs
+        assert tracker.jobs[job_id].status == ProcessingStatus.SCHEDULED
+        assert tracker.jobs[job_id].slurm_job_id is None
 
 
 def test_processing_tracker_initialize_jobs_preserves_existing(tmp_path):
@@ -2380,8 +2380,8 @@ def test_processing_tracker_initialize_jobs_preserves_existing(tmp_path):
 
     # Verify the first job's status is preserved
     tracker._load_state()
-    assert tracker._jobs[job_ids[0]].status == ProcessingStatus.RUNNING
-    assert tracker._jobs[job_ids[1]].status == ProcessingStatus.SCHEDULED
+    assert tracker.jobs[job_ids[0]].status == ProcessingStatus.RUNNING
+    assert tracker.jobs[job_ids[1]].status == ProcessingStatus.SCHEDULED
 
 
 def test_processing_tracker_start_job(tmp_path, monkeypatch):
@@ -2406,8 +2406,8 @@ def test_processing_tracker_start_job(tmp_path, monkeypatch):
     tracker.start_job(job_id)
 
     tracker._load_state()
-    assert tracker._jobs[job_id].status == ProcessingStatus.RUNNING
-    assert tracker._jobs[job_id].slurm_job_id == 12345
+    assert tracker.jobs[job_id].status == ProcessingStatus.RUNNING
+    assert tracker.jobs[job_id].slurm_job_id == 12345
 
 
 def test_processing_tracker_start_job_without_slurm(tmp_path):
@@ -2428,8 +2428,8 @@ def test_processing_tracker_start_job_without_slurm(tmp_path):
     tracker.start_job(job_id)
 
     tracker._load_state()
-    assert tracker._jobs[job_id].status == ProcessingStatus.RUNNING
-    assert tracker._jobs[job_id].slurm_job_id is None
+    assert tracker.jobs[job_id].status == ProcessingStatus.RUNNING
+    assert tracker.jobs[job_id].slurm_job_id is None
 
 
 def test_processing_tracker_start_job_raises_for_unknown_job(tmp_path):
@@ -2470,7 +2470,7 @@ def test_processing_tracker_complete_job(tmp_path):
     tracker.complete_job(job_id)
 
     tracker._load_state()
-    assert tracker._jobs[job_id].status == ProcessingStatus.SUCCEEDED
+    assert tracker.jobs[job_id].status == ProcessingStatus.SUCCEEDED
 
 
 def test_processing_tracker_fail_job(tmp_path):
@@ -2492,7 +2492,7 @@ def test_processing_tracker_fail_job(tmp_path):
     tracker.fail_job(job_id)
 
     tracker._load_state()
-    assert tracker._jobs[job_id].status == ProcessingStatus.FAILED
+    assert tracker.jobs[job_id].status == ProcessingStatus.FAILED
 
 
 def test_processing_tracker_get_job_status(tmp_path):
@@ -2547,7 +2547,7 @@ def test_processing_tracker_reset(tmp_path):
     tracker.reset()
 
     tracker._load_state()
-    assert len(tracker._jobs) == 0
+    assert len(tracker.jobs) == 0
 
 
 def test_processing_tracker_complete_property(tmp_path):
@@ -2666,9 +2666,9 @@ def test_processing_tracker_yaml_serialization(tmp_path):
     tracker2 = ProcessingTracker(file_path=tracker_file)
     tracker2._load_state()
 
-    assert len(tracker2._jobs) == 2
-    assert tracker2._jobs[job_ids[0]].status == ProcessingStatus.RUNNING
-    assert tracker2._jobs[job_ids[1]].status == ProcessingStatus.SCHEDULED
+    assert len(tracker2.jobs) == 2
+    assert tracker2.jobs[job_ids[0]].status == ProcessingStatus.RUNNING
+    assert tracker2.jobs[job_ids[1]].status == ProcessingStatus.SCHEDULED
 
 
 # Tests for ProcessingStatus enumeration

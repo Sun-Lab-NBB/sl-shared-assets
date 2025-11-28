@@ -50,7 +50,7 @@ class ProcessingTracker(YamlConfig):
 
     file_path: Path
     """The path to the .YAML file used to cache the tracker's data on disk."""
-    _jobs: dict[str, JobState] = field(default_factory=dict)
+    jobs: dict[str, JobState] = field(default_factory=dict)
     """Maps the unique identifiers of the jobs that make up the processing pipeline to their current state and 
     metadata."""
     lock_path: str = field(init=False)
@@ -66,7 +66,7 @@ class ProcessingTracker(YamlConfig):
 
         # Converts integer status values back to ProcessingStatus enumeration instances. The conversion to integers is
         # necessary for .YAML saving compatibility.
-        for job_state in self._jobs.values():
+        for job_state in self.jobs.values():
             if isinstance(job_state.status, int):
                 job_state.status = ProcessingStatus(job_state.status)
 
@@ -102,7 +102,7 @@ class ProcessingTracker(YamlConfig):
         if self.file_path.exists():
             # Loads the data for the state values but does not replace the file path or lock attributes.
             instance: ProcessingTracker = self.from_yaml(self.file_path)
-            self._jobs = copy.deepcopy(instance._jobs)
+            self.jobs = copy.deepcopy(instance.jobs)
         else:
             # Otherwise, if the tracker file does not exist, generates a new .yaml file using default instance values
             # and saves it to disk using the specified tracker file path.
@@ -112,11 +112,11 @@ class ProcessingTracker(YamlConfig):
         """Caches the current processing state stored inside the instance's attributes as a.YAML file."""
         # Resets the lock_path and file_path to None and jobs to a dictionary of integers before dumping the data to
         # .YAML to avoid issues with loading it back.
-        temp_file_path, temp_lock_path, temp_jobs = self.file_path, self.lock_path, self._jobs
+        temp_file_path, temp_lock_path, temp_jobs = self.file_path, self.lock_path, self.jobs
 
         # Converts enums to int for YAML serialization
         converted_jobs = {}
-        for job_id, job_state in self._jobs.items():
+        for job_id, job_state in self.jobs.items():
             converted_jobs[job_id] = JobState(
                 status=int(job_state.status),  # type: ignore[arg-type]
                 slurm_job_id=job_state.slurm_job_id,
@@ -125,7 +125,7 @@ class ProcessingTracker(YamlConfig):
         try:
             self.file_path = None  # type: ignore[assignment]
             self.lock_path = None  # type: ignore[assignment]
-            self._jobs = converted_jobs
+            self.jobs = converted_jobs
             self.to_yaml(file_path=temp_file_path)
         finally:
             self.file_path, self.lock_path, self.jobs = temp_file_path, temp_lock_path, temp_jobs
@@ -146,8 +146,8 @@ class ProcessingTracker(YamlConfig):
 
             # Initialize all jobs as SCHEDULED if they don't already exist
             for job_id in job_ids:
-                if job_id not in self._jobs:
-                    self._jobs[job_id] = JobState(status=ProcessingStatus.SCHEDULED)
+                if job_id not in self.jobs:
+                    self.jobs[job_id] = JobState(status=ProcessingStatus.SCHEDULED)
 
             self._save_state()
 
@@ -168,18 +168,18 @@ class ProcessingTracker(YamlConfig):
             self._load_state()
 
             # Verifies that the tracker is configured to track the specified job
-            if job_id not in self._jobs:
+            if job_id not in self.jobs:
                 message = (
                     f"The ProcessingTracker instance is not configured to track the state of the job with ID "
                     f"'{job_id}'. The instance is currently configured to track jobs with IDs: "
-                    f"{', '.join(self._jobs.keys())}."
+                    f"{', '.join(self.jobs.keys())}."
                 )
                 console.error(message=message, error=ValueError)
                 # Fallback to appease mypy, should not be reachable
                 raise ValueError(message)  # pragma: no cover
 
             # Updates job status and captures the SLURM-assigned job ID
-            job_info = self._jobs[job_id]
+            job_info = self.jobs[job_id]
             job_info.status = ProcessingStatus.RUNNING
             job_info.slurm_job_id = self._get_slurm_job_id()
 
@@ -201,18 +201,18 @@ class ProcessingTracker(YamlConfig):
             self._load_state()
 
             # Verifies that the tracker is configured to track the specified job
-            if job_id not in self._jobs:
+            if job_id not in self.jobs:
                 message = (
                     f"The ProcessingTracker instance is not configured to track the state of the job with ID "
                     f"'{job_id}'. The instance is currently configured to track jobs with IDs: "
-                    f"{', '.join(self._jobs.keys())}."
+                    f"{', '.join(self.jobs.keys())}."
                 )
                 console.error(message=message, error=ValueError)
                 # Fallback to appease mypy, should not be reachable
                 raise ValueError(message)  # pragma: no cover
 
             # Updates the job's status.
-            job_info = self._jobs[job_id]
+            job_info = self.jobs[job_id]
             job_info.status = ProcessingStatus.SUCCEEDED
 
             self._save_state()
@@ -233,18 +233,18 @@ class ProcessingTracker(YamlConfig):
             self._load_state()
 
             # Verifies that the tracker is configured to track the specified job
-            if job_id not in self._jobs:
+            if job_id not in self.jobs:
                 message = (
                     f"The ProcessingTracker instance is not configured to track the state of the job with ID "
                     f"'{job_id}'. The instance is currently configured to track jobs with IDs: "
-                    f"{', '.join(self._jobs.keys())}."
+                    f"{', '.join(self.jobs.keys())}."
                 )
                 console.error(message=message, error=ValueError)
                 # Fallback to appease mypy, should not be reachable
                 raise ValueError(message)  # pragma: no cover
 
             # Updates the job's status.
-            job_info = self._jobs[job_id]
+            job_info = self.jobs[job_id]
             job_info.status = ProcessingStatus.FAILED
 
             self._save_state()
@@ -267,17 +267,17 @@ class ProcessingTracker(YamlConfig):
             self._load_state()
 
             # Verifies that the tracker is configured to track the specified job
-            if job_id not in self._jobs:
+            if job_id not in self.jobs:
                 message = (
                     f"The ProcessingTracker instance is not configured to track the state of the job with ID "
                     f"'{job_id}'. The instance is currently configured to track jobs with IDs: "
-                    f"{', '.join(self._jobs.keys())}."
+                    f"{', '.join(self.jobs.keys())}."
                 )
                 console.error(message=message, error=ValueError)
                 # Fallback to appease mypy, should not be reachable
                 raise ValueError(message)  # pragma: no cover
 
-            return self._jobs[job_id].status
+            return self.jobs[job_id].status
 
     def reset(self) -> None:
         """Resets the tracker file to the default state."""
@@ -287,7 +287,7 @@ class ProcessingTracker(YamlConfig):
             self._load_state()
 
             # Resets the tracker file to the default state.
-            self._jobs.clear()
+            self.jobs.clear()
             self._save_state()
 
     @property
@@ -300,9 +300,9 @@ class ProcessingTracker(YamlConfig):
         lock = FileLock(self.lock_path)
         with lock.acquire(timeout=10.0):
             self._load_state()
-            if not self._jobs:
+            if not self.jobs:
                 return False
-            return all(job.status == ProcessingStatus.SUCCEEDED for job in self._jobs.values())
+            return all(job.status == ProcessingStatus.SUCCEEDED for job in self.jobs.values())
 
     @property
     def encountered_error(self) -> bool:
@@ -314,4 +314,4 @@ class ProcessingTracker(YamlConfig):
         lock = FileLock(self.lock_path)
         with lock.acquire(timeout=10.0):
             self._load_state()
-            return any(job.status == ProcessingStatus.FAILED for job in self._jobs.values())
+            return any(job.status == ProcessingStatus.FAILED for job in self.jobs.values())
