@@ -595,11 +595,9 @@ def create_server_configuration_file(
     storage_root: str = "/local/workdir",
     working_root: str = "/local/storage",
     shared_directory_name: str = "sun_data",
-    *,
-    service: bool = False,
 ) -> None:
-    """Creates the .YAML configuration file for the requested Sun lab compute server and configures the local machine
-    (PC) to use this file for all future server-related calls.
+    """Creates the .YAML configuration file for the Sun lab compute server and configures the local machine (PC) to use
+    this file for all future server-related calls.
 
     Notes:
         This function creates the configuration file inside the shared Sun lab's working directory on the local machine.
@@ -607,8 +605,6 @@ def create_server_configuration_file(
     Args:
         username: The username to use for server authentication.
         password: The password to use for server authentication.
-        service: Determines whether the generated configuration file should access the server as a user or as a shared
-            service account.
         host: The hostname or IP address of the server to connect to.
         storage_root: The path to the server's storage (slow) HDD RAID volume.
         working_root: The path to the server's working (fast) NVME RAID volume.
@@ -616,98 +612,55 @@ def create_server_configuration_file(
             volumes.
     """
     output_directory = get_working_directory().joinpath("configuration")
-    if service:
-        ServerConfiguration(
-            username=username,
-            password=password,
-            host=host,
-            storage_root=storage_root,
-            working_root=working_root,
-            shared_directory_name=shared_directory_name,
-        ).to_yaml(file_path=output_directory.joinpath("service_server_configuration.yaml"))
-        console.echo(message="Service server configuration file: Created.", level=LogLevel.SUCCESS)
-    else:
-        ServerConfiguration(
-            username=username,
-            password=password,
-            host=host,
-            storage_root=storage_root,
-            working_root=working_root,
-            shared_directory_name=shared_directory_name,
-        ).to_yaml(file_path=output_directory.joinpath("user_server_configuration.yaml"))
-        console.echo(message="User server configuration file: Created.", level=LogLevel.SUCCESS)
+    ServerConfiguration(
+        username=username,
+        password=password,
+        host=host,
+        storage_root=storage_root,
+        working_root=working_root,
+        shared_directory_name=shared_directory_name,
+    ).to_yaml(file_path=output_directory.joinpath("server_configuration.yaml"))
+    console.echo(message="Server configuration file: Created.", level=LogLevel.SUCCESS)
 
 
-def get_server_configuration(*, service: bool = False) -> ServerConfiguration:
-    """Resolves and returns the requested Sun lab compute server's configuration data as a ServerConfiguration instance.
-
-    Args:
-        service: Determines whether this function is called to load the user or the service configuration file.
+def get_server_configuration() -> ServerConfiguration:
+    """Resolves and returns the Sun lab compute server's configuration data as a ServerConfiguration instance.
 
     Returns:
         The loaded and validated server configuration data, stored in a ServerConfiguration instance.
 
     Raises:
-        FileNotFoundError: If the requested configuration file does not exist in the local Sun lab's working directory.
-        ValueError: If the requested configuration file exists, but is not properly configured.
+        FileNotFoundError: If the configuration file does not exist in the local Sun lab's working directory.
+        ValueError: If the configuration file exists, but is not properly configured.
     """
     # Gets the path to the local working directory.
     working_directory = get_working_directory().joinpath("configuration")
 
-    # Resolves the paths to the credential files.
-    service_path = working_directory.joinpath("service_server_configuration.yaml")
-    user_path = working_directory.joinpath("user_server_configuration.yaml")
+    # Resolves the path to the server configuration file.
+    config_path = working_directory.joinpath("server_configuration.yaml")
 
-    # If the caller requires the service account, evaluates the service configuration file.
-    if service:
-        # Ensures that the configuration file exists.
-        if not service_path.exists():
-            message = (
-                f"Unable to locate the 'service_server_configuration.yaml' file in the Sun lab's working directory "
-                f"{service_path}. Call the 'sl-configure server -s' CLI command to create the service server "
-                f"configuration file."
-            )
-            console.error(message=message, error=FileNotFoundError)
-            raise FileNotFoundError(message)  # Fallback to appease mypy, should not be reachable
-
-        configuration = ServerConfiguration.from_yaml(file_path=service_path)
-
-        # If the service account is not configured, aborts with an error.
-        if configuration.username == "" or configuration.password == "":
-            message = (
-                "The 'service_server_configuration.yaml' file appears to be unconfigured or contains placeholder "
-                "access credentials. Call the 'sl-configure server -s' CLI command to reconfigure the server access "
-                "credentials."
-            )
-            console.error(message=message, error=ValueError)
-            raise ValueError(message)  # Fallback to appease mypy, should not be reachable
-
-        # If the service account is configured, returns the loaded configuration data to caller
-        message = f"Service server configuration: Resolved. Using the service {configuration.username} account."
-        console.echo(message=message, level=LogLevel.SUCCESS)
-        return configuration
-
-    if not user_path.exists():
+    # Ensures that the configuration file exists.
+    if not config_path.exists():
         message = (
-            f"Unable to locate the 'user_server_configuration.yaml' file in the Sun lab's working directory "
-            f"{user_path}. Call the 'sl-configure server' CLI command to create the user server configuration file."
+            f"Unable to locate the 'server_configuration.yaml' file in the Sun lab's working directory "
+            f"{config_path}. Call the 'sl-configure server' CLI command to create the server configuration file."
         )
         console.error(message=message, error=FileNotFoundError)
         raise FileNotFoundError(message)  # Fallback to appease mypy, should not be reachable
 
-    # Otherwise, evaluates the user configuration file.
-    configuration = ServerConfiguration.from_yaml(file_path=user_path)
+    # Loads the configuration file.
+    configuration = ServerConfiguration.from_yaml(file_path=config_path)
 
-    # If the user account is not configured, aborts with an error.
+    # Validates that the configuration is properly set up.
     if configuration.username == "" or configuration.password == "":
         message = (
-            "The 'user_server_configuration.yaml' file appears to be unconfigured or contains placeholder access "
+            "The 'server_configuration.yaml' file appears to be unconfigured or contains placeholder access "
             "credentials. Call the 'sl-configure server' CLI command to reconfigure the server access credentials."
         )
         console.error(message=message, error=ValueError)
         raise ValueError(message)  # Fallback to appease mypy, should not be reachable
 
-    # Otherwise, returns the user's service configuration data to the caller.
-    message = f"User server configuration: Resolved. Using the {configuration.username} account."
+    # Returns the loaded configuration data to the caller.
+    message = f"Server configuration: Resolved. Using the {configuration.username} account."
     console.echo(message=message, level=LogLevel.SUCCESS)
     return configuration

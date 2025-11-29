@@ -2041,7 +2041,7 @@ def test_server_configuration_yaml_round_trip(tmp_path):
 # Tests for the create_server_configuration_file function
 
 
-def test_create_server_configuration_file_user(clean_working_directory, monkeypatch):
+def test_create_server_configuration_file(clean_working_directory, monkeypatch):
     """Verifies that create_server_configuration_file creates user config.
 
     Args:
@@ -2058,45 +2058,15 @@ def test_create_server_configuration_file_user(clean_working_directory, monkeypa
     create_server_configuration_file(
         username="testuser",
         password="testpass",
-        service=False,
     )
 
-    config_file = clean_working_directory / "configuration" / "user_server_configuration.yaml"
+    config_file = clean_working_directory / "configuration" / "server_configuration.yaml"
     assert config_file.exists()
 
     # Verify content
     loaded = ServerConfiguration.from_yaml(file_path=config_file)
     assert loaded.username == "testuser"
     assert loaded.password == "testpass"
-
-
-def test_create_server_configuration_file_service(clean_working_directory, monkeypatch):
-    """Verifies that create_server_configuration_file creates service config.
-
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
-    This test ensures service server configuration is created correctly.
-    """
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
-
-    set_working_directory(clean_working_directory)
-
-    create_server_configuration_file(
-        username="service_account",
-        password="service_pass",
-        service=True,
-    )
-
-    config_file = clean_working_directory / "configuration" / "service_server_configuration.yaml"
-    assert config_file.exists()
-
-    # Verify content
-    loaded = ServerConfiguration.from_yaml(file_path=config_file)
-    assert loaded.username == "service_account"
-    assert loaded.password == "service_pass"
 
 
 def test_create_server_configuration_file_custom_parameters(clean_working_directory, monkeypatch):
@@ -2120,10 +2090,9 @@ def test_create_server_configuration_file_custom_parameters(clean_working_direct
         storage_root="/custom/storage",
         working_root="/custom/work",
         shared_directory_name="custom_shared",
-        service=False,
     )
 
-    config_file = clean_working_directory / "configuration" / "user_server_configuration.yaml"
+    config_file = clean_working_directory / "configuration" / "server_configuration.yaml"
     loaded = ServerConfiguration.from_yaml(file_path=config_file)
 
     assert loaded.host == "custom.server.com"
@@ -2153,42 +2122,13 @@ def test_get_server_configuration_user(clean_working_directory, monkeypatch):
     create_server_configuration_file(
         username="testuser",
         password="testpass",
-        service=False,
     )
 
     # Load it
-    config = get_server_configuration(service=False)
+    config = get_server_configuration()
 
     assert config.username == "testuser"
     assert config.password == "testpass"
-
-
-def test_get_server_configuration_service(clean_working_directory, monkeypatch):
-    """Verifies that get_server_configuration loads service config.
-
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
-    This test ensures service configuration can be retrieved.
-    """
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
-
-    set_working_directory(clean_working_directory)
-
-    # Create service config
-    create_server_configuration_file(
-        username="service",
-        password="service_pass",
-        service=True,
-    )
-
-    # Load it
-    config = get_server_configuration(service=True)
-
-    assert config.username == "service"
-    assert config.password == "service_pass"
 
 
 def test_get_server_configuration_raises_error_if_missing(clean_working_directory, monkeypatch):
@@ -2208,9 +2148,9 @@ def test_get_server_configuration_raises_error_if_missing(clean_working_director
     # Don't create any config files
 
     with pytest.raises(FileNotFoundError) as exc_info:
-        get_server_configuration(service=False)
+        get_server_configuration()
 
-    assert "user_server_configuration.yaml" in str(exc_info.value)
+    assert "server_configuration.yaml" in str(exc_info.value)
 
 
 def test_get_server_configuration_raises_error_if_unconfigured(clean_working_directory, monkeypatch):
@@ -2228,48 +2168,13 @@ def test_get_server_configuration_raises_error_if_unconfigured(clean_working_dir
     set_working_directory(clean_working_directory)
 
     # Create config with empty credentials (unconfigured)
-    config_file = clean_working_directory / "configuration" / "user_server_configuration.yaml"
+    config_file = clean_working_directory / "configuration" / "server_configuration.yaml"
     ServerConfiguration().to_yaml(file_path=config_file)
 
     with pytest.raises(ValueError) as exc_info:
-        get_server_configuration(service=False)
+        get_server_configuration()
 
     assert "unconfigured" in str(exc_info.value).lower()
-
-
-def test_get_server_configuration_distinguishes_user_and_service(clean_working_directory, monkeypatch):
-    """Verifies that get_server_configuration correctly distinguishes user vs. service.
-
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
-    This test ensures the correct config is loaded based on the service flag.
-    """
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
-
-    set_working_directory(clean_working_directory)
-
-    # Create both configs with different usernames
-    create_server_configuration_file(
-        username="regular_user",
-        password="user_pass",
-        service=False,
-    )
-
-    create_server_configuration_file(
-        username="service_user",
-        password="service_pass",
-        service=True,
-    )
-
-    # Verify the correct config is loaded
-    user_config = get_server_configuration(service=False)
-    service_config = get_server_configuration(service=True)
-
-    assert user_config.username == "regular_user"
-    assert service_config.username == "service_user"
 
 
 # Tests for ProcessingTracker dataclass

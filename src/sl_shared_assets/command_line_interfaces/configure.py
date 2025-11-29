@@ -61,16 +61,6 @@ def configure_directory(directory: Path) -> None:  # pragma: no cover
     help="The password to use for server authentication.",
 )
 @click.option(
-    "-s",
-    "--service",
-    is_flag=True,
-    default=False,
-    help=(
-        "Determines whether the server configuration file should use the shared service account for accessing the "
-        "server."
-    ),
-)
-@click.option(
     "-h",
     "--host",
     type=str,
@@ -113,15 +103,12 @@ def generate_server_configuration_file(
     storage_root: str,
     working_root: str,
     shared_directory: str,
-    *,
-    service: bool,
 ) -> None:  # pragma: no cover
-    """Creates the requested service or user server configuration file."""
-    # Generates the requested credentials' file.
+    """Creates the remote compute server configuration file."""
+    # Generates the server configuration file.
     create_server_configuration_file(
         username=username,
         password=password,
-        service=service,
         host=host,
         storage_root=storage_root,
         working_root=working_root,
