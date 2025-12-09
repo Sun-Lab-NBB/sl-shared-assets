@@ -27,8 +27,12 @@ from .surgery_data import (
     ProcedureData,
 )
 from .processing_data import (
+    DatasetTrackers,
+    ManagingTrackers,
     ProcessingStatus,
     ProcessingTracker,
+    ProcessingTrackers,
+    ProcessingPipelines,
 )
 from .configuration_data import (
     MesoscopeCameras,
@@ -54,10 +58,12 @@ from .configuration_data import (
 
 __all__ = [
     "AcquisitionSystems",
+    "DatasetTrackers",
     "DrugData",
     "ImplantData",
     "InjectionData",
     "LickTrainingDescriptor",
+    "ManagingTrackers",
     "MesoscopeCameras",
     "MesoscopeExperimentConfiguration",
     "MesoscopeExperimentDescriptor",
@@ -72,8 +78,10 @@ __all__ = [
     "MesoscopeSystemConfiguration",
     "ProcedureData",
     "ProcessedData",
+    "ProcessingPipelines",
     "ProcessingStatus",
     "ProcessingTracker",
+    "ProcessingTrackers",
     "RawData",
     "RunTrainingDescriptor",
     "ServerConfiguration",
