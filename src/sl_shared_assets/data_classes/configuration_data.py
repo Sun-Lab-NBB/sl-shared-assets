@@ -14,13 +14,26 @@ class AcquisitionSystems(StrEnum):
     """Defines the data acquisition systems currently used in the Sun lab."""
 
     MESOSCOPE_VR = "mesoscope"
-    """This system is built around the 2-Photon Random Access Mesoscope (2P-RAM) and relies on Virtual Reality (VR) 
+    """This system is built around the 2-Photon Random Access Mesoscope (2P-RAM) and relies on Virtual Reality (VR)
     environments running in Unity game engine to conduct experiments."""
+
+
+class StimulusTriggers(StrEnum):
+    """Defines the triggers for initiating or omitting stimulus delivery during experiment trials."""
+
+    LICK = "lick"
+    """The stimulus is triggered when the animal licks the lick port sensor while located inside the stimulus trigger 
+    zone."""
+    OCCUPANCY = "occupancy"
+    """The stimulus is triggered after the animal occupies the stimulus trigger zone for a certain duration."""
+    COLLISION = "collision"
+    """The stimulus is triggered when the animal collides with the invisible boundary (wall) placed at the location of 
+    the stimulus. The location of the stimulus may be outside the stimulus trigger zone."""
 
 
 @dataclass()
 class MesoscopeExperimentState:
-    """Defines the structure and runtime parameters of an experiment state."""
+    """Defines the structure and runtime parameters of an experiment state (phase)."""
 
     experiment_state_code: int
     """The unique identifier code of the experiment state."""
@@ -28,35 +41,119 @@ class MesoscopeExperimentState:
     """The data acquisition system's state (configuration snapshot) code associated with the experiment state."""
     state_duration_s: float
     """The time, in seconds, to maintain the experiment state while executing the experiment."""
-    initial_guided_trials: int
-    """The number of trials after the onset of the experiment state that must use the guided mode."""
-    recovery_failed_trial_threshold: int
-    """The number of sequentially failed trials after which to enable the 'recovery' guided mode."""
-    recovery_guided_trials: int
-    """The number of guided trials to use in the 'recovery' guided mode."""
+    supported_trial_structures: list[str] | None = None
+    """The list of trial structure names to be conducted during this experiment state. If None or empty, no trials are 
+    executed during this state."""
+    # Reinforcing (water reward) trial guidance parameters
+    reinforcing_initial_guided_trials: int = 0
+    """The number of reinforcing trials after the onset of the experiment state that use the guidance mode."""
+    reinforcing_recovery_failed_threshold: int = 0
+    """The number of sequentially failed reinforcing trials after which to enable the recovery guidance mode."""
+    reinforcing_recovery_guided_trials: int = 0
+    """The number of guided reinforcing trials to use in the recovery guidance mode."""
+    # Aversive (gas puff) trial guidance parameters
+    aversive_initial_guided_trials: int = 0
+    """The number of aversive trials after the onset of the experiment state that use the guidance mode."""
+    aversive_recovery_failed_threshold: int = 0
+    """The number of sequentially failed aversive trials after which to enable the recovery guidance mode."""
+    aversive_recovery_guided_trials: int = 0
+    """The number of guided aversive trials to use in the recovery guidance mode."""
 
 
 @dataclass()
-class MesoscopeExperimentTrial:
-    """Defines the structure and task parameters of an experiment trial."""
+class _MesoscopeBaseTrial:
+    """Defines the shared structure and task parameters common to all supported experiment trial types."""
 
     cue_sequence: list[int]
-    """The sequence of Virtual Reality environment wall cues experienced by the animal while running the 
-    trial. The cues must be specified as integer-codes matching the codes used in the 'cue_map' dictionary of the 
+    """The sequence of Virtual Reality environment wall cues experienced by the animal while running the
+    trial. The cues must be specified as integer-codes matching the codes used in the 'cue_map' dictionary of the
     experiment's MesoscopeExperimentConfiguration instance."""
     trial_length_cm: float
     """The length of the trial cue sequence in centimeters."""
-    reward_zone_start_cm: float
-    """The position of the trial reward zone starting boundary, in centimeters."""
-    reward_zone_end_cm: float
-    """The position of the trial reward zone ending boundary, in centimeters."""
-    guidance_trigger_location_cm: float
-    """The location of the invisible boundary (wall) with which the animal must collide to trigger water reward 
-    delivery during guided trials."""
-    trial_reward_size_ul: float = 5.0
-    """The volume of water, in microliters, dispensed when the animal successfully completes the trial's task."""
+    stimulus_trigger_zone_start_cm: float
+    """The position of the trial stimulus trigger zone starting boundary, in centimeters."""
+    stimulus_trigger_zone_end_cm: float
+    """The position of the trial stimulus trigger zone ending boundary, in centimeters."""
+    stimulus_location_cm: float
+    """The location of the invisible boundary (wall) with which the animal must collide to elicit the stimulus if
+    the trial supports triggering the stimuli by collision."""
+    stimulus_trigger: str = str(StimulusTriggers.LICK)
+    """The trigger condition for delivering the stimulus. Must be one of the StimulusTriggers enumeration values."""
+    stimulus_omission_trigger: str | None = None
+    """The trigger condition for omitting the stimulus. Must be one of the StimulusTriggers enumeration values. Cannot
+    match the condition specified by the 'stimulus_trigger' attribute and takes precedence over that condition."""
+
+    def __post_init__(self) -> None:
+        """Validates trial configuration parameters."""
+        valid_triggers = tuple(StimulusTriggers)
+        if self.stimulus_trigger not in valid_triggers:
+            message = (
+                f"The 'stimulus_trigger' value '{self.stimulus_trigger}' is not valid. "
+                f"Must be one of the supported StimulusTriggers enumeration members: {', '.join(valid_triggers)}."
+            )
+            raise ValueError(message)
+
+        if self.stimulus_omission_trigger is not None and self.stimulus_omission_trigger not in valid_triggers:
+            message = (
+                f"The 'stimulus_omission_trigger' value '{self.stimulus_omission_trigger}' is not valid. "
+                f"Must be one of the supported StimulusTriggers enumeration members: {', '.join(valid_triggers)}."
+            )
+            raise ValueError(message)
+
+        if self.stimulus_omission_trigger is not None and self.stimulus_trigger == self.stimulus_omission_trigger:
+            message = (
+                f"The 'stimulus_trigger' and 'stimulus_omission_trigger' attributes cannot be set to the same value. "
+                f"Both are currently set to '{self.stimulus_trigger}'."
+            )
+            raise ValueError(message)
+
+        if self.stimulus_trigger_zone_end_cm < self.stimulus_trigger_zone_start_cm:
+            message = (
+                f"The 'stimulus_trigger_zone_end_cm' ({self.stimulus_trigger_zone_end_cm}) must be greater than or "
+                f"equal to 'stimulus_trigger_zone_start_cm' ({self.stimulus_trigger_zone_start_cm})."
+            )
+            raise ValueError(message)
+
+        if not 0 <= self.stimulus_trigger_zone_start_cm <= self.trial_length_cm:
+            message = (
+                f"The 'stimulus_trigger_zone_start_cm' ({self.stimulus_trigger_zone_start_cm}) must be within the "
+                f"trial length (0 to {self.trial_length_cm} cm)."
+            )
+            raise ValueError(message)
+
+        if not 0 <= self.stimulus_trigger_zone_end_cm <= self.trial_length_cm:
+            message = (
+                f"The 'stimulus_trigger_zone_end_cm' ({self.stimulus_trigger_zone_end_cm}) must be within the "
+                f"trial length (0 to {self.trial_length_cm} cm)."
+            )
+            raise ValueError(message)
+
+        if not 0 <= self.stimulus_location_cm <= self.trial_length_cm:
+            message = (
+                f"The 'stimulus_location_cm' ({self.stimulus_location_cm}) must be within the "
+                f"trial length (0 to {self.trial_length_cm} cm)."
+            )
+            raise ValueError(message)
+
+
+@dataclass()
+class WaterRewardTrial(_MesoscopeBaseTrial):
+    """Defines a trial that delivers water rewards (reinforcing stimuli) when the animal completes the reward
+    conditions.
+    """
+
+    reward_size_ul: float = 5.0
+    """The volume of water, in microliters, to deliver when the animal successfully completes the trial."""
     reward_tone_duration_ms: int = 300
-    """The duration, in milliseconds, to sound the auditory tone when delivering water rewards."""
+    """The duration, in milliseconds, to sound the auditory tone when delivering the water reward."""
+
+
+@dataclass()
+class GasPuffTrial(_MesoscopeBaseTrial):
+    """Defines a trial that delivers N2 gas puffs (aversive stimuli) when the animal fails omission conditions."""
+
+    puff_duration_ms: int = 100
+    """The duration, in milliseconds, for which to deliver the N2 gas puff when the animal fails the trial."""
 
 
 # noinspection PyArgumentList
@@ -65,19 +162,40 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     """Defines an experiment session that uses the Mesoscope_VR data acquisition system."""
 
     cue_map: dict[int, float]
-    """Maps each integer-code associated with the experiment's Virtual Reality (VR) environment wall 
+    """Maps each integer-code associated with the experiment's Virtual Reality (VR) environment wall
     cue to its length in centimeters."""
     cue_offset_cm: float
-    """Specifies the offset of the animal's starting position relative to the Virtual Reality (VR) environment's cue 
+    """Specifies the offset of the animal's starting position relative to the Virtual Reality (VR) environment's cue
     sequence origin, in centimeters."""
     unity_scene_name: str
     """The name of the Virtual Reality task (Unity Scene) used during the experiment."""
     experiment_states: dict[str, MesoscopeExperimentState]
-    """Defines the experiment's flow by specifying the sequence of experiment and data acquisition system states 
+    """Defines the experiment's flow by specifying the sequence of experiment and data acquisition system states
     executed during runtime."""
-    trial_structures: dict[str, MesoscopeExperimentTrial]
-    """Defines experiment's structure by specifying the types of trials used by the phases (states) of the 
-    experiment."""
+    trial_structures: dict[str, WaterRewardTrial | GasPuffTrial]
+    """Defines experiment's structure by specifying the types of trials used by the phases (states) of the
+    experiment. Each state references trial structures by their keys via the 'supported_trial_structures' field."""
+
+    def __post_init__(self) -> None:
+        """Validates experiment configuration parameters."""
+        for trial_name, trial in self.trial_structures.items():
+            # Calculates the total length of the cue sequence using the cue_map
+            calculated_length = 0.0
+            for cue_code in trial.cue_sequence:
+                if cue_code not in self.cue_map:
+                    message = (
+                        f"Trial '{trial_name}' contains the cue code '{cue_code}' that is not defined in the overall "
+                        f"cue_map. Available cue codes: {', '.join(str(k) for k in self.cue_map)}."
+                    )
+                    raise ValueError(message)
+                calculated_length += self.cue_map[cue_code]
+
+            if calculated_length != trial.trial_length_cm:
+                message = (
+                    f"Trial '{trial_name}' declares a length of {trial.trial_length_cm} cm, but the cue sequence "
+                    f"length calculated from the cue_map is {calculated_length} cm."
+                )
+                raise ValueError(message)
 
 
 @dataclass()

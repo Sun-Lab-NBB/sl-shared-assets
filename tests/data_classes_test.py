@@ -5,8 +5,9 @@ import appdirs
 
 from sl_shared_assets import (
     AcquisitionSystems,
+    GasPuffTrial,
+    WaterRewardTrial,
     MesoscopeExperimentState,
-    MesoscopeExperimentTrial,
     MesoscopeExperimentConfiguration,
     MesoscopeFileSystem,
     MesoscopeCameras,
@@ -64,18 +65,19 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=600.0,
-        initial_guided_trials=10,
-        recovery_failed_trial_threshold=5,
-        recovery_guided_trials=3,
+        supported_trial_structures=["trial1"],
+        reinforcing_initial_guided_trials=10,
+        reinforcing_recovery_failed_threshold=5,
+        reinforcing_recovery_guided_trials=3,
     )
 
-    trial = MesoscopeExperimentTrial(
+    # cue_map: 1->50, 2->75, 3->50 = 175 total
+    trial = WaterRewardTrial(
         cue_sequence=[1, 2, 3],
-        trial_length_cm=200.0,
-        trial_reward_size_ul=5.0,
-        reward_zone_start_cm=180.0,
-        reward_zone_end_cm=200.0,
-        guidance_trigger_location_cm=190.0,
+        trial_length_cm=175.0,
+        stimulus_trigger_zone_start_cm=150.0,
+        stimulus_trigger_zone_end_cm=175.0,
+        stimulus_location_cm=160.0,
     )
 
     config = MesoscopeExperimentConfiguration(
@@ -742,17 +744,25 @@ def test_mesoscope_experiment_state_initialization():
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=600.0,
-        initial_guided_trials=10,
-        recovery_failed_trial_threshold=5,
-        recovery_guided_trials=3,
+        supported_trial_structures=["trial1", "trial2"],
+        reinforcing_initial_guided_trials=10,
+        reinforcing_recovery_failed_threshold=5,
+        reinforcing_recovery_guided_trials=3,
+        aversive_initial_guided_trials=5,
+        aversive_recovery_failed_threshold=3,
+        aversive_recovery_guided_trials=2,
     )
 
     assert state.experiment_state_code == 1
     assert state.system_state_code == 0
     assert state.state_duration_s == 600.0
-    assert state.initial_guided_trials == 10
-    assert state.recovery_failed_trial_threshold == 5
-    assert state.recovery_guided_trials == 3
+    assert state.supported_trial_structures == ["trial1", "trial2"]
+    assert state.reinforcing_initial_guided_trials == 10
+    assert state.reinforcing_recovery_failed_threshold == 5
+    assert state.reinforcing_recovery_guided_trials == 3
+    assert state.aversive_initial_guided_trials == 5
+    assert state.aversive_recovery_failed_threshold == 3
+    assert state.aversive_recovery_guided_trials == 2
 
 
 def test_mesoscope_experiment_state_types():
@@ -764,65 +774,300 @@ def test_mesoscope_experiment_state_types():
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=600.0,
-        initial_guided_trials=10,
-        recovery_failed_trial_threshold=5,
-        recovery_guided_trials=3,
+        supported_trial_structures=["trial1"],
+        reinforcing_initial_guided_trials=10,
+        reinforcing_recovery_failed_threshold=5,
+        reinforcing_recovery_guided_trials=3,
     )
 
     assert isinstance(state.experiment_state_code, int)
     assert isinstance(state.system_state_code, int)
     assert isinstance(state.state_duration_s, float)
-    assert isinstance(state.initial_guided_trials, int)
-    assert isinstance(state.recovery_failed_trial_threshold, int)
-    assert isinstance(state.recovery_guided_trials, int)
+    assert isinstance(state.supported_trial_structures, list)
+    assert isinstance(state.reinforcing_initial_guided_trials, int)
+    assert isinstance(state.reinforcing_recovery_failed_threshold, int)
+    assert isinstance(state.reinforcing_recovery_guided_trials, int)
+    assert isinstance(state.aversive_initial_guided_trials, int)
+    assert isinstance(state.aversive_recovery_failed_threshold, int)
+    assert isinstance(state.aversive_recovery_guided_trials, int)
 
 
-# Tests for MesoscopeExperimentTrial dataclass
+# Tests for Trial dataclasses (WaterRewardTrial, GasPuffTrial)
 
 
-def test_mesoscope_experiment_trial_initialization():
-    """Verifies basic initialization of MesoscopeExperimentTrial.
+def test_water_reward_trial_initialization():
+    """Verifies basic initialization of WaterRewardTrial.
 
     This test ensures all fields are properly assigned during initialization.
     """
-    trial = MesoscopeExperimentTrial(
+    trial = WaterRewardTrial(
         cue_sequence=[1, 2, 3, 4],
         trial_length_cm=200.0,
-        trial_reward_size_ul=5.0,
-        reward_zone_start_cm=180.0,
-        reward_zone_end_cm=200.0,
-        guidance_trigger_location_cm=190.0,
+        stimulus_trigger_zone_start_cm=180.0,
+        stimulus_trigger_zone_end_cm=200.0,
+        stimulus_location_cm=190.0,
     )
 
     assert trial.cue_sequence == [1, 2, 3, 4]
     assert trial.trial_length_cm == 200.0
-    assert trial.trial_reward_size_ul == 5.0
-    assert trial.reward_zone_start_cm == 180.0
-    assert trial.reward_zone_end_cm == 200.0
-    assert trial.guidance_trigger_location_cm == 190.0
+    assert trial.stimulus_trigger_zone_start_cm == 180.0
+    assert trial.stimulus_trigger_zone_end_cm == 200.0
+    assert trial.stimulus_location_cm == 190.0
+    assert trial.stimulus_trigger == "lick"
+    assert trial.stimulus_omission_trigger is None
+    assert trial.reward_size_ul == 5.0
+    assert trial.reward_tone_duration_ms == 300
 
 
-def test_mesoscope_experiment_trial_types():
-    """Verifies the data types of MesoscopeExperimentTrial fields.
+def test_gas_puff_trial_initialization():
+    """Verifies basic initialization of GasPuffTrial.
 
-    This test ensures each field has the expected type.
+    This test ensures all fields are properly assigned during initialization.
     """
-    trial = MesoscopeExperimentTrial(
-        cue_sequence=[1, 2, 3],
+    trial = GasPuffTrial(
+        cue_sequence=[1, 2, 3, 4],
         trial_length_cm=200.0,
-        trial_reward_size_ul=5.0,
-        reward_zone_start_cm=180.0,
-        reward_zone_end_cm=200.0,
-        guidance_trigger_location_cm=190.0,
+        stimulus_trigger_zone_start_cm=180.0,
+        stimulus_trigger_zone_end_cm=200.0,
+        stimulus_location_cm=190.0,
     )
 
-    assert isinstance(trial.cue_sequence, list)
-    assert all(isinstance(cue, int) for cue in trial.cue_sequence)
-    assert isinstance(trial.trial_length_cm, float)
-    assert isinstance(trial.trial_reward_size_ul, float)
-    assert isinstance(trial.reward_zone_start_cm, float)
-    assert isinstance(trial.reward_zone_end_cm, float)
-    assert isinstance(trial.guidance_trigger_location_cm, float)
+    assert trial.cue_sequence == [1, 2, 3, 4]
+    assert trial.trial_length_cm == 200.0
+    assert trial.stimulus_trigger_zone_start_cm == 180.0
+    assert trial.stimulus_trigger_zone_end_cm == 200.0
+    assert trial.stimulus_location_cm == 190.0
+    assert trial.stimulus_trigger == "lick"
+    assert trial.stimulus_omission_trigger is None
+    assert trial.puff_duration_ms == 100
+
+
+def test_trial_types():
+    """Verifies the data types of trial fields.
+
+    This test ensures each field has the expected type for both trial classes.
+    """
+    water_trial = WaterRewardTrial(
+        cue_sequence=[1, 2, 3],
+        trial_length_cm=200.0,
+        stimulus_trigger_zone_start_cm=180.0,
+        stimulus_trigger_zone_end_cm=200.0,
+        stimulus_location_cm=190.0,
+    )
+
+    assert isinstance(water_trial.cue_sequence, list)
+    assert all(isinstance(cue, int) for cue in water_trial.cue_sequence)
+    assert isinstance(water_trial.trial_length_cm, float)
+    assert isinstance(water_trial.stimulus_trigger_zone_start_cm, float)
+    assert isinstance(water_trial.stimulus_trigger_zone_end_cm, float)
+    assert isinstance(water_trial.stimulus_location_cm, float)
+    assert isinstance(water_trial.stimulus_trigger, str)
+    assert isinstance(water_trial.reward_size_ul, float)
+    assert isinstance(water_trial.reward_tone_duration_ms, int)
+
+    gas_trial = GasPuffTrial(
+        cue_sequence=[1, 2, 3],
+        trial_length_cm=200.0,
+        stimulus_trigger_zone_start_cm=180.0,
+        stimulus_trigger_zone_end_cm=200.0,
+        stimulus_location_cm=190.0,
+    )
+
+    assert isinstance(gas_trial.puff_duration_ms, int)
+    assert isinstance(gas_trial.stimulus_trigger, str)
+
+
+# Tests for Trial validation
+
+
+def test_trial_invalid_stimulus_trigger():
+    """Verifies that an invalid stimulus_trigger raises ValueError."""
+    with pytest.raises(ValueError, match="stimulus_trigger.*not valid"):
+        WaterRewardTrial(
+            cue_sequence=[1, 2, 3],
+            trial_length_cm=200.0,
+            stimulus_trigger_zone_start_cm=180.0,
+            stimulus_trigger_zone_end_cm=200.0,
+            stimulus_location_cm=190.0,
+            stimulus_trigger="invalid_trigger",
+        )
+
+
+def test_trial_invalid_stimulus_omission_trigger():
+    """Verifies that an invalid stimulus_omission_trigger raises ValueError."""
+    with pytest.raises(ValueError, match="stimulus_omission_trigger.*not valid"):
+        WaterRewardTrial(
+            cue_sequence=[1, 2, 3],
+            trial_length_cm=200.0,
+            stimulus_trigger_zone_start_cm=180.0,
+            stimulus_trigger_zone_end_cm=200.0,
+            stimulus_location_cm=190.0,
+            stimulus_omission_trigger="invalid_trigger",
+        )
+
+
+def test_trial_matching_trigger_and_omission_trigger():
+    """Verifies that matching stimulus_trigger and stimulus_omission_trigger raises ValueError."""
+    with pytest.raises(ValueError, match="cannot be set to the same value"):
+        WaterRewardTrial(
+            cue_sequence=[1, 2, 3],
+            trial_length_cm=200.0,
+            stimulus_trigger_zone_start_cm=180.0,
+            stimulus_trigger_zone_end_cm=200.0,
+            stimulus_location_cm=190.0,
+            stimulus_trigger="lick",
+            stimulus_omission_trigger="lick",
+        )
+
+
+def test_trial_zone_end_less_than_start():
+    """Verifies that zone_end < zone_start raises ValueError."""
+    with pytest.raises(ValueError, match="must be greater than or equal to"):
+        WaterRewardTrial(
+            cue_sequence=[1, 2, 3],
+            trial_length_cm=200.0,
+            stimulus_trigger_zone_start_cm=180.0,
+            stimulus_trigger_zone_end_cm=170.0,  # Less than start
+            stimulus_location_cm=175.0,
+        )
+
+
+def test_trial_zone_start_outside_trial_length():
+    """Verifies that zone_start outside trial length raises ValueError."""
+    with pytest.raises(ValueError, match="stimulus_trigger_zone_start_cm.*must be within"):
+        WaterRewardTrial(
+            cue_sequence=[1, 2, 3],
+            trial_length_cm=200.0,
+            stimulus_trigger_zone_start_cm=250.0,  # Outside trial length
+            stimulus_trigger_zone_end_cm=260.0,
+            stimulus_location_cm=255.0,
+        )
+
+
+def test_trial_zone_end_outside_trial_length():
+    """Verifies that zone_end outside trial length raises ValueError."""
+    with pytest.raises(ValueError, match="stimulus_trigger_zone_end_cm.*must be within"):
+        WaterRewardTrial(
+            cue_sequence=[1, 2, 3],
+            trial_length_cm=200.0,
+            stimulus_trigger_zone_start_cm=180.0,
+            stimulus_trigger_zone_end_cm=250.0,  # Outside trial length
+            stimulus_location_cm=190.0,
+        )
+
+
+def test_trial_stimulus_location_outside_trial_length():
+    """Verifies that stimulus_location outside trial length raises ValueError."""
+    with pytest.raises(ValueError, match="stimulus_location_cm.*must be within"):
+        WaterRewardTrial(
+            cue_sequence=[1, 2, 3],
+            trial_length_cm=200.0,
+            stimulus_trigger_zone_start_cm=180.0,
+            stimulus_trigger_zone_end_cm=200.0,
+            stimulus_location_cm=250.0,  # Outside trial length
+        )
+
+
+def test_trial_valid_different_triggers():
+    """Verifies that different trigger and omission trigger values are accepted."""
+    trial = WaterRewardTrial(
+        cue_sequence=[1, 2, 3],
+        trial_length_cm=200.0,
+        stimulus_trigger_zone_start_cm=180.0,
+        stimulus_trigger_zone_end_cm=200.0,
+        stimulus_location_cm=190.0,
+        stimulus_trigger="lick",
+        stimulus_omission_trigger="occupancy",
+    )
+    assert trial.stimulus_trigger == "lick"
+    assert trial.stimulus_omission_trigger == "occupancy"
+
+
+# Tests for MesoscopeExperimentConfiguration validation
+
+
+def test_experiment_config_invalid_cue_code():
+    """Verifies that a trial with an undefined cue code raises ValueError."""
+    state = MesoscopeExperimentState(
+        experiment_state_code=1,
+        system_state_code=0,
+        state_duration_s=600.0,
+        supported_trial_structures=["trial1"],
+    )
+
+    trial = WaterRewardTrial(
+        cue_sequence=[1, 2, 99],  # 99 is not in cue_map
+        trial_length_cm=175.0,
+        stimulus_trigger_zone_start_cm=150.0,
+        stimulus_trigger_zone_end_cm=175.0,
+        stimulus_location_cm=160.0,
+    )
+
+    with pytest.raises(ValueError, match="cue code '99'.*not defined in.*cue_map"):
+        MesoscopeExperimentConfiguration(
+            cue_map={1: 50.0, 2: 75.0, 3: 50.0},
+            cue_offset_cm=10.0,
+            unity_scene_name="TestScene",
+            experiment_states={"state1": state},
+            trial_structures={"trial1": trial},
+        )
+
+
+def test_experiment_config_mismatched_trial_length():
+    """Verifies that a trial length mismatch with cue sequence raises ValueError."""
+    state = MesoscopeExperimentState(
+        experiment_state_code=1,
+        system_state_code=0,
+        state_duration_s=600.0,
+        supported_trial_structures=["trial1"],
+    )
+
+    # cue_map: 1->50, 2->75, 3->50 = 175 total, but trial declares 200
+    trial = WaterRewardTrial(
+        cue_sequence=[1, 2, 3],
+        trial_length_cm=200.0,  # Mismatched with cue sequence sum (175)
+        stimulus_trigger_zone_start_cm=150.0,
+        stimulus_trigger_zone_end_cm=175.0,
+        stimulus_location_cm=160.0,
+    )
+
+    with pytest.raises(ValueError, match="declares a length of 200.0 cm.*calculated.*is 175.0 cm"):
+        MesoscopeExperimentConfiguration(
+            cue_map={1: 50.0, 2: 75.0, 3: 50.0},
+            cue_offset_cm=10.0,
+            unity_scene_name="TestScene",
+            experiment_states={"state1": state},
+            trial_structures={"trial1": trial},
+        )
+
+
+def test_experiment_config_valid_trial_length():
+    """Verifies that a valid trial length matching cue sequence is accepted."""
+    state = MesoscopeExperimentState(
+        experiment_state_code=1,
+        system_state_code=0,
+        state_duration_s=600.0,
+        supported_trial_structures=["trial1"],
+    )
+
+    # cue_map: 1->50, 2->75, 3->50 = 175 total
+    trial = WaterRewardTrial(
+        cue_sequence=[1, 2, 3],
+        trial_length_cm=175.0,  # Matches cue sequence sum
+        stimulus_trigger_zone_start_cm=150.0,
+        stimulus_trigger_zone_end_cm=175.0,
+        stimulus_location_cm=160.0,
+    )
+
+    config = MesoscopeExperimentConfiguration(
+        cue_map={1: 50.0, 2: 75.0, 3: 50.0},
+        cue_offset_cm=10.0,
+        unity_scene_name="TestScene",
+        experiment_states={"state1": state},
+        trial_structures={"trial1": trial},
+    )
+
+    assert config.trial_structures["trial1"].trial_length_cm == 175.0
 
 
 # Tests for MesoscopeFileSystem dataclass
@@ -1219,7 +1464,7 @@ def test_mesoscope_experiment_configuration_nested_structures(sample_experiment_
     assert state.experiment_state_code == 1
 
     trial = sample_experiment_config.trial_structures["trial1"]
-    assert isinstance(trial, MesoscopeExperimentTrial)
+    assert isinstance(trial, WaterRewardTrial)
     assert trial.cue_sequence == [1, 2, 3]
 
 
