@@ -372,8 +372,8 @@ class DatasetData(YamlConfig):
         cache_key = f"{animal}/{session}"
         if cache_key not in self._session_data_cache:
             message = (
-                f"Unable to retrieve session data for animal '{animal}', session '{session}'. "
-                f"This session is not included in the dataset."
+                f"Unable to retrieve the data for the session '{session}', performed by the animal '{animal}'. "
+                f"The target animal and session combination is not found in the '{self.name}' dataset."
             )
             console.error(message=message, error=ValueError)
             raise ValueError(message)  # Fallback for mypy
