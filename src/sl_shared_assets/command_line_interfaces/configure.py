@@ -8,7 +8,10 @@ import click  # pragma: no cover
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists  # pragma: no cover
 
 from ..data_classes import (
+    Cue,
+    Segment,
     GasPuffTrial,
+    VREnvironment,
     WaterRewardTrial,
     AcquisitionSystems,
     MesoscopeExperimentState,
@@ -227,6 +230,23 @@ def generate_experiment_configuration_file(
         # Fallback to appease mypy, should not be reachable
         raise ValueError(message)
 
+    # Generates precursor cue definitions
+    cues = [
+        Cue(name="Gray", code=0, length_cm=30.0),
+        Cue(name="A", code=1, length_cm=30.0),
+        Cue(name="B", code=2, length_cm=30.0),
+        Cue(name="C", code=3, length_cm=30.0),
+        Cue(name="D", code=4, length_cm=30.0),
+    ]
+
+    # Generates precursor segment definitions
+    segments = [
+        Segment(
+            name="Segment_abcd",
+            cue_sequence=["A", "Gray", "B", "Gray", "C", "Gray", "D", "Gray"],
+        ),
+    ]
+
     # Generates precursor trial structures for water reward (reinforcing) trials.
     trials: dict[str, WaterRewardTrial | GasPuffTrial] = {}
     trial_names: list[str] = []
@@ -234,8 +254,7 @@ def generate_experiment_configuration_file(
         trial_name = f"water_reward_{trial + 1}"
         trial_names.append(trial_name)
         trials[trial_name] = WaterRewardTrial(
-            cue_sequence=[1, 0, 2, 0, 3, 0, 4, 0],
-            trial_length_cm=240,
+            segment_name="Segment_abcd",
             stimulus_trigger_zone_start_cm=208.0,
             stimulus_trigger_zone_end_cm=222.0,
             stimulus_location_cm=208.0,
@@ -246,8 +265,7 @@ def generate_experiment_configuration_file(
         trial_name = f"gas_puff_{trial + 1}"
         trial_names.append(trial_name)
         trials[trial_name] = GasPuffTrial(
-            cue_sequence=[1, 0, 2, 0, 3, 0, 4, 0],
-            trial_length_cm=240,
+            segment_name="Segment_abcd",
             stimulus_trigger_zone_start_cm=208.0,
             stimulus_trigger_zone_end_cm=222.0,
             stimulus_location_cm=208.0,
@@ -273,11 +291,13 @@ def generate_experiment_configuration_file(
     # saves it to the project's configuration directory as a .yaml file.
     if acquisition_system.name == "mesoscope-vr":
         experiment_configuration = MesoscopeExperimentConfiguration(
-            experiment_states=states,
+            cues=cues,
+            segments=segments,
             trial_structures=trials,
-            cue_map={0: 30.0, 1: 30.0, 2: 30.0, 3: 30.0, 4: 30.0},
-            cue_offset_cm=10.0,
+            experiment_states=states,
+            vr_environment=VREnvironment(),
             unity_scene_name="",
+            cue_offset_cm=10.0,
         )
 
     else:

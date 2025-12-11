@@ -41,7 +41,10 @@ from .processing_data import (
     ProcessingPipelines,
 )
 from .configuration_data import (
+    Cue,
+    Segment,
     GasPuffTrial,
+    VREnvironment,
     MesoscopeCameras,
     StimulusTriggers,
     WaterRewardTrial,
@@ -66,6 +69,7 @@ from .configuration_data import (
 
 __all__ = [
     "AcquisitionSystems",
+    "Cue",
     "DatasetData",
     "DatasetSessionData",
     "DatasetTrackers",
@@ -95,6 +99,7 @@ __all__ = [
     "ProcessingTrackers",
     "RawData",
     "RunTrainingDescriptor",
+    "Segment",
     "ServerConfiguration",
     "SessionData",
     "SessionMetadata",
@@ -103,6 +108,7 @@ __all__ = [
     "SubjectData",
     "SurgeryData",
     "TrackingData",
+    "VREnvironment",
     "WaterRewardTrial",
     "WindowCheckingDescriptor",
     "ZaberPositions",

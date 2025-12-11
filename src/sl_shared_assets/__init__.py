@@ -8,7 +8,9 @@ Authors: Ivan Kondratyev (Inkaros), Kushaan Gupta, Natalie Yeung
 from ataraxis_base_utilities import console
 
 from .data_classes import (
+    Cue,
     RawData,
+    Segment,
     DrugData,
     DatasetData,
     ImplantData,
@@ -21,6 +23,7 @@ from .data_classes import (
     InjectionData,
     ProcedureData,
     ProcessedData,
+    VREnvironment,
     ZaberPositions,
     DatasetTrackers,
     SessionMetadata,
@@ -66,6 +69,7 @@ if not console.enabled:
 
 __all__ = [
     "AcquisitionSystems",
+    "Cue",
     "DatasetData",
     "DatasetSessionData",
     "DatasetTrackers",
@@ -95,6 +99,7 @@ __all__ = [
     "ProcessingTrackers",
     "RawData",
     "RunTrainingDescriptor",
+    "Segment",
     "ServerConfiguration",
     "SessionData",
     "SessionMetadata",
@@ -103,6 +108,7 @@ __all__ = [
     "SubjectData",
     "SurgeryData",
     "TrackingData",
+    "VREnvironment",
     "WaterRewardTrial",
     "WindowCheckingDescriptor",
     "ZaberPositions",
