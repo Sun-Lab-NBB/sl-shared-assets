@@ -82,6 +82,12 @@ class _MesoscopeBaseTrial:
     stimulus_omission_trigger: str | None = None
     """The trigger condition for omitting the stimulus. Must be one of the StimulusTriggers enumeration values. Cannot
     match the condition specified by the 'stimulus_trigger' attribute and takes precedence over that condition."""
+    show_stimulus_collision_boundary: bool = False
+    """Determines whether the stimulus collision boundary is visible to the animal during this trial type. When True,
+    the boundary marker is displayed in the Virtual Reality environment at the stimulus location."""
+    guidance_trigger: str = str(StimulusTriggers.COLLISION)
+    """The trigger condition used during guidance mode to elicit reinforcing stimuli or omit aversive stimuli.
+    Must be either 'occupancy' or 'collision' (not 'lick')."""
 
     def __post_init__(self) -> None:
         """Validates trial configuration parameters."""
@@ -104,6 +110,21 @@ class _MesoscopeBaseTrial:
             message = (
                 f"The 'stimulus_trigger' and 'stimulus_omission_trigger' attributes cannot be set to the same value. "
                 f"Both are currently set to '{self.stimulus_trigger}'."
+            )
+            raise ValueError(message)
+
+        if self.stimulus_omission_trigger == StimulusTriggers.COLLISION:
+            message = (
+                f"The 'stimulus_omission_trigger' cannot be set to '{StimulusTriggers.COLLISION}'. Collision-based "
+                f"omission is not supported as colliding with the boundary inherently triggers stimulus delivery."
+            )
+            raise ValueError(message)
+
+        valid_guidance_triggers = (StimulusTriggers.OCCUPANCY, StimulusTriggers.COLLISION)
+        if self.guidance_trigger not in valid_guidance_triggers:
+            message = (
+                f"The 'guidance_trigger' value '{self.guidance_trigger}' is not valid. Must be one of the supported "
+                f"guidance triggers: {', '.join(valid_guidance_triggers)}."
             )
             raise ValueError(message)
 
@@ -135,6 +156,14 @@ class _MesoscopeBaseTrial:
             )
             raise ValueError(message)
 
+        if self.stimulus_location_cm < self.stimulus_trigger_zone_start_cm:
+            message = (
+                f"The 'stimulus_location_cm' ({self.stimulus_location_cm}) cannot precede the "
+                f"'stimulus_trigger_zone_start_cm' ({self.stimulus_trigger_zone_start_cm}). The stimulus location must "
+                f"be at or after the start of the trigger zone."
+            )
+            raise ValueError(message)
+
 
 @dataclass()
 class WaterRewardTrial(_MesoscopeBaseTrial):
@@ -147,6 +176,17 @@ class WaterRewardTrial(_MesoscopeBaseTrial):
     reward_tone_duration_ms: int = 300
     """The duration, in milliseconds, to sound the auditory tone when delivering the water reward."""
 
+    def __post_init__(self) -> None:
+        """Validates water reward trial configuration parameters."""
+        super().__post_init__()
+
+        if self.guidance_trigger == self.stimulus_trigger:
+            message = (
+                f"The 'guidance_trigger' cannot match 'stimulus_trigger' for reinforcing trials. Both are currently "
+                f"set to '{self.guidance_trigger}'. Guidance mode must use a different trigger to elicit the reward."
+            )
+            raise ValueError(message)
+
 
 @dataclass()
 class GasPuffTrial(_MesoscopeBaseTrial):
@@ -154,6 +194,18 @@ class GasPuffTrial(_MesoscopeBaseTrial):
 
     puff_duration_ms: int = 100
     """The duration, in milliseconds, for which to deliver the N2 gas puff when the animal fails the trial."""
+
+    def __post_init__(self) -> None:
+        """Validates gas puff trial configuration parameters."""
+        super().__post_init__()
+
+        if self.stimulus_omission_trigger is not None and self.guidance_trigger == self.stimulus_omission_trigger:
+            message = (
+                f"The 'guidance_trigger' cannot match 'stimulus_omission_trigger' for aversive trials. Both are "
+                f"currently set to '{self.guidance_trigger}'. Guidance mode must use a different trigger to omit "
+                f"the aversive stimulus."
+            )
+            raise ValueError(message)
 
 
 # noinspection PyArgumentList

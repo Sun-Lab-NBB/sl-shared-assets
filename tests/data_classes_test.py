@@ -815,6 +815,8 @@ def test_water_reward_trial_initialization():
     assert trial.stimulus_location_cm == 190.0
     assert trial.stimulus_trigger == "lick"
     assert trial.stimulus_omission_trigger is None
+    assert trial.show_stimulus_collision_boundary is False
+    assert trial.guidance_trigger == "collision"
     assert trial.reward_size_ul == 5.0
     assert trial.reward_tone_duration_ms == 300
 
@@ -839,6 +841,8 @@ def test_gas_puff_trial_initialization():
     assert trial.stimulus_location_cm == 190.0
     assert trial.stimulus_trigger == "lick"
     assert trial.stimulus_omission_trigger is None
+    assert trial.show_stimulus_collision_boundary is False
+    assert trial.guidance_trigger == "collision"
     assert trial.puff_duration_ms == 100
 
 
@@ -862,6 +866,8 @@ def test_trial_types():
     assert isinstance(water_trial.stimulus_trigger_zone_end_cm, float)
     assert isinstance(water_trial.stimulus_location_cm, float)
     assert isinstance(water_trial.stimulus_trigger, str)
+    assert isinstance(water_trial.show_stimulus_collision_boundary, bool)
+    assert isinstance(water_trial.guidance_trigger, str)
     assert isinstance(water_trial.reward_size_ul, float)
     assert isinstance(water_trial.reward_tone_duration_ms, int)
 
@@ -875,6 +881,8 @@ def test_trial_types():
 
     assert isinstance(gas_trial.puff_duration_ms, int)
     assert isinstance(gas_trial.stimulus_trigger, str)
+    assert isinstance(gas_trial.show_stimulus_collision_boundary, bool)
+    assert isinstance(gas_trial.guidance_trigger, str)
 
 
 # Tests for Trial validation
@@ -981,6 +989,112 @@ def test_trial_valid_different_triggers():
     )
     assert trial.stimulus_trigger == "lick"
     assert trial.stimulus_omission_trigger == "occupancy"
+
+
+def test_trial_collision_omission_trigger_invalid():
+    """Verifies that using 'collision' as stimulus_omission_trigger raises ValueError."""
+    with pytest.raises(ValueError, match="stimulus_omission_trigger.*cannot be set to.*collision"):
+        WaterRewardTrial(
+            cue_sequence=[1, 2, 3],
+            trial_length_cm=200.0,
+            stimulus_trigger_zone_start_cm=180.0,
+            stimulus_trigger_zone_end_cm=200.0,
+            stimulus_location_cm=190.0,
+            stimulus_omission_trigger="collision",
+        )
+
+
+def test_trial_stimulus_location_precedes_trigger_zone():
+    """Verifies that stimulus_location before trigger zone start raises ValueError."""
+    with pytest.raises(ValueError, match="stimulus_location_cm.*cannot precede"):
+        WaterRewardTrial(
+            cue_sequence=[1, 2, 3],
+            trial_length_cm=200.0,
+            stimulus_trigger_zone_start_cm=180.0,
+            stimulus_trigger_zone_end_cm=200.0,
+            stimulus_location_cm=170.0,  # Before trigger zone start (180)
+        )
+
+
+def test_trial_invalid_guidance_trigger():
+    """Verifies that using 'lick' as guidance_trigger raises ValueError."""
+    with pytest.raises(ValueError, match="guidance_trigger.*not valid"):
+        WaterRewardTrial(
+            cue_sequence=[1, 2, 3],
+            trial_length_cm=200.0,
+            stimulus_trigger_zone_start_cm=180.0,
+            stimulus_trigger_zone_end_cm=200.0,
+            stimulus_location_cm=190.0,
+            guidance_trigger="lick",
+        )
+
+
+def test_trial_valid_guidance_triggers():
+    """Verifies that valid guidance_trigger values ('occupancy' and 'collision') are accepted."""
+    # Test with occupancy
+    trial_occupancy = WaterRewardTrial(
+        cue_sequence=[1, 2, 3],
+        trial_length_cm=200.0,
+        stimulus_trigger_zone_start_cm=180.0,
+        stimulus_trigger_zone_end_cm=200.0,
+        stimulus_location_cm=190.0,
+        guidance_trigger="occupancy",
+    )
+    assert trial_occupancy.guidance_trigger == "occupancy"
+
+    # Test with collision (default)
+    trial_collision = WaterRewardTrial(
+        cue_sequence=[1, 2, 3],
+        trial_length_cm=200.0,
+        stimulus_trigger_zone_start_cm=180.0,
+        stimulus_trigger_zone_end_cm=200.0,
+        stimulus_location_cm=190.0,
+        guidance_trigger="collision",
+    )
+    assert trial_collision.guidance_trigger == "collision"
+
+
+def test_water_reward_guidance_trigger_matches_stimulus_trigger():
+    """Verifies that guidance_trigger matching stimulus_trigger raises ValueError for reinforcing trials."""
+    with pytest.raises(ValueError, match="guidance_trigger.*cannot match.*stimulus_trigger.*reinforcing"):
+        WaterRewardTrial(
+            cue_sequence=[1, 2, 3],
+            trial_length_cm=200.0,
+            stimulus_trigger_zone_start_cm=180.0,
+            stimulus_trigger_zone_end_cm=200.0,
+            stimulus_location_cm=190.0,
+            stimulus_trigger="collision",
+            guidance_trigger="collision",
+        )
+
+
+def test_gas_puff_guidance_trigger_matches_omission_trigger():
+    """Verifies that guidance_trigger matching stimulus_omission_trigger raises ValueError for aversive trials."""
+    with pytest.raises(ValueError, match="guidance_trigger.*cannot match.*stimulus_omission_trigger.*aversive"):
+        GasPuffTrial(
+            cue_sequence=[1, 2, 3],
+            trial_length_cm=200.0,
+            stimulus_trigger_zone_start_cm=180.0,
+            stimulus_trigger_zone_end_cm=200.0,
+            stimulus_location_cm=190.0,
+            stimulus_omission_trigger="occupancy",
+            guidance_trigger="occupancy",
+        )
+
+
+def test_gas_puff_guidance_trigger_valid_when_no_omission_trigger():
+    """Verifies that guidance_trigger is valid when stimulus_omission_trigger is None for aversive trials."""
+    # When stimulus_omission_trigger is None, any valid guidance_trigger should be accepted
+    trial = GasPuffTrial(
+        cue_sequence=[1, 2, 3],
+        trial_length_cm=200.0,
+        stimulus_trigger_zone_start_cm=180.0,
+        stimulus_trigger_zone_end_cm=200.0,
+        stimulus_location_cm=190.0,
+        guidance_trigger="occupancy",
+    )
+    assert trial.guidance_trigger == "occupancy"
+    assert trial.stimulus_omission_trigger is None
 
 
 # Tests for MesoscopeExperimentConfiguration validation

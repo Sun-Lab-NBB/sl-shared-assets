@@ -48,6 +48,8 @@ dependencies = [
     "xxhash>=3,<4",
     "click>=8,<9",
     "filelock>=3,<4",
+    "polars>=1,<2",
+    "pyarrow>=22,<23",
 ]
 
 [project.urls]

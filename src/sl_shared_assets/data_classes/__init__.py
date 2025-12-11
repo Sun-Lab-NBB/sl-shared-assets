@@ -2,6 +2,12 @@
 workflow components.
 """
 
+from .dataset_data import (
+    DatasetData,
+    SessionMetadata,
+    DatasetSessionData,
+    DatasetTrackingData,
+)
 from .runtime_data import (
     ZaberPositions,
     MesoscopePositions,
@@ -60,7 +66,10 @@ from .configuration_data import (
 
 __all__ = [
     "AcquisitionSystems",
+    "DatasetData",
+    "DatasetSessionData",
     "DatasetTrackers",
+    "DatasetTrackingData",
     "DrugData",
     "GasPuffTrial",
     "ImplantData",
@@ -88,6 +97,7 @@ __all__ = [
     "RunTrainingDescriptor",
     "ServerConfiguration",
     "SessionData",
+    "SessionMetadata",
     "SessionTypes",
     "StimulusTriggers",
     "SubjectData",
