@@ -5,6 +5,9 @@ import appdirs
 
 from sl_shared_assets import (
     AcquisitionSystems,
+    Cue,
+    Segment,
+    VREnvironment,
     GasPuffTrial,
     WaterRewardTrial,
     MesoscopeExperimentState,
@@ -71,21 +74,33 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
         reinforcing_recovery_guided_trials=3,
     )
 
-    # cue_map: 1->50, 2->75, 3->50 = 175 total
+    # Cues: A->50, B->75, C->50 = 175 total for Segment_abc
+    cues = [
+        Cue(name="A", code=1, length_cm=50.0),
+        Cue(name="B", code=2, length_cm=75.0),
+        Cue(name="C", code=3, length_cm=50.0),
+    ]
+
+    segments = [
+        Segment(name="Segment_abc", cue_sequence=["A", "B", "C"]),
+    ]
+
+    # Trial references the segment - cue_sequence and trial_length_cm are derived
     trial = WaterRewardTrial(
-        cue_sequence=[1, 2, 3],
-        trial_length_cm=175.0,
+        segment_name="Segment_abc",
         stimulus_trigger_zone_start_cm=150.0,
         stimulus_trigger_zone_end_cm=175.0,
         stimulus_location_cm=160.0,
     )
 
     config = MesoscopeExperimentConfiguration(
-        cue_map={1: 50.0, 2: 75.0, 3: 50.0},
-        cue_offset_cm=10.0,
-        unity_scene_name="TestScene",
-        experiment_states={"state1": state},
+        cues=cues,
+        segments=segments,
         trial_structures={"trial1": trial},
+        experiment_states={"state1": state},
+        vr_environment=VREnvironment(),
+        unity_scene_name="TestScene",
+        cue_offset_cm=10.0,
     )
 
     return config
@@ -793,6 +808,38 @@ def test_mesoscope_experiment_state_types():
 
 
 # Tests for Trial dataclasses (WaterRewardTrial, GasPuffTrial)
+#
+# Note: Trials now use segment_name to reference a segment, and cue_sequence/trial_length_cm
+# are derived fields populated by MesoscopeExperimentConfiguration.__post_init__.
+# Zone validation requires trial_length_cm > 0, so zone tests must go through the full config.
+
+
+def _create_test_config_with_trial(trial: WaterRewardTrial | GasPuffTrial) -> MesoscopeExperimentConfiguration:
+    """Helper to create a MesoscopeExperimentConfiguration for testing a trial.
+
+    The segment "TestSegment" has cues that sum to 200.0 cm.
+    """
+    cues = [
+        Cue(name="A", code=1, length_cm=50.0),
+        Cue(name="B", code=2, length_cm=50.0),
+        Cue(name="C", code=3, length_cm=50.0),
+        Cue(name="D", code=4, length_cm=50.0),
+    ]
+    segments = [Segment(name="TestSegment", cue_sequence=["A", "B", "C", "D"])]
+    state = MesoscopeExperimentState(
+        experiment_state_code=1,
+        system_state_code=0,
+        state_duration_s=60.0,
+        supported_trial_structures=["test_trial"],
+    )
+    return MesoscopeExperimentConfiguration(
+        cues=cues,
+        segments=segments,
+        trial_structures={"test_trial": trial},
+        experiment_states={"state1": state},
+        vr_environment=VREnvironment(),
+        unity_scene_name="TestScene",
+    )
 
 
 def test_water_reward_trial_initialization():
@@ -801,24 +848,28 @@ def test_water_reward_trial_initialization():
     This test ensures all fields are properly assigned during initialization.
     """
     trial = WaterRewardTrial(
-        cue_sequence=[1, 2, 3, 4],
-        trial_length_cm=200.0,
+        segment_name="TestSegment",
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=200.0,
         stimulus_location_cm=190.0,
     )
 
-    assert trial.cue_sequence == [1, 2, 3, 4]
-    assert trial.trial_length_cm == 200.0
-    assert trial.stimulus_trigger_zone_start_cm == 180.0
-    assert trial.stimulus_trigger_zone_end_cm == 200.0
-    assert trial.stimulus_location_cm == 190.0
-    assert trial.stimulus_trigger == "lick"
-    assert trial.stimulus_omission_trigger is None
-    assert trial.show_stimulus_collision_boundary is False
-    assert trial.guidance_trigger == "collision"
-    assert trial.reward_size_ul == 5.0
-    assert trial.reward_tone_duration_ms == 300
+    # Create config to populate derived fields
+    config = _create_test_config_with_trial(trial)
+    populated_trial = config.trial_structures["test_trial"]
+
+    assert populated_trial.segment_name == "TestSegment"
+    assert populated_trial.cue_sequence == [1, 2, 3, 4]  # Derived from segment
+    assert populated_trial.trial_length_cm == 200.0  # Derived from segment (4 * 50.0)
+    assert populated_trial.stimulus_trigger_zone_start_cm == 180.0
+    assert populated_trial.stimulus_trigger_zone_end_cm == 200.0
+    assert populated_trial.stimulus_location_cm == 190.0
+    assert populated_trial.stimulus_trigger == "lick"
+    assert populated_trial.stimulus_omission_trigger is None
+    assert populated_trial.show_stimulus_collision_boundary is False
+    assert populated_trial.guidance_trigger == "collision"
+    assert populated_trial.reward_size_ul == 5.0
+    assert populated_trial.reward_tone_duration_ms == 300
 
 
 def test_gas_puff_trial_initialization():
@@ -827,23 +878,28 @@ def test_gas_puff_trial_initialization():
     This test ensures all fields are properly assigned during initialization.
     """
     trial = GasPuffTrial(
-        cue_sequence=[1, 2, 3, 4],
-        trial_length_cm=200.0,
+        segment_name="TestSegment",
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=200.0,
         stimulus_location_cm=190.0,
     )
 
-    assert trial.cue_sequence == [1, 2, 3, 4]
-    assert trial.trial_length_cm == 200.0
-    assert trial.stimulus_trigger_zone_start_cm == 180.0
-    assert trial.stimulus_trigger_zone_end_cm == 200.0
-    assert trial.stimulus_location_cm == 190.0
-    assert trial.stimulus_trigger == "lick"
-    assert trial.stimulus_omission_trigger is None
-    assert trial.show_stimulus_collision_boundary is False
-    assert trial.guidance_trigger == "collision"
-    assert trial.puff_duration_ms == 100
+    # Create config to populate derived fields
+    config = _create_test_config_with_trial(trial)
+    populated_trial = config.trial_structures["test_trial"]
+
+    assert populated_trial.segment_name == "TestSegment"
+    assert populated_trial.cue_sequence == [1, 2, 3, 4]  # Derived from segment
+    assert populated_trial.trial_length_cm == 200.0  # Derived from segment (4 * 50.0)
+    assert populated_trial.stimulus_trigger_zone_start_cm == 180.0
+    assert populated_trial.stimulus_trigger_zone_end_cm == 200.0
+    assert populated_trial.stimulus_location_cm == 190.0
+    assert populated_trial.stimulus_trigger == "lick"
+    assert populated_trial.stimulus_omission_trigger is None
+    assert populated_trial.show_stimulus_collision_boundary is False
+    assert populated_trial.guidance_trigger == "collision"
+    assert populated_trial.puff_duration_ms == 100
+    assert populated_trial.occupancy_duration_ms == 1000
 
 
 def test_trial_types():
@@ -852,13 +908,17 @@ def test_trial_types():
     This test ensures each field has the expected type for both trial classes.
     """
     water_trial = WaterRewardTrial(
-        cue_sequence=[1, 2, 3],
-        trial_length_cm=200.0,
+        segment_name="TestSegment",
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=200.0,
         stimulus_location_cm=190.0,
     )
 
+    # Create config to populate derived fields
+    config = _create_test_config_with_trial(water_trial)
+    water_trial = config.trial_structures["test_trial"]
+
+    assert isinstance(water_trial.segment_name, str)
     assert isinstance(water_trial.cue_sequence, list)
     assert all(isinstance(cue, int) for cue in water_trial.cue_sequence)
     assert isinstance(water_trial.trial_length_cm, float)
@@ -872,14 +932,18 @@ def test_trial_types():
     assert isinstance(water_trial.reward_tone_duration_ms, int)
 
     gas_trial = GasPuffTrial(
-        cue_sequence=[1, 2, 3],
-        trial_length_cm=200.0,
+        segment_name="TestSegment",
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=200.0,
         stimulus_location_cm=190.0,
     )
 
+    # Create config to populate derived fields
+    config = _create_test_config_with_trial(gas_trial)
+    gas_trial = config.trial_structures["test_trial"]
+
     assert isinstance(gas_trial.puff_duration_ms, int)
+    assert isinstance(gas_trial.occupancy_duration_ms, int)
     assert isinstance(gas_trial.stimulus_trigger, str)
     assert isinstance(gas_trial.show_stimulus_collision_boundary, bool)
     assert isinstance(gas_trial.guidance_trigger, str)
@@ -892,8 +956,7 @@ def test_trial_invalid_stimulus_trigger():
     """Verifies that an invalid stimulus_trigger raises ValueError."""
     with pytest.raises(ValueError, match="stimulus_trigger.*not valid"):
         WaterRewardTrial(
-            cue_sequence=[1, 2, 3],
-            trial_length_cm=200.0,
+            segment_name="TestSegment",
             stimulus_trigger_zone_start_cm=180.0,
             stimulus_trigger_zone_end_cm=200.0,
             stimulus_location_cm=190.0,
@@ -905,8 +968,7 @@ def test_trial_invalid_stimulus_omission_trigger():
     """Verifies that an invalid stimulus_omission_trigger raises ValueError."""
     with pytest.raises(ValueError, match="stimulus_omission_trigger.*not valid"):
         WaterRewardTrial(
-            cue_sequence=[1, 2, 3],
-            trial_length_cm=200.0,
+            segment_name="TestSegment",
             stimulus_trigger_zone_start_cm=180.0,
             stimulus_trigger_zone_end_cm=200.0,
             stimulus_location_cm=190.0,
@@ -918,8 +980,7 @@ def test_trial_matching_trigger_and_omission_trigger():
     """Verifies that matching stimulus_trigger and stimulus_omission_trigger raises ValueError."""
     with pytest.raises(ValueError, match="cannot be set to the same value"):
         WaterRewardTrial(
-            cue_sequence=[1, 2, 3],
-            trial_length_cm=200.0,
+            segment_name="TestSegment",
             stimulus_trigger_zone_start_cm=180.0,
             stimulus_trigger_zone_end_cm=200.0,
             stimulus_location_cm=190.0,
@@ -929,74 +990,75 @@ def test_trial_matching_trigger_and_omission_trigger():
 
 
 def test_trial_zone_end_less_than_start():
-    """Verifies that zone_end < zone_start raises ValueError."""
+    """Verifies that zone_end < zone_start raises ValueError during config validation."""
+    trial = WaterRewardTrial(
+        segment_name="TestSegment",
+        stimulus_trigger_zone_start_cm=180.0,
+        stimulus_trigger_zone_end_cm=170.0,  # Less than start
+        stimulus_location_cm=175.0,
+    )
     with pytest.raises(ValueError, match="must be greater than or equal to"):
-        WaterRewardTrial(
-            cue_sequence=[1, 2, 3],
-            trial_length_cm=200.0,
-            stimulus_trigger_zone_start_cm=180.0,
-            stimulus_trigger_zone_end_cm=170.0,  # Less than start
-            stimulus_location_cm=175.0,
-        )
+        _create_test_config_with_trial(trial)
 
 
 def test_trial_zone_start_outside_trial_length():
-    """Verifies that zone_start outside trial length raises ValueError."""
+    """Verifies that zone_start outside trial length raises ValueError during config validation."""
+    trial = WaterRewardTrial(
+        segment_name="TestSegment",
+        stimulus_trigger_zone_start_cm=250.0,  # Outside trial length (200)
+        stimulus_trigger_zone_end_cm=260.0,
+        stimulus_location_cm=255.0,
+    )
     with pytest.raises(ValueError, match="stimulus_trigger_zone_start_cm.*must be within"):
-        WaterRewardTrial(
-            cue_sequence=[1, 2, 3],
-            trial_length_cm=200.0,
-            stimulus_trigger_zone_start_cm=250.0,  # Outside trial length
-            stimulus_trigger_zone_end_cm=260.0,
-            stimulus_location_cm=255.0,
-        )
+        _create_test_config_with_trial(trial)
 
 
 def test_trial_zone_end_outside_trial_length():
-    """Verifies that zone_end outside trial length raises ValueError."""
+    """Verifies that zone_end outside trial length raises ValueError during config validation."""
+    trial = WaterRewardTrial(
+        segment_name="TestSegment",
+        stimulus_trigger_zone_start_cm=180.0,
+        stimulus_trigger_zone_end_cm=250.0,  # Outside trial length (200)
+        stimulus_location_cm=190.0,
+    )
     with pytest.raises(ValueError, match="stimulus_trigger_zone_end_cm.*must be within"):
-        WaterRewardTrial(
-            cue_sequence=[1, 2, 3],
-            trial_length_cm=200.0,
-            stimulus_trigger_zone_start_cm=180.0,
-            stimulus_trigger_zone_end_cm=250.0,  # Outside trial length
-            stimulus_location_cm=190.0,
-        )
+        _create_test_config_with_trial(trial)
 
 
 def test_trial_stimulus_location_outside_trial_length():
-    """Verifies that stimulus_location outside trial length raises ValueError."""
+    """Verifies that stimulus_location outside trial length raises ValueError during config validation."""
+    trial = WaterRewardTrial(
+        segment_name="TestSegment",
+        stimulus_trigger_zone_start_cm=180.0,
+        stimulus_trigger_zone_end_cm=200.0,
+        stimulus_location_cm=250.0,  # Outside trial length (200)
+    )
     with pytest.raises(ValueError, match="stimulus_location_cm.*must be within"):
-        WaterRewardTrial(
-            cue_sequence=[1, 2, 3],
-            trial_length_cm=200.0,
-            stimulus_trigger_zone_start_cm=180.0,
-            stimulus_trigger_zone_end_cm=200.0,
-            stimulus_location_cm=250.0,  # Outside trial length
-        )
+        _create_test_config_with_trial(trial)
 
 
 def test_trial_valid_different_triggers():
     """Verifies that different trigger and omission trigger values are accepted."""
     trial = WaterRewardTrial(
-        cue_sequence=[1, 2, 3],
-        trial_length_cm=200.0,
+        segment_name="TestSegment",
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=200.0,
         stimulus_location_cm=190.0,
         stimulus_trigger="lick",
         stimulus_omission_trigger="occupancy",
     )
-    assert trial.stimulus_trigger == "lick"
-    assert trial.stimulus_omission_trigger == "occupancy"
+    # Create config to populate derived fields
+    config = _create_test_config_with_trial(trial)
+    populated_trial = config.trial_structures["test_trial"]
+    assert populated_trial.stimulus_trigger == "lick"
+    assert populated_trial.stimulus_omission_trigger == "occupancy"
 
 
 def test_trial_collision_omission_trigger_invalid():
     """Verifies that using 'collision' as stimulus_omission_trigger raises ValueError."""
     with pytest.raises(ValueError, match="stimulus_omission_trigger.*cannot be set to.*collision"):
         WaterRewardTrial(
-            cue_sequence=[1, 2, 3],
-            trial_length_cm=200.0,
+            segment_name="TestSegment",
             stimulus_trigger_zone_start_cm=180.0,
             stimulus_trigger_zone_end_cm=200.0,
             stimulus_location_cm=190.0,
@@ -1005,23 +1067,22 @@ def test_trial_collision_omission_trigger_invalid():
 
 
 def test_trial_stimulus_location_precedes_trigger_zone():
-    """Verifies that stimulus_location before trigger zone start raises ValueError."""
+    """Verifies that stimulus_location before trigger zone start raises ValueError during config validation."""
+    trial = WaterRewardTrial(
+        segment_name="TestSegment",
+        stimulus_trigger_zone_start_cm=180.0,
+        stimulus_trigger_zone_end_cm=200.0,
+        stimulus_location_cm=170.0,  # Before trigger zone start (180)
+    )
     with pytest.raises(ValueError, match="stimulus_location_cm.*cannot precede"):
-        WaterRewardTrial(
-            cue_sequence=[1, 2, 3],
-            trial_length_cm=200.0,
-            stimulus_trigger_zone_start_cm=180.0,
-            stimulus_trigger_zone_end_cm=200.0,
-            stimulus_location_cm=170.0,  # Before trigger zone start (180)
-        )
+        _create_test_config_with_trial(trial)
 
 
 def test_trial_invalid_guidance_trigger():
     """Verifies that using 'lick' as guidance_trigger raises ValueError."""
     with pytest.raises(ValueError, match="guidance_trigger.*not valid"):
         WaterRewardTrial(
-            cue_sequence=[1, 2, 3],
-            trial_length_cm=200.0,
+            segment_name="TestSegment",
             stimulus_trigger_zone_start_cm=180.0,
             stimulus_trigger_zone_end_cm=200.0,
             stimulus_location_cm=190.0,
@@ -1033,75 +1094,66 @@ def test_trial_valid_guidance_triggers():
     """Verifies that valid guidance_trigger values ('occupancy' and 'collision') are accepted."""
     # Test with occupancy
     trial_occupancy = WaterRewardTrial(
-        cue_sequence=[1, 2, 3],
-        trial_length_cm=200.0,
+        segment_name="TestSegment",
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=200.0,
         stimulus_location_cm=190.0,
         guidance_trigger="occupancy",
     )
-    assert trial_occupancy.guidance_trigger == "occupancy"
+    config = _create_test_config_with_trial(trial_occupancy)
+    populated_trial = config.trial_structures["test_trial"]
+    assert populated_trial.guidance_trigger == "occupancy"
 
     # Test with collision (default)
     trial_collision = WaterRewardTrial(
-        cue_sequence=[1, 2, 3],
-        trial_length_cm=200.0,
+        segment_name="TestSegment",
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=200.0,
         stimulus_location_cm=190.0,
         guidance_trigger="collision",
     )
-    assert trial_collision.guidance_trigger == "collision"
+    config = _create_test_config_with_trial(trial_collision)
+    populated_trial = config.trial_structures["test_trial"]
+    assert populated_trial.guidance_trigger == "collision"
 
 
 def test_water_reward_guidance_trigger_matches_stimulus_trigger():
-    """Verifies that guidance_trigger matching stimulus_trigger raises ValueError for reinforcing trials."""
-    with pytest.raises(ValueError, match="guidance_trigger.*cannot match.*stimulus_trigger.*reinforcing"):
-        WaterRewardTrial(
-            cue_sequence=[1, 2, 3],
-            trial_length_cm=200.0,
-            stimulus_trigger_zone_start_cm=180.0,
-            stimulus_trigger_zone_end_cm=200.0,
-            stimulus_location_cm=190.0,
-            stimulus_trigger="collision",
-            guidance_trigger="collision",
-        )
-
-
-def test_gas_puff_guidance_trigger_matches_omission_trigger():
-    """Verifies that guidance_trigger matching stimulus_omission_trigger raises ValueError for aversive trials."""
-    with pytest.raises(ValueError, match="guidance_trigger.*cannot match.*stimulus_omission_trigger.*aversive"):
-        GasPuffTrial(
-            cue_sequence=[1, 2, 3],
-            trial_length_cm=200.0,
-            stimulus_trigger_zone_start_cm=180.0,
-            stimulus_trigger_zone_end_cm=200.0,
-            stimulus_location_cm=190.0,
-            stimulus_omission_trigger="occupancy",
-            guidance_trigger="occupancy",
-        )
-
-
-def test_gas_puff_guidance_trigger_valid_when_no_omission_trigger():
-    """Verifies that guidance_trigger is valid when stimulus_omission_trigger is None for aversive trials."""
-    # When stimulus_omission_trigger is None, any valid guidance_trigger should be accepted
-    trial = GasPuffTrial(
-        cue_sequence=[1, 2, 3],
-        trial_length_cm=200.0,
+    """Verifies that guidance_trigger can match stimulus_trigger for reinforcing trials."""
+    trial = WaterRewardTrial(
+        segment_name="TestSegment",
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=200.0,
         stimulus_location_cm=190.0,
+        stimulus_trigger="collision",
+        guidance_trigger="collision",
+    )
+    config = _create_test_config_with_trial(trial)
+    populated_trial = config.trial_structures["test_trial"]
+    assert populated_trial.guidance_trigger == "collision"
+    assert populated_trial.stimulus_trigger == "collision"
+
+
+def test_gas_puff_guidance_trigger_matches_omission_trigger():
+    """Verifies that guidance_trigger can match stimulus_omission_trigger for aversive trials."""
+    trial = GasPuffTrial(
+        segment_name="TestSegment",
+        stimulus_trigger_zone_start_cm=180.0,
+        stimulus_trigger_zone_end_cm=200.0,
+        stimulus_location_cm=190.0,
+        stimulus_omission_trigger="occupancy",
         guidance_trigger="occupancy",
     )
-    assert trial.guidance_trigger == "occupancy"
-    assert trial.stimulus_omission_trigger is None
+    config = _create_test_config_with_trial(trial)
+    populated_trial = config.trial_structures["test_trial"]
+    assert populated_trial.guidance_trigger == "occupancy"
+    assert populated_trial.stimulus_omission_trigger == "occupancy"
 
 
 # Tests for MesoscopeExperimentConfiguration validation
 
 
-def test_experiment_config_invalid_cue_code():
-    """Verifies that a trial with an undefined cue code raises ValueError."""
+def test_experiment_config_invalid_segment_reference():
+    """Verifies that a trial referencing an unknown segment raises ValueError."""
     state = MesoscopeExperimentState(
         experiment_state_code=1,
         system_state_code=0,
@@ -1109,26 +1161,32 @@ def test_experiment_config_invalid_cue_code():
         supported_trial_structures=["trial1"],
     )
 
+    cues = [
+        Cue(name="A", code=1, length_cm=50.0),
+        Cue(name="B", code=2, length_cm=75.0),
+    ]
+    segments = [Segment(name="Segment_ab", cue_sequence=["A", "B"])]
+
     trial = WaterRewardTrial(
-        cue_sequence=[1, 2, 99],  # 99 is not in cue_map
-        trial_length_cm=175.0,
-        stimulus_trigger_zone_start_cm=150.0,
-        stimulus_trigger_zone_end_cm=175.0,
-        stimulus_location_cm=160.0,
+        segment_name="NonexistentSegment",  # Does not exist
+        stimulus_trigger_zone_start_cm=100.0,
+        stimulus_trigger_zone_end_cm=125.0,
+        stimulus_location_cm=110.0,
     )
 
-    with pytest.raises(ValueError, match="cue code '99'.*not defined in.*cue_map"):
+    with pytest.raises(ValueError, match="references unknown segment.*NonexistentSegment"):
         MesoscopeExperimentConfiguration(
-            cue_map={1: 50.0, 2: 75.0, 3: 50.0},
-            cue_offset_cm=10.0,
-            unity_scene_name="TestScene",
-            experiment_states={"state1": state},
+            cues=cues,
+            segments=segments,
             trial_structures={"trial1": trial},
+            experiment_states={"state1": state},
+            vr_environment=VREnvironment(),
+            unity_scene_name="TestScene",
         )
 
 
-def test_experiment_config_mismatched_trial_length():
-    """Verifies that a trial length mismatch with cue sequence raises ValueError."""
+def test_experiment_config_invalid_cue_in_segment():
+    """Verifies that a segment referencing an unknown cue raises ValueError."""
     state = MesoscopeExperimentState(
         experiment_state_code=1,
         system_state_code=0,
@@ -1136,27 +1194,33 @@ def test_experiment_config_mismatched_trial_length():
         supported_trial_structures=["trial1"],
     )
 
-    # cue_map: 1->50, 2->75, 3->50 = 175 total, but trial declares 200
+    cues = [
+        Cue(name="A", code=1, length_cm=50.0),
+        Cue(name="B", code=2, length_cm=75.0),
+    ]
+    # Segment references cue "C" which doesn't exist
+    segments = [Segment(name="Segment_abc", cue_sequence=["A", "B", "C"])]
+
     trial = WaterRewardTrial(
-        cue_sequence=[1, 2, 3],
-        trial_length_cm=200.0,  # Mismatched with cue sequence sum (175)
-        stimulus_trigger_zone_start_cm=150.0,
-        stimulus_trigger_zone_end_cm=175.0,
-        stimulus_location_cm=160.0,
+        segment_name="Segment_abc",
+        stimulus_trigger_zone_start_cm=100.0,
+        stimulus_trigger_zone_end_cm=125.0,
+        stimulus_location_cm=110.0,
     )
 
-    with pytest.raises(ValueError, match="declares a length of 200.0 cm.*calculated.*is 175.0 cm"):
+    with pytest.raises(ValueError, match="references unknown cue.*C"):
         MesoscopeExperimentConfiguration(
-            cue_map={1: 50.0, 2: 75.0, 3: 50.0},
-            cue_offset_cm=10.0,
-            unity_scene_name="TestScene",
-            experiment_states={"state1": state},
+            cues=cues,
+            segments=segments,
             trial_structures={"trial1": trial},
+            experiment_states={"state1": state},
+            vr_environment=VREnvironment(),
+            unity_scene_name="TestScene",
         )
 
 
-def test_experiment_config_valid_trial_length():
-    """Verifies that a valid trial length matching cue sequence is accepted."""
+def test_experiment_config_derives_trial_fields():
+    """Verifies that trial cue_sequence and trial_length_cm are derived from segment."""
     state = MesoscopeExperimentState(
         experiment_state_code=1,
         system_state_code=0,
@@ -1164,23 +1228,33 @@ def test_experiment_config_valid_trial_length():
         supported_trial_structures=["trial1"],
     )
 
-    # cue_map: 1->50, 2->75, 3->50 = 175 total
+    # Cues: A->50, B->75, C->50 = 175 total
+    cues = [
+        Cue(name="A", code=1, length_cm=50.0),
+        Cue(name="B", code=2, length_cm=75.0),
+        Cue(name="C", code=3, length_cm=50.0),
+    ]
+    segments = [Segment(name="Segment_abc", cue_sequence=["A", "B", "C"])]
+
     trial = WaterRewardTrial(
-        cue_sequence=[1, 2, 3],
-        trial_length_cm=175.0,  # Matches cue sequence sum
+        segment_name="Segment_abc",
         stimulus_trigger_zone_start_cm=150.0,
         stimulus_trigger_zone_end_cm=175.0,
         stimulus_location_cm=160.0,
     )
 
     config = MesoscopeExperimentConfiguration(
-        cue_map={1: 50.0, 2: 75.0, 3: 50.0},
-        cue_offset_cm=10.0,
-        unity_scene_name="TestScene",
-        experiment_states={"state1": state},
+        cues=cues,
+        segments=segments,
         trial_structures={"trial1": trial},
+        experiment_states={"state1": state},
+        vr_environment=VREnvironment(),
+        unity_scene_name="TestScene",
+        cue_offset_cm=10.0,
     )
 
+    # Verify derived fields
+    assert config.trial_structures["trial1"].cue_sequence == [1, 2, 3]
     assert config.trial_structures["trial1"].trial_length_cm == 175.0
 
 
@@ -1558,7 +1632,8 @@ def test_mesoscope_experiment_configuration_initialization(sample_experiment_con
 
     This test ensures all fields are properly assigned during initialization.
     """
-    assert sample_experiment_config.cue_map == {1: 50.0, 2: 75.0, 3: 50.0}
+    assert len(sample_experiment_config.cues) == 3
+    assert len(sample_experiment_config.segments) == 1
     assert sample_experiment_config.cue_offset_cm == 10.0
     assert sample_experiment_config.unity_scene_name == "TestScene"
     assert "state1" in sample_experiment_config.experiment_states
@@ -1579,7 +1654,7 @@ def test_mesoscope_experiment_configuration_nested_structures(sample_experiment_
 
     trial = sample_experiment_config.trial_structures["trial1"]
     assert isinstance(trial, WaterRewardTrial)
-    assert trial.cue_sequence == [1, 2, 3]
+    assert trial.cue_sequence == [1, 2, 3]  # Derived from Segment_abc
 
 
 def test_mesoscope_experiment_configuration_yaml_serialization(tmp_path, sample_experiment_config):
@@ -1597,7 +1672,7 @@ def test_mesoscope_experiment_configuration_yaml_serialization(tmp_path, sample_
     assert yaml_path.exists()
     content = yaml_path.read_text()
 
-    assert "cue_map:" in content
+    assert "cues:" in content
     assert "unity_scene_name:" in content
     assert "TestScene" in content
 
@@ -1616,7 +1691,7 @@ def test_mesoscope_experiment_configuration_yaml_deserialization(tmp_path, sampl
 
     loaded_config = MesoscopeExperimentConfiguration.from_yaml(file_path=yaml_path)
 
-    assert loaded_config.cue_map == sample_experiment_config.cue_map
+    assert len(loaded_config.cues) == len(sample_experiment_config.cues)
     assert loaded_config.unity_scene_name == sample_experiment_config.unity_scene_name
     assert loaded_config.cue_offset_cm == sample_experiment_config.cue_offset_cm
 
@@ -2226,7 +2301,7 @@ def test_session_data_create_copies_experiment_configuration(
         file_path=session_data.raw_data.experiment_configuration_path
     )
     assert loaded_config.unity_scene_name == sample_experiment_config.unity_scene_name
-    assert loaded_config.cue_map == sample_experiment_config.cue_map
+    assert len(loaded_config.cues) == len(sample_experiment_config.cues)
 
 
 def test_session_data_create_without_experiment_name_skips_experiment_config(

@@ -32,7 +32,7 @@ class SessionMetadata:
 @dataclass()
 class DatasetTrackingData:
     """Provides the path to the directory that stores the .yaml and .lock files used by ProcessingTracker instances to
-    track the runtime status of the dataset forging and multi-day analysis pipelines.
+    track the runtime status of the dataset forging and multi-day processing pipelines.
     """
 
     tracking_data_path: Path = Path()
@@ -53,22 +53,26 @@ class DatasetTrackingData:
 
 @dataclass()
 class DatasetSessionData:
-    """Provides paths and access to the assembled data files for a single session within the dataset.
+    """Provides the paths and access to the assembled data files for a single session within the dataset.
 
-    Each session in the dataset has its own directory containing the forged data and metadata feather files.
-    When loaded, data is memory-mapped as Polars dataframes for efficient access.
+    Notes:
+        Each session in the dataset has its own directory containing the forged data and metadata feather files, in
+        addition to other supplementary data files.
+
+        As part of loading the data, this class memory-maps the .feather files to Polars dataframes for efficient
+        access.
     """
 
     session_path: Path = Path()
     """The path to the session's directory within the dataset hierarchy (dataset/animal/session)."""
     data_path: Path = Path()
-    """The path to the data.feather file containing the forged session data."""
+    """The path to the data.feather file containing the assembled and time-aligned session-specific dataset."""
     metadata_path: Path = Path()
-    """The path to the metadata.feather file containing session metadata."""
+    """The path to the metadata.feather file containing session's metadata."""
     data: pl.DataFrame | None = None
-    """The memory-mapped contents of the session's data.feather file as a Polars dataframe."""
+    """The Polars dataframe that stores the session's data memory-mapped from the dataset .feather file."""
     metadata: pl.DataFrame | None = None
-    """The memory-mapped contents of the session's metadata.feather file as a Polars dataframe."""
+    """The Polars dataframe that stores the session's metadata memory-mapped from the metadata .feather file."""
 
     def resolve_paths(self, session_directory: Path) -> None:
         """Resolves all paths managed by the class instance.
@@ -124,14 +128,15 @@ class DatasetData(YamlConfig):
     acquisition_system: str | AcquisitionSystems
     """The name of the data acquisition system used to acquire all sessions in the dataset."""
     sessions: tuple[SessionMetadata, ...] = field(default_factory=tuple)
-    """The collection of session + animal pairs included in the dataset. This should be a pre-filtered set of sessions
-    that meet the dataset's inclusion criteria."""
+    """Stores the SessionMetadata instances that define the metadata used to identify each session included in the 
+    dataset."""
     tracking_data: DatasetTrackingData = field(default_factory=DatasetTrackingData)
-    """Defines the dataset's tracking data hierarchy for forging and multi-day analysis pipelines."""
+    """Defines the dataset's tracking data hierarchy for forging and multi-day processing pipelines."""
     dataset_data_path: Path = field(default_factory=Path)
-    """The path to the dataset_data.yaml file. This path is used by the DatasetData instance to save itself to disk."""
-    session_data_cache: dict[str, DatasetSessionData] = field(default_factory=dict, repr=False)
-    """Cache for DatasetSessionData instances, keyed by 'animal/session'."""
+    """The path to the dataset.yaml file. This path is used by the DatasetData instance to save itself to disk."""
+    _session_data_cache: dict[str, DatasetSessionData] = field(default_factory=dict, repr=False)
+    """Private cache that stores initialized DatasetSessionData instances for each included session, keyed by
+    'animal/session'. Use get_session_data() to access session data."""
 
     def __post_init__(self) -> None:
         """Validates and initializes the dataset configuration."""
@@ -169,9 +174,11 @@ class DatasetData(YamlConfig):
             name: The unique name for the dataset.
             project: The name of the project from which the dataset's sessions originate.
             session_type: The type of data acquisition sessions included in the dataset.
-            acquisition_system: The name of the data acquisition system used to acquire all sessions.
-            sessions: The pre-filtered collection of session + animal pairs to include in the dataset.
-            datasets_root: The path to the root directory where datasets are stored.
+            acquisition_system: The name of the data acquisition system used to acquire all sessions included in the
+                dataset.
+            sessions: The set of SessionMetadata instances that define the sessions whose data should be included in
+                the dataset.
+            datasets_root: The path to the root directory where to create the dataset's hierarchy.
 
         Returns:
             An initialized DatasetData instance that stores the structure and the metadata of the created dataset.
@@ -191,7 +198,10 @@ class DatasetData(YamlConfig):
             sessions = tuple(sessions)
 
         if not sessions:
-            message = "Cannot create a dataset with no sessions. Provide at least one session + animal pair."
+            message = (
+                f"Unable to create the '{name}' analysis dataset, as no sessions were provided to the creation method "
+                f"via the 'sessions' argument."
+            )
             console.error(message=message, error=ValueError)
             raise ValueError(message)  # Fallback for mypy
 
@@ -201,8 +211,9 @@ class DatasetData(YamlConfig):
         # Prevents overwriting existing datasets
         if dataset_path.exists():
             message = (
-                f"Unable to create the dataset '{name}'. A dataset with this name already exists at {dataset_path}. "
-                f"Use a different name or delete the existing dataset first."
+                f"Unable to create the '{name}' analysis dataset. A dataset with this name already exists at "
+                f"{dataset_path}. Use a different name or delete the existing dataset before creating a new one with "
+                f"the same name."
             )
             console.error(message=message, error=FileExistsError)
             raise FileExistsError(message)  # Fallback for mypy
@@ -213,7 +224,7 @@ class DatasetData(YamlConfig):
         tracking_data.make_directories()
 
         # Creates animal/session subdirectories and initializes session data instances
-        session_data_cache: dict[str, DatasetSessionData] = {}
+        _session_data_cache: dict[str, DatasetSessionData] = {}
         for session_meta in sessions:
             session_dir = dataset_path.joinpath(session_meta.animal, session_meta.session)
 
@@ -222,7 +233,7 @@ class DatasetData(YamlConfig):
             session_data.make_directories()
 
             cache_key = f"{session_meta.animal}/{session_meta.session}"
-            session_data_cache[cache_key] = session_data
+            _session_data_cache[cache_key] = session_data
 
         # Generates the DatasetData instance
         instance = cls(
@@ -232,8 +243,8 @@ class DatasetData(YamlConfig):
             acquisition_system=acquisition_system,
             sessions=sessions,
             tracking_data=tracking_data,
-            dataset_data_path=dataset_path.joinpath("dataset_data.yaml"),
-            session_data_cache=session_data_cache,
+            dataset_data_path=dataset_path.joinpath("dataset.yaml"),
+            _session_data_cache=_session_data_cache,
         )
 
         # Saves the configured instance data to disk
@@ -243,28 +254,29 @@ class DatasetData(YamlConfig):
 
     @classmethod
     def load(cls, dataset_path: Path) -> DatasetData:
-        """Loads the target dataset's data from the specified dataset_data.yaml file.
+        """Loads the target dataset's data from the specified dataset.yaml file.
 
         Notes:
             To create a new dataset, use the create() method.
 
-            This method memory-maps the data.feather and metadata.feather files for each session as Polars dataframes.
+            This method memory-maps the data.feather and metadata.feather files for each loaded session as Polars
+            dataframes.
 
         Args:
-            dataset_path: The path to the directory where to search for the dataset_data.yaml file. Typically, this
+            dataset_path: The path to the directory where to search for the dataset.yaml file. Typically, this
                 is the path to the root dataset directory.
 
         Returns:
             An initialized DatasetData instance that stores the loaded dataset's data.
 
         Raises:
-            FileNotFoundError: If multiple or no 'dataset_data.yaml' file instances are found under the input directory.
+            FileNotFoundError: If multiple or no 'dataset.yaml' file instances are found under the input directory.
         """
-        # Locates the dataset_data.yaml file
-        dataset_data_files = list(dataset_path.rglob("dataset_data.yaml"))
+        # Locates the dataset.yaml file
+        dataset_data_files = list(dataset_path.rglob("dataset.yaml"))
         if len(dataset_data_files) != 1:
             message = (
-                f"Unable to load the target dataset's data. Expected a single dataset_data.yaml file to be located "
+                f"Unable to load the target dataset's data. Expected a single dataset.yaml file to be located "
                 f"under the directory tree specified by the input path: {dataset_path}. Instead, encountered "
                 f"{len(dataset_data_files)} candidate files. This indicates that the input path does not point to a "
                 f"valid dataset data hierarchy."
@@ -292,18 +304,18 @@ class DatasetData(YamlConfig):
             session_data.load_data()
 
             cache_key = f"{session_meta.animal}/{session_meta.session}"
-            instance.session_data_cache[cache_key] = session_data
+            instance._session_data_cache[cache_key] = session_data
 
         return instance
 
     def save(self) -> None:
-        """Caches the instance's data to the dataset's root directory as a 'dataset_data.yaml' file.
+        """Caches the instance's data to the dataset's root directory as a 'dataset.yaml' file.
 
         Notes:
             This method releases all memory-mapped dataframes before saving and resets them to None.
         """
         # Releases all memory-mapped dataframes
-        for session_data in self.session_data_cache.values():
+        for session_data in self._session_data_cache.values():
             session_data.release_data()
 
         # Generates a copy to avoid modifying the instance
@@ -312,7 +324,7 @@ class DatasetData(YamlConfig):
         # Resets path fields and cache to None before saving
         origin.tracking_data = None  # type: ignore[assignment]
         origin.dataset_data_path = None  # type: ignore[assignment]
-        origin.session_data_cache = None  # type: ignore[assignment]
+        origin._session_data_cache = None  # type: ignore[assignment]  #noqa: SLF001
 
         # Converts StrEnum instances to strings for YAML serialization
         origin.session_type = str(origin.session_type)
@@ -331,53 +343,39 @@ class DatasetData(YamlConfig):
         """Returns a tuple of unique animal identifiers included in the dataset."""
         return tuple(sorted({s.animal for s in self.sessions}))
 
-    @property
-    def session_count(self) -> int:
-        """Returns the total number of sessions in the dataset."""
-        return len(self.sessions)
-
     def get_sessions_for_animal(self, animal: str) -> tuple[SessionMetadata, ...]:
-        """Returns all sessions for the specified animal.
+        """Returns the identification data for all sessions for the specified animal packaged into SessionMetadata
+        instances.
 
         Args:
-            animal: The unique identifier of the animal.
+            animal: The unique identifier of the animal for which to retrieve the session identification data.
 
         Returns:
             A tuple of SessionMetadata instances for the specified animal.
         """
         return tuple(s for s in self.sessions if s.animal == animal)
 
-    def get_session_count_for_animal(self, animal: str) -> int:
-        """Returns the number of sessions for the specified animal.
-
-        Args:
-            animal: The unique identifier of the animal.
-
-        Returns:
-            The number of sessions for the specified animal.
-        """
-        return len(self.get_sessions_for_animal(animal))
-
     def get_session_data(self, animal: str, session: str) -> DatasetSessionData:
         """Returns the DatasetSessionData instance for the specified session.
 
         Args:
-            animal: The unique identifier of the animal.
-            session: The unique identifier of the session.
+            animal: The unique identifier of the animal that participated in the session.
+            session: The unique identifier of the session for which to return the data.
 
         Returns:
-            The DatasetSessionData instance containing paths and data for the session's assembled data files.
+            The DatasetSessionData instance containing the paths to the session's data folder and memory-mapped data
+            files.
 
         Raises:
             ValueError: If the specified session is not found in the dataset.
         """
         cache_key = f"{animal}/{session}"
-        if cache_key not in self.session_data_cache:
+        if cache_key not in self._session_data_cache:
             message = (
-                f"Unable to retrieve session data for animal '{animal}', session '{session}'. "
-                f"This session is not included in the dataset."
+                f"Unable to retrieve the data for the session '{session}', performed by the animal '{animal}'. "
+                f"The target animal and session combination is not found in the '{self.name}' dataset."
             )
             console.error(message=message, error=ValueError)
             raise ValueError(message)  # Fallback for mypy
 
-        return self.session_data_cache[cache_key]
+        return self._session_data_cache[cache_key]
