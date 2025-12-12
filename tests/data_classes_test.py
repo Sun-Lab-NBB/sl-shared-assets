@@ -864,10 +864,7 @@ def test_water_reward_trial_initialization():
     assert populated_trial.stimulus_trigger_zone_start_cm == 180.0
     assert populated_trial.stimulus_trigger_zone_end_cm == 200.0
     assert populated_trial.stimulus_location_cm == 190.0
-    assert populated_trial.stimulus_trigger == "lick"
-    assert populated_trial.stimulus_omission_trigger is None
     assert populated_trial.show_stimulus_collision_boundary is False
-    assert populated_trial.guidance_trigger == "collision"
     assert populated_trial.reward_size_ul == 5.0
     assert populated_trial.reward_tone_duration_ms == 300
 
@@ -894,10 +891,7 @@ def test_gas_puff_trial_initialization():
     assert populated_trial.stimulus_trigger_zone_start_cm == 180.0
     assert populated_trial.stimulus_trigger_zone_end_cm == 200.0
     assert populated_trial.stimulus_location_cm == 190.0
-    assert populated_trial.stimulus_trigger == "lick"
-    assert populated_trial.stimulus_omission_trigger is None
     assert populated_trial.show_stimulus_collision_boundary is False
-    assert populated_trial.guidance_trigger == "collision"
     assert populated_trial.puff_duration_ms == 100
     assert populated_trial.occupancy_duration_ms == 1000
 
@@ -925,9 +919,7 @@ def test_trial_types():
     assert isinstance(water_trial.stimulus_trigger_zone_start_cm, float)
     assert isinstance(water_trial.stimulus_trigger_zone_end_cm, float)
     assert isinstance(water_trial.stimulus_location_cm, float)
-    assert isinstance(water_trial.stimulus_trigger, str)
     assert isinstance(water_trial.show_stimulus_collision_boundary, bool)
-    assert isinstance(water_trial.guidance_trigger, str)
     assert isinstance(water_trial.reward_size_ul, float)
     assert isinstance(water_trial.reward_tone_duration_ms, int)
 
@@ -944,49 +936,10 @@ def test_trial_types():
 
     assert isinstance(gas_trial.puff_duration_ms, int)
     assert isinstance(gas_trial.occupancy_duration_ms, int)
-    assert isinstance(gas_trial.stimulus_trigger, str)
     assert isinstance(gas_trial.show_stimulus_collision_boundary, bool)
-    assert isinstance(gas_trial.guidance_trigger, str)
 
 
 # Tests for Trial validation
-
-
-def test_trial_invalid_stimulus_trigger():
-    """Verifies that an invalid stimulus_trigger raises ValueError."""
-    with pytest.raises(ValueError, match="stimulus_trigger.*not valid"):
-        WaterRewardTrial(
-            segment_name="TestSegment",
-            stimulus_trigger_zone_start_cm=180.0,
-            stimulus_trigger_zone_end_cm=200.0,
-            stimulus_location_cm=190.0,
-            stimulus_trigger="invalid_trigger",
-        )
-
-
-def test_trial_invalid_stimulus_omission_trigger():
-    """Verifies that an invalid stimulus_omission_trigger raises ValueError."""
-    with pytest.raises(ValueError, match="stimulus_omission_trigger.*not valid"):
-        WaterRewardTrial(
-            segment_name="TestSegment",
-            stimulus_trigger_zone_start_cm=180.0,
-            stimulus_trigger_zone_end_cm=200.0,
-            stimulus_location_cm=190.0,
-            stimulus_omission_trigger="invalid_trigger",
-        )
-
-
-def test_trial_matching_trigger_and_omission_trigger():
-    """Verifies that matching stimulus_trigger and stimulus_omission_trigger raises ValueError."""
-    with pytest.raises(ValueError, match="cannot be set to the same value"):
-        WaterRewardTrial(
-            segment_name="TestSegment",
-            stimulus_trigger_zone_start_cm=180.0,
-            stimulus_trigger_zone_end_cm=200.0,
-            stimulus_location_cm=190.0,
-            stimulus_trigger="lick",
-            stimulus_omission_trigger="lick",
-        )
 
 
 def test_trial_zone_end_less_than_start():
@@ -1037,35 +990,6 @@ def test_trial_stimulus_location_outside_trial_length():
         _create_test_config_with_trial(trial)
 
 
-def test_trial_valid_different_triggers():
-    """Verifies that different trigger and omission trigger values are accepted."""
-    trial = WaterRewardTrial(
-        segment_name="TestSegment",
-        stimulus_trigger_zone_start_cm=180.0,
-        stimulus_trigger_zone_end_cm=200.0,
-        stimulus_location_cm=190.0,
-        stimulus_trigger="lick",
-        stimulus_omission_trigger="occupancy",
-    )
-    # Create config to populate derived fields
-    config = _create_test_config_with_trial(trial)
-    populated_trial = config.trial_structures["test_trial"]
-    assert populated_trial.stimulus_trigger == "lick"
-    assert populated_trial.stimulus_omission_trigger == "occupancy"
-
-
-def test_trial_collision_omission_trigger_invalid():
-    """Verifies that using 'collision' as stimulus_omission_trigger raises ValueError."""
-    with pytest.raises(ValueError, match="stimulus_omission_trigger.*cannot be set to.*collision"):
-        WaterRewardTrial(
-            segment_name="TestSegment",
-            stimulus_trigger_zone_start_cm=180.0,
-            stimulus_trigger_zone_end_cm=200.0,
-            stimulus_location_cm=190.0,
-            stimulus_omission_trigger="collision",
-        )
-
-
 def test_trial_stimulus_location_precedes_trigger_zone():
     """Verifies that stimulus_location before trigger zone start raises ValueError during config validation."""
     trial = WaterRewardTrial(
@@ -1076,77 +1000,6 @@ def test_trial_stimulus_location_precedes_trigger_zone():
     )
     with pytest.raises(ValueError, match="stimulus_location_cm.*cannot precede"):
         _create_test_config_with_trial(trial)
-
-
-def test_trial_invalid_guidance_trigger():
-    """Verifies that using 'lick' as guidance_trigger raises ValueError."""
-    with pytest.raises(ValueError, match="guidance_trigger.*not valid"):
-        WaterRewardTrial(
-            segment_name="TestSegment",
-            stimulus_trigger_zone_start_cm=180.0,
-            stimulus_trigger_zone_end_cm=200.0,
-            stimulus_location_cm=190.0,
-            guidance_trigger="lick",
-        )
-
-
-def test_trial_valid_guidance_triggers():
-    """Verifies that valid guidance_trigger values ('occupancy' and 'collision') are accepted."""
-    # Test with occupancy
-    trial_occupancy = WaterRewardTrial(
-        segment_name="TestSegment",
-        stimulus_trigger_zone_start_cm=180.0,
-        stimulus_trigger_zone_end_cm=200.0,
-        stimulus_location_cm=190.0,
-        guidance_trigger="occupancy",
-    )
-    config = _create_test_config_with_trial(trial_occupancy)
-    populated_trial = config.trial_structures["test_trial"]
-    assert populated_trial.guidance_trigger == "occupancy"
-
-    # Test with collision (default)
-    trial_collision = WaterRewardTrial(
-        segment_name="TestSegment",
-        stimulus_trigger_zone_start_cm=180.0,
-        stimulus_trigger_zone_end_cm=200.0,
-        stimulus_location_cm=190.0,
-        guidance_trigger="collision",
-    )
-    config = _create_test_config_with_trial(trial_collision)
-    populated_trial = config.trial_structures["test_trial"]
-    assert populated_trial.guidance_trigger == "collision"
-
-
-def test_water_reward_guidance_trigger_matches_stimulus_trigger():
-    """Verifies that guidance_trigger can match stimulus_trigger for reinforcing trials."""
-    trial = WaterRewardTrial(
-        segment_name="TestSegment",
-        stimulus_trigger_zone_start_cm=180.0,
-        stimulus_trigger_zone_end_cm=200.0,
-        stimulus_location_cm=190.0,
-        stimulus_trigger="collision",
-        guidance_trigger="collision",
-    )
-    config = _create_test_config_with_trial(trial)
-    populated_trial = config.trial_structures["test_trial"]
-    assert populated_trial.guidance_trigger == "collision"
-    assert populated_trial.stimulus_trigger == "collision"
-
-
-def test_gas_puff_guidance_trigger_matches_omission_trigger():
-    """Verifies that guidance_trigger can match stimulus_omission_trigger for aversive trials."""
-    trial = GasPuffTrial(
-        segment_name="TestSegment",
-        stimulus_trigger_zone_start_cm=180.0,
-        stimulus_trigger_zone_end_cm=200.0,
-        stimulus_location_cm=190.0,
-        stimulus_omission_trigger="occupancy",
-        guidance_trigger="occupancy",
-    )
-    config = _create_test_config_with_trial(trial)
-    populated_trial = config.trial_structures["test_trial"]
-    assert populated_trial.guidance_trigger == "occupancy"
-    assert populated_trial.stimulus_omission_trigger == "occupancy"
 
 
 # Tests for MesoscopeExperimentConfiguration validation

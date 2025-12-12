@@ -24,19 +24,6 @@ class AcquisitionSystems(StrEnum):
     environments running in Unity game engine to conduct experiments."""
 
 
-class StimulusTriggers(StrEnum):
-    """Defines the triggers for initiating or omitting stimulus delivery during experiment trials."""
-
-    LICK = "lick"
-    """The stimulus is triggered when the animal licks the lick port sensor while located inside the stimulus trigger
-    zone."""
-    OCCUPANCY = "occupancy"
-    """The stimulus is triggered after the animal occupies the stimulus trigger zone for a certain duration."""
-    COLLISION = "collision"
-    """The stimulus is triggered when the animal collides with the invisible boundary (wall) placed at the location of
-    the stimulus. The location of the stimulus may be outside the stimulus trigger zone."""
-
-
 @dataclass()
 class Cue:
     """Defines a single visual cue used in the experiment task's Virtual Reality (VR) environment.
@@ -144,7 +131,13 @@ class MesoscopeExperimentState:
 
 @dataclass()
 class _MesoscopeBaseTrial:
-    """Defines the shared structure and task parameters common to all supported experiment trial types."""
+    """Defines the shared structure and task parameters common to all supported experiment trial types.
+
+    Notes:
+        The trigger mode and guidance behavior are determined by the trial type:
+        - WaterRewardTrial: Uses 'lick' trigger mode; guidance delivers stimulus on collision.
+        - GasPuffTrial: Uses 'occupancy' trigger mode; guidance emits OccupancyFailed for movement blocking.
+    """
 
     segment_name: str
     """The name of the Unity Segment this trial is based on."""
@@ -153,19 +146,10 @@ class _MesoscopeBaseTrial:
     stimulus_trigger_zone_end_cm: float
     """The position of the trial stimulus trigger zone ending boundary, in centimeters."""
     stimulus_location_cm: float
-    """The location of the invisible boundary (wall) with which the animal must collide to elicit the stimulus if
-    the trial supports triggering the stimuli by collision."""
-    stimulus_trigger: str = str(StimulusTriggers.LICK)
-    """The trigger condition for delivering the stimulus. Must be one of the StimulusTriggers enumeration values."""
-    stimulus_omission_trigger: str | None = None
-    """The trigger condition for omitting the stimulus. Must be one of the StimulusTriggers enumeration values. Cannot
-    match the condition specified by the 'stimulus_trigger' attribute and takes precedence over that condition."""
+    """The location of the invisible boundary (wall) with which the animal must collide to elicit the stimulus."""
     show_stimulus_collision_boundary: bool = False
     """Determines whether the stimulus collision boundary is visible to the animal during this trial type. When True,
     the boundary marker is displayed in the Virtual Reality environment at the stimulus location."""
-    guidance_trigger: str = str(StimulusTriggers.COLLISION)
-    """The trigger condition used during guidance mode to elicit reinforcing stimuli or omit aversive stimuli.
-    Must be either 'occupancy' or 'collision' (not 'lick')."""
 
     # Derived fields - populated by MesoscopeExperimentConfiguration.__post_init__
     cue_sequence: list[int] = field(default_factory=list)
@@ -173,45 +157,6 @@ class _MesoscopeBaseTrial:
     trials."""
     trial_length_cm: float = 0.0
     """The total length of the trial environment in centimeters."""
-
-    def __post_init__(self) -> None:
-        """Validates trial configuration parameters."""
-        valid_triggers = tuple(StimulusTriggers)
-        if self.stimulus_trigger not in valid_triggers:
-            message = (
-                f"The 'stimulus_trigger' value '{self.stimulus_trigger}' is not valid. "
-                f"Must be one of the supported StimulusTriggers enumeration members: {', '.join(valid_triggers)}."
-            )
-            console.error(message=message, error=ValueError)
-
-        if self.stimulus_omission_trigger is not None and self.stimulus_omission_trigger not in valid_triggers:
-            message = (
-                f"The 'stimulus_omission_trigger' value '{self.stimulus_omission_trigger}' is not valid. "
-                f"Must be one of the supported StimulusTriggers enumeration members: {', '.join(valid_triggers)}."
-            )
-            console.error(message=message, error=ValueError)
-
-        if self.stimulus_omission_trigger is not None and self.stimulus_trigger == self.stimulus_omission_trigger:
-            message = (
-                f"The 'stimulus_trigger' and 'stimulus_omission_trigger' attributes cannot be set to the same value. "
-                f"Both are currently set to '{self.stimulus_trigger}'."
-            )
-            console.error(message=message, error=ValueError)
-
-        if self.stimulus_omission_trigger == StimulusTriggers.COLLISION:
-            message = (
-                f"The 'stimulus_omission_trigger' cannot be set to '{StimulusTriggers.COLLISION}'. Collision-based "
-                f"omission is not supported as colliding with the boundary inherently triggers stimulus delivery."
-            )
-            console.error(message=message, error=ValueError)
-
-        valid_guidance_triggers = (StimulusTriggers.OCCUPANCY, StimulusTriggers.COLLISION)
-        if self.guidance_trigger not in valid_guidance_triggers:
-            message = (
-                f"The 'guidance_trigger' value '{self.guidance_trigger}' is not valid. Must be one of the supported "
-                f"guidance triggers: {', '.join(valid_guidance_triggers)}."
-            )
-            console.error(message=message, error=ValueError)
 
     def validate_zones(self) -> None:
         """Validates stimulus zone positions.
@@ -262,8 +207,11 @@ class _MesoscopeBaseTrial:
 
 @dataclass()
 class WaterRewardTrial(_MesoscopeBaseTrial):
-    """Defines a trial that delivers water rewards (reinforcing stimuli) when the animal completes the reward
-    conditions.
+    """Defines a trial that delivers water rewards (reinforcing stimuli) when the animal licks in the trigger zone.
+
+    Notes:
+        Trigger mode: The animal must lick while inside the stimulus trigger zone to receive the water reward.
+        Guidance mode: The animal receives the reward upon colliding with the stimulus boundary (no lick required).
     """
 
     reward_size_ul: float = 5.0
@@ -274,14 +222,22 @@ class WaterRewardTrial(_MesoscopeBaseTrial):
 
 @dataclass()
 class GasPuffTrial(_MesoscopeBaseTrial):
-    """Defines a trial that delivers N2 gas puffs (aversive stimuli) when the animal fails omission conditions."""
+    """Defines a trial that delivers N2 gas puffs (aversive stimuli) when the animal fails to meet occupancy duration.
+
+    Notes:
+        Trigger mode: The animal must occupy the stimulus trigger zone for the specified duration to disarm the
+        stimulus boundary and avoid the gas puff. If the animal exits the zone early or collides with the boundary
+        before meeting the occupancy threshold, the gas puff is delivered.
+        Guidance mode: When the animal exits the zone early, an OccupancyFailed message is emitted, allowing
+        sl-experiment to block movement and prevent the animal from reaching the armed boundary.
+    """
 
     puff_duration_ms: int = 100
     """The duration, in milliseconds, for which to deliver the N2 gas puff when the animal fails the trial."""
 
     occupancy_duration_ms: int = 1000
-    """The time, in milliseconds, the animal must occupy the trigger zone to satisfy the occupancy omission
-    condition."""
+    """The time, in milliseconds, the animal must occupy the trigger zone to disarm the stimulus boundary and avoid
+    the gas puff."""
 
 
 # noinspection PyArgumentList
