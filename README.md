@@ -10,7 +10,7 @@ A Python library that provides data acquisition and processing assets shared bet
 ![PyPI - Status](https://img.shields.io/pypi/status/sl-shared-assets)
 ![PyPI - Wheel](https://img.shields.io/pypi/wheel/sl-shared-assets)
 
-___
+---
 
 ## Detailed Description
 
@@ -35,7 +35,7 @@ manage the data at all stages of Sun lab data workflow: acquisition, processing,
 - [License](#license)
 - [Acknowledgements](#Acknowledgments)
 
-___
+---
 
 ## Dependencies
 
@@ -84,7 +84,7 @@ classes exposed by components of this library.
 **Note!** The API documentation includes important information about the 'configuration' Command-Line Interface (CLI) 
 exposed by this library.
 
-___
+---
 
 ## Versioning
 
@@ -100,13 +100,13 @@ releases.
 - Kushaan Gupta ([kushaangupta](https://github.com/kushaangupta))
 - Natalie Yeung
 
-___
+---
 
 ## License
 
 This project is licensed under the GPL3 License: see the [LICENSE](LICENSE) file for details.
 
-___
+---
 
 ## Acknowledgments
 
