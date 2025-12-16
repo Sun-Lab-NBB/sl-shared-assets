@@ -110,9 +110,9 @@ class MesoscopeExperimentState:
     """The data acquisition system's state (configuration snapshot) code associated with the experiment state."""
     state_duration_s: float
     """The time, in seconds, to maintain the experiment state while executing the experiment."""
-    supported_trial_structures: list[str] | None = None
-    """The list of trial structure names to be conducted during this experiment state. If None or empty, no trials are 
-    executed during this state."""
+    supports_trials: bool = True
+    """Determines whether trials are executed during this experiment state. When False, no trial-related processing
+    occurs during this phase."""
     # Reinforcing (water reward) trial guidance parameters
     reinforcing_initial_guided_trials: int = 0
     """The number of reinforcing trials after the onset of the experiment state that use the guidance mode."""

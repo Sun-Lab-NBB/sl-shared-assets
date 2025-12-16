@@ -278,7 +278,7 @@ def generate_experiment_configuration_file(
             experiment_state_code=state + 1,  # Assumes experiment state sequences are 1-based
             system_state_code=0,
             state_duration_s=60,
-            supported_trial_structures=trial_names if trial_names else None,
+            supports_trials=bool(trial_names),
             reinforcing_initial_guided_trials=3 if water_reward_count > 0 else 0,
             reinforcing_recovery_failed_threshold=9 if water_reward_count > 0 else 0,
             reinforcing_recovery_guided_trials=3 if water_reward_count > 0 else 0,

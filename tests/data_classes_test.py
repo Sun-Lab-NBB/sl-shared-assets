@@ -68,7 +68,7 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=600.0,
-        supported_trial_structures=["trial1"],
+        supports_trials=True,
         reinforcing_initial_guided_trials=10,
         reinforcing_recovery_failed_threshold=5,
         reinforcing_recovery_guided_trials=3,
@@ -759,7 +759,7 @@ def test_mesoscope_experiment_state_initialization():
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=600.0,
-        supported_trial_structures=["trial1", "trial2"],
+        supports_trials=True,
         reinforcing_initial_guided_trials=10,
         reinforcing_recovery_failed_threshold=5,
         reinforcing_recovery_guided_trials=3,
@@ -771,7 +771,7 @@ def test_mesoscope_experiment_state_initialization():
     assert state.experiment_state_code == 1
     assert state.system_state_code == 0
     assert state.state_duration_s == 600.0
-    assert state.supported_trial_structures == ["trial1", "trial2"]
+    assert state.supports_trials is True
     assert state.reinforcing_initial_guided_trials == 10
     assert state.reinforcing_recovery_failed_threshold == 5
     assert state.reinforcing_recovery_guided_trials == 3
@@ -789,7 +789,7 @@ def test_mesoscope_experiment_state_types():
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=600.0,
-        supported_trial_structures=["trial1"],
+        supports_trials=True,
         reinforcing_initial_guided_trials=10,
         reinforcing_recovery_failed_threshold=5,
         reinforcing_recovery_guided_trials=3,
@@ -798,7 +798,7 @@ def test_mesoscope_experiment_state_types():
     assert isinstance(state.experiment_state_code, int)
     assert isinstance(state.system_state_code, int)
     assert isinstance(state.state_duration_s, float)
-    assert isinstance(state.supported_trial_structures, list)
+    assert isinstance(state.supports_trials, bool)
     assert isinstance(state.reinforcing_initial_guided_trials, int)
     assert isinstance(state.reinforcing_recovery_failed_threshold, int)
     assert isinstance(state.reinforcing_recovery_guided_trials, int)
@@ -830,7 +830,7 @@ def _create_test_config_with_trial(trial: WaterRewardTrial | GasPuffTrial) -> Me
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=60.0,
-        supported_trial_structures=["test_trial"],
+        supports_trials=True,
     )
     return MesoscopeExperimentConfiguration(
         cues=cues,
@@ -1011,7 +1011,7 @@ def test_experiment_config_invalid_segment_reference():
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=600.0,
-        supported_trial_structures=["trial1"],
+        supports_trials=True,
     )
 
     cues = [
@@ -1044,7 +1044,7 @@ def test_experiment_config_invalid_cue_in_segment():
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=600.0,
-        supported_trial_structures=["trial1"],
+        supports_trials=True,
     )
 
     cues = [
@@ -1078,7 +1078,7 @@ def test_experiment_config_derives_trial_fields():
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=600.0,
-        supported_trial_structures=["trial1"],
+        supports_trials=True,
     )
 
     # Cues: A->50, B->75, C->50 = 175 total
