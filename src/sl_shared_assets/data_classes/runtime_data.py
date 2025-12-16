@@ -39,8 +39,10 @@ class MesoscopeHardwareState(YamlConfig):  # pragma: no cover
     """Stores the initial state of the Virtual Reality screens at the beginning of the session's runtime."""
     recorded_mesoscope_ttl: bool | None = None
     """Tracks whether the session recorded brain activity data with the mesoscope."""
+    delivered_gas_puffs: bool | None = None
+    """Tracks whether the session delivered any gas puffs to the animal."""
     system_state_codes: dict[str, int] | None = None
-    """Maps integer state-codes used by the Mesoscope-VR system to communicate its states (system states) to 
+    """Maps integer state-codes used by the Mesoscope-VR system to communicate its states (system states) to
     human-readable state names."""
 
 
