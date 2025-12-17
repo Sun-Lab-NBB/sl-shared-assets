@@ -107,8 +107,8 @@ class RunTrainingDescriptor(YamlConfig):  # pragma: no cover
     increase_threshold_ml: float = 0.1
     """The threshold volume of water delivered to the animal, in milliliters, that triggers the increase in the running 
     speed and duration thresholds."""
-    run_speed_increase_step_cm_s: float = 0.1
-    """The value, in centimeters per second, used by the system to increment the running speed threshold each 
+    run_speed_increase_step_cm_s: float = 0.05
+    """The value, in centimeters per second, used by the system to increment the running speed threshold each
     time the animal receives 'increase_threshold' volume of water."""
     run_duration_increase_step_s: float = 0.1
     """The value, in seconds, used by the system to increment the duration threshold each time the animal 
