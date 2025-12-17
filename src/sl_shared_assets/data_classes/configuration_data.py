@@ -234,7 +234,6 @@ class GasPuffTrial(_MesoscopeBaseTrial):
 
     puff_duration_ms: int = 100
     """The duration, in milliseconds, for which to deliver the N2 gas puff when the animal fails the trial."""
-
     occupancy_duration_ms: int = 1000
     """The time, in milliseconds, the animal must occupy the trigger zone to disarm the stimulus boundary and avoid
     the gas puff."""
@@ -391,14 +390,14 @@ class MesoscopeCameras:
     """The index of the face camera in the list of all available Harvester-managed cameras."""
     body_camera_index: int = 1
     """The index of the body camera in the list of all available Harvester-managed cameras."""
-    face_camera_quantization: int = 15
+    face_camera_quantization: int = 20
     """The quantization parameter used by the face camera to encode acquired frames as video files."""
-    face_camera_preset: int = 5
+    face_camera_preset: int = 7
     """The encoding speed preset used by the face camera to encode acquired frames as video files. Must be one of the 
     valid members of the EncoderSpeedPresets enumeration from the ataraxis-video-system library."""
-    body_camera_quantization: int = 15
+    body_camera_quantization: int = 20
     """The quantization parameter used by the body camera to encode acquired frames as video files."""
-    body_camera_preset: int = 5
+    body_camera_preset: int = 7
     """The encoding speed preset used by the body camera to encode acquired frames as video files. Must be one of the 
     valid members of the EncoderSpeedPresets enumeration from the ataraxis-video-system library."""
 
@@ -476,9 +475,9 @@ class MesoscopeMicroControllers:
     TTL signal sent by the mesoscope at the onset of each frame's acquisition."""
     valve_calibration_data: dict[int | float, int | float] | tuple[tuple[int | float, int | float], ...] = (
         (15000, 1.10),
-        (30000, 3.65),
-        (45000, 7.00),
-        (60000, 11.10),
+        (30000, 3.0),
+        (45000, 6.25),
+        (60000, 10.90),
     )
     """Maps water delivery solenoid valve open times, in microseconds, to the dispensed volumes of water, in 
     microliters."""

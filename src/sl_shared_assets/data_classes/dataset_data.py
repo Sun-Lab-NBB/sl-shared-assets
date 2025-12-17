@@ -133,10 +133,10 @@ class DatasetData(YamlConfig):
     tracking_data: DatasetTrackingData = field(default_factory=DatasetTrackingData)
     """Defines the dataset's tracking data hierarchy for forging and multi-day processing pipelines."""
     dataset_data_path: Path = field(default_factory=Path)
-    """The path to the dataset.yaml file. This path is used by the DatasetData instance to save itself to disk."""
+    """The path to the dataset.yaml file cached to disk."""
     _session_data_cache: dict[str, DatasetSessionData] = field(default_factory=dict, repr=False)
-    """Private cache that stores initialized DatasetSessionData instances for each included session, keyed by
-    'animal/session'. Use get_session_data() to access session data."""
+    """Stores initialized DatasetSessionData instances for each included session, keyed by 'animal/session'. Use 
+    the get_session_data() method to access session data."""
 
     def __post_init__(self) -> None:
         """Validates and initializes the dataset configuration."""
