@@ -100,7 +100,7 @@ class RunTrainingDescriptor(YamlConfig):  # pragma: no cover
     """The running speed threshold, in centimeters per second, at the end of training."""
     final_run_duration_threshold_s: float = 1.5
     """The running duration threshold, in seconds, at the end of training."""
-    initial_run_speed_threshold_cm_s: float = 1.5
+    initial_run_speed_threshold_cm_s: float = 0.8
     """The initial running speed threshold, in centimeters per second."""
     initial_run_duration_threshold_s: float = 1.5
     """The initial running duration threshold, in seconds."""
