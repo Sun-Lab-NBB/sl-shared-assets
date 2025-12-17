@@ -1185,10 +1185,10 @@ def test_mesoscope_cameras_default_initialization():
 
     assert cameras.face_camera_index == 0
     assert cameras.body_camera_index == 1
-    assert cameras.face_camera_quantization == 15
-    assert cameras.face_camera_preset == 5
-    assert cameras.body_camera_quantization == 15
-    assert cameras.body_camera_preset == 5
+    assert cameras.face_camera_quantization == 20
+    assert cameras.face_camera_preset == 7
+    assert cameras.body_camera_quantization == 20
+    assert cameras.body_camera_preset == 7
 
 
 def test_mesoscope_cameras_custom_initialization():
