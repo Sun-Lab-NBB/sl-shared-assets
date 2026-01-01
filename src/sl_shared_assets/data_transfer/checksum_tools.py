@@ -97,7 +97,7 @@ def calculate_directory_checksum(
 
         # Collects results as they complete
         results = []
-        if not progress:
+        if progress:
             with tqdm(
                 total=len(files), desc=f"Calculating checksum for {Path(*directory.parts[-6:])}", unit="file"
             ) as pbar:
