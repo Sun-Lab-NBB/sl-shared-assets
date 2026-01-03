@@ -288,6 +288,10 @@ class DatasetData(YamlConfig):
         dataset_data_path = dataset_data_files.pop()
         instance: DatasetData = cls.from_yaml(file_path=dataset_data_path)
 
+        # Initializes the session data cache if it was set to None during save().
+        if instance._session_data_cache is None:
+            instance._session_data_cache = {}
+
         # Resolves the dataset root directory (parent of the YAML file)
         local_root = dataset_data_path.parent
 
