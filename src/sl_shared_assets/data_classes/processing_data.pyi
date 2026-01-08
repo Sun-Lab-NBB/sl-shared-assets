@@ -13,6 +13,7 @@ class ProcessingPipelines(StrEnum):
     SUITE2P = "suite2p"
     MULTIDAY = "multiday"
     FORGING = "forging"
+    REPORT = "report"
 
 class ManagingTrackers(StrEnum):
     CHECKSUM = "checksum.yaml"

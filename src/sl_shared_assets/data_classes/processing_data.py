@@ -43,6 +43,9 @@ class ProcessingPipelines(StrEnum):
     """The dataset assembly (forging) pipeline. This pipeline integrates the single-day and multi-day data from all
     available sources for each processed session into a unified analysis Dataset structure. The assembled
     dataset then serves as an entry-point for all further data analysis tasks."""
+    REPORT = "report"
+    """The report dataset assembly pipeline. This pipeline generates behavior report datasets containing synchronized
+    camera timestamps, behavior data, and experiment data for individual sessions."""
 
 
 class ManagingTrackers(StrEnum):
