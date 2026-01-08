@@ -1,4 +1,4 @@
-"""This module provides the assets for computing data integrity checksums."""
+"""Provides assets for computing data integrity checksums."""
 
 import os
 from pathlib import Path
@@ -8,9 +8,8 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 import xxhash
 
-# Defines a 'blacklist' set of files. Primarily, this list contains the service files that may change after the session
-# data has been acquired. Therefore, it does not make sense to include them in the checksum, as they do not reflect the
-# data that should remain permanently unchanged.
+# Stores the set of excluded files. This set contains service files that may change after session data acquisition,
+# so they should not be included in the checksum as they do not reflect permanently unchanged data.
 _excluded_files = {
     "ax_checksum.txt",
     "nk.bin",
@@ -53,7 +52,7 @@ def calculate_directory_checksum(
 ) -> str:
     """Calculates the xxHash3-128 checksum for the input directory.
 
-    Note:
+    Notes:
         The function can be configured to write the generated checksum as a hexadecimal string to the ax_checksum.txt
         file stored at the highest level of the input directory.
 

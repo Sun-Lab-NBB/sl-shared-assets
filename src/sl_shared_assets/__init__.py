@@ -1,4 +1,4 @@
-"""A Python library that provides data acquisition and processing assets shared between Sun (NeuroAI) lab libraries.
+"""Provides data acquisition and processing assets shared between Sun (NeuroAI) lab libraries.
 
 See https://github.com/Sun-Lab-NBB/sl-shared-assets for more details.
 API documentation: https://sl-shared-assets-api-docs.netlify.app/

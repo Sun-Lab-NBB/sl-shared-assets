@@ -1,6 +1,4 @@
-"""This module provides the Command-Line Interface (CLI) for configuring major components of the Sun lab data
-workflow.
-"""
+"""Provides the Command-Line Interface (CLI) for configuring major components of the Sun lab data workflow."""
 
 from pathlib import Path  # pragma: no cover
 

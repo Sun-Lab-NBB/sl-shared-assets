@@ -1,6 +1,4 @@
-"""This package provides the assets for storing the data acquired in the Sun lab and configuring all lab's data
-workflow components.
-"""
+"""Provides assets for storing data acquired in the Sun lab and configuring all lab's data workflow components."""
 
 from .dataset_data import (
     DatasetData,

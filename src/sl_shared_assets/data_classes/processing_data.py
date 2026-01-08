@@ -1,4 +1,4 @@
-"""This module provides the assets for running data processing pipelines."""
+"""Provides assets for running data processing pipelines."""
 
 import os
 import copy
@@ -113,7 +113,7 @@ class ProcessingTracker(YamlConfig):
     """Tracks the state of a data processing pipeline and provides tools for communicating this state between multiple
     processes and host-machines.
 
-    Note:
+    Notes:
         All modifications to the tracker file require the acquisition of the .lock file, which ensures exclusive
         access to the tracker's data, allowing multiple independent processes (jobs) to safely work with the same
         tracker file.
@@ -379,7 +379,7 @@ class ProcessingTracker(YamlConfig):
     def encountered_error(self) -> bool:
         """Returns True if the tracked processing pipeline has been terminated due to a runtime error.
 
-        Note:
+        Notes:
             The pipeline is considered to have encountered an error if any job has been marked as failed.
         """
         lock = FileLock(self.lock_path)

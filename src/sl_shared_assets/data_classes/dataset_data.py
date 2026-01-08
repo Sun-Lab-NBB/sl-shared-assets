@@ -1,6 +1,4 @@
-"""This module provides the assets that maintain the Sun lab analysis dataset data hierarchy across all machines used to
-process and store the data.
-"""
+"""Provides assets for maintaining the Sun lab analysis dataset data hierarchy across all processing machines."""
 
 import copy
 from pathlib import Path
@@ -328,7 +326,7 @@ class DatasetData(YamlConfig):
         # Resets path fields and cache to None before saving
         origin.tracking_data = None  # type: ignore[assignment]
         origin.dataset_data_path = None  # type: ignore[assignment]
-        origin._session_data_cache = None  # type: ignore[assignment]  #noqa: SLF001
+        origin._session_data_cache = None  # type: ignore[assignment]  # noqa: SLF001
 
         # Converts StrEnum instances to strings for YAML serialization
         origin.session_type = str(origin.session_type)

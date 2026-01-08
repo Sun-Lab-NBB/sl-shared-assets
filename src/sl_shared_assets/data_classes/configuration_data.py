@@ -1,4 +1,4 @@
-"""This module provides the assets used to configure data acquisition and processing runtimes in the Sun lab."""
+"""Provides assets for configuring data acquisition and processing runtimes in the Sun lab."""
 
 from copy import deepcopy
 from enum import StrEnum

@@ -1,4 +1,4 @@
-"""This module provides the assets used by data acquisition systems to store a subset of the acquired data."""
+"""Provides assets for storing runtime data acquired by data acquisition systems."""
 
 from dataclasses import dataclass  # pragma: no cover
 
@@ -228,7 +228,7 @@ class MesoscopePositions(YamlConfig):  # pragma: no cover
     mesoscope_fast_z: float = 0.0
     """The ScanImage's FastZ (virtual Z-axis) position, in micrometers."""
     mesoscope_tip: float = 0.0
-    """The ScanImage's Tilt position, in degrees.."""
+    """The ScanImage's Tilt position, in degrees."""
     mesoscope_tilt: float = 0.0
     """The ScanImage's Tip position, in degrees."""
     laser_power_mw: float = 0.0

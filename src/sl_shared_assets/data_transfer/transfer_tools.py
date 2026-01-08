@@ -1,6 +1,4 @@
-"""This module provides the assets for moving the data between destinations available on the host-machine's filesystem
-and removing the data from the host-machine.
-"""
+"""Provides assets for moving data between filesystem destinations and removing data from the host machine."""
 
 import os
 import shutil

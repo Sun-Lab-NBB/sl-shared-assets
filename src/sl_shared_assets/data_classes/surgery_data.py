@@ -1,4 +1,4 @@
-"""This module provides the assets used to store animal surgery data extracted from the Sun lab surgery log."""
+"""Provides assets for storing animal surgery data extracted from the Sun lab surgery log."""
 
 from dataclasses import dataclass  # pragma: no cover
 
@@ -47,8 +47,8 @@ class ProcedureData:  # pragma: no cover
     post_op_notes: str
     """The surgeon's notes taken during the post-surgery recovery period."""
     surgery_quality: int = 0
-    """The quality of the surgical intervention ob a scake from 0 to 3 inclusive. 0 indicates unusable (bad) result, 1 
-    indicates usable result that does not meet the publication threshold, 2 indicates publication-grade 
+    """The quality of the surgical intervention on a scale from 0 to 3 inclusive. 0 indicates unusable (bad) result, 1
+    indicates usable result that does not meet the publication threshold, 2 indicates publication-grade
     result, 3 indicates high-tier publication grade result."""
 
 
