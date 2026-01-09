@@ -1,4 +1,6 @@
-"""Provides assets for maintaining the Sun lab project data hierarchy across all data acquisition and processing machines."""
+"""Provides assets for maintaining the Sun lab project data hierarchy across all data acquisition and processing
+machines.
+"""
 
 import copy
 from enum import StrEnum

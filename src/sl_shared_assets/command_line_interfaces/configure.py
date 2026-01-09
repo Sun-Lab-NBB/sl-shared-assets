@@ -287,7 +287,7 @@ def generate_experiment_configuration_file(
 
     # Depending on the acquisition system, packs the resolved data into the experiment configuration class and
     # saves it to the project's configuration directory as a .yaml file.
-    if acquisition_system.name == "mesoscope-vr":
+    if acquisition_system == AcquisitionSystems.MESOSCOPE_VR:
         experiment_configuration = MesoscopeExperimentConfiguration(
             cues=cues,
             segments=segments,
