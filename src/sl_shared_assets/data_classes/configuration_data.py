@@ -702,7 +702,7 @@ def create_system_configuration_file(system: AcquisitionSystems | str) -> None:
         config_file.unlink()
 
     if system == AcquisitionSystems.MESOSCOPE_VR:
-        # Creates the precursor configuration file for the mesoscope-vr system
+        # Creates the precursor configuration file for the Mesoscope-VR system
         configuration = MesoscopeSystemConfiguration()
         configuration_path = directory.joinpath(f"{system}_system_configuration.yaml")
         configuration.save(path=configuration_path)
