@@ -1,3 +1,5 @@
+"""Contains tests for classes and methods provided by the data_transfer module."""
+
 from pathlib import Path
 import multiprocessing
 
@@ -15,14 +17,7 @@ from sl_shared_assets import (
 
 @pytest.fixture
 def sample_directory_structure(tmp_path) -> Path:
-    """Creates a sample directory structure for testing.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    Returns:
-        Path to the root of the created directory structure.
-    """
+    """Creates a sample directory structure for testing."""
     root = tmp_path / "test_source"
     root.mkdir()
 
@@ -50,14 +45,7 @@ def sample_directory_structure(tmp_path) -> Path:
 
 @pytest.fixture
 def large_directory_structure(tmp_path) -> Path:
-    """Creates a larger directory structure for performance testing.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    Returns:
-        Path to the root of the created directory structure.
-    """
+    """Creates a larger directory structure for performance testing."""
     root = tmp_path / "large_source"
     root.mkdir()
 
@@ -75,11 +63,7 @@ def large_directory_structure(tmp_path) -> Path:
 
 
 def test_delete_directory_basic(tmp_path):
-    """Verifies basic directory deletion functionality.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies basic directory deletion functionality."""
     # Creates a simple directory structure
     test_dir = tmp_path / "to_delete"
     test_dir.mkdir()
@@ -97,11 +81,7 @@ def test_delete_directory_basic(tmp_path):
 
 
 def test_delete_directory_nested(tmp_path):
-    """Verifies deletion of nested directory structures.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies deletion of nested directory structures."""
     # Creates nested structure
     root = tmp_path / "nested_root"
     root.mkdir()
@@ -125,22 +105,14 @@ def test_delete_directory_nested(tmp_path):
 
 
 def test_delete_directory_nonexistent(tmp_path):
-    """Verifies that deleting a non-existent directory does not raise errors.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies that deleting a non-existent directory does not raise errors."""
     nonexistent = tmp_path / "does_not_exist"
     # Should not raise any exception
     delete_directory(nonexistent)
 
 
 def test_delete_directory_empty(tmp_path):
-    """Verifies deletion of empty directories.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies deletion of empty directories."""
     empty_dir = tmp_path / "empty"
     empty_dir.mkdir()
 
@@ -150,12 +122,7 @@ def test_delete_directory_empty(tmp_path):
 
 
 def test_transfer_directory_basic(sample_directory_structure, tmp_path):
-    """Verifies basic directory transfer functionality.
-
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies basic directory transfer functionality."""
     source = sample_directory_structure
     destination = tmp_path / "test_destination"
 
@@ -183,13 +150,7 @@ def test_transfer_directory_basic(sample_directory_structure, tmp_path):
 
 @pytest.mark.parametrize("num_threads", [1, 2, 4, -1])
 def test_transfer_directory_multithreading(sample_directory_structure, tmp_path, num_threads):
-    """Verifies that transfer_directory works correctly with different thread counts.
-
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-        tmp_path: Pytest fixture providing a temporary directory path.
-        num_threads: Number of threads to use for transfer.
-    """
+    """Verifies that transfer_directory works correctly with different thread counts."""
     source = sample_directory_structure
     destination = tmp_path / f"dest_threads_{num_threads}"
 
@@ -205,12 +166,7 @@ def test_transfer_directory_multithreading(sample_directory_structure, tmp_path,
 
 
 def test_transfer_directory_with_removal(sample_directory_structure, tmp_path):
-    """Verifies that the source directory is removed when remove_source=True.
-
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies that the source directory is removed when remove_source=True."""
     source = sample_directory_structure
     destination = tmp_path / "dest_with_removal"
 
@@ -230,12 +186,7 @@ def test_transfer_directory_with_removal(sample_directory_structure, tmp_path):
 
 
 def test_transfer_directory_with_integrity_check(sample_directory_structure, tmp_path):
-    """Verifies the integrity verification feature of transfer_directory.
-
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies the integrity verification feature of transfer_directory."""
     source = sample_directory_structure
     destination = tmp_path / "dest_integrity"
 
@@ -252,12 +203,7 @@ def test_transfer_directory_with_integrity_check(sample_directory_structure, tmp
 
 
 def test_transfer_directory_with_existing_checksum(sample_directory_structure, tmp_path):
-    """Verifies transfer when the checksum file already exists.
-
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies transfer when the checksum file already exists."""
     source = sample_directory_structure
     destination = tmp_path / "dest_existing_checksum"
 
@@ -274,11 +220,7 @@ def test_transfer_directory_with_existing_checksum(sample_directory_structure, t
 
 
 def test_transfer_directory_nonexistent_source(tmp_path):
-    """Verifies that transferring a non-existent source raises FileNotFoundError.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies that transferring a non-existent source raises FileNotFoundError."""
     source = tmp_path / "nonexistent"
     destination = tmp_path / "destination"
 
@@ -287,11 +229,7 @@ def test_transfer_directory_nonexistent_source(tmp_path):
 
 
 def test_transfer_directory_preserves_structure(tmp_path):
-    """Verifies that complex directory hierarchies are preserved during transfer.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies that complex directory hierarchies are preserved during transfer."""
     # Creates complex structure
     source = tmp_path / "complex_source"
     source.mkdir()
@@ -324,11 +262,7 @@ def test_transfer_directory_preserves_structure(tmp_path):
 
 
 def test_transfer_directory_empty_source(tmp_path):
-    """Verifies transfer of an empty directory.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies transfer of an empty directory."""
     source = tmp_path / "empty_source"
     source.mkdir()
     destination = tmp_path / "empty_dest"
@@ -341,12 +275,7 @@ def test_transfer_directory_empty_source(tmp_path):
 
 
 def test_transfer_directory_large_dataset(large_directory_structure, tmp_path):
-    """Verifies transfer of a larger directory structure with multiple threads.
-
-    Args:
-        large_directory_structure: Fixture providing a large directory structure.
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies transfer of a larger directory structure with multiple threads."""
     source = large_directory_structure
     destination = tmp_path / "large_dest"
 
@@ -367,12 +296,7 @@ def test_transfer_directory_large_dataset(large_directory_structure, tmp_path):
 
 
 def test_transfer_directory_with_integrity_and_removal(sample_directory_structure, tmp_path):
-    """Verifies combined integrity verification and source removal.
-
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies combined integrity verification and source removal."""
     source = sample_directory_structure
     destination = tmp_path / "dest_integrity_removal"
 
@@ -394,11 +318,7 @@ def test_transfer_directory_with_integrity_and_removal(sample_directory_structur
 
 
 def test_delete_directory_parallel_performance(tmp_path):
-    """Verifies that parallel deletion works with many files.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies that parallel deletion works with many files."""
     # Creates a directory with many files
     test_dir = tmp_path / "many_files"
     test_dir.mkdir()
@@ -426,12 +346,7 @@ def test_delete_directory_parallel_performance(tmp_path):
 
 
 def test_transfer_directory_metadata_preservation(sample_directory_structure, tmp_path):
-    """Verifies that file metadata is preserved during transfer.
-
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies that file metadata is preserved during transfer."""
     source = sample_directory_structure
     destination = tmp_path / "dest_metadata"
 
@@ -454,12 +369,7 @@ def test_transfer_directory_metadata_preservation(sample_directory_structure, tm
 
 
 def test_transfer_directory_to_existing_destination(sample_directory_structure, tmp_path):
-    """Verifies transfer when the destination directory already exists.
-
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies transfer when the destination directory already exists."""
     source = sample_directory_structure
     destination = tmp_path / "existing_dest"
 
@@ -477,12 +387,7 @@ def test_transfer_directory_to_existing_destination(sample_directory_structure, 
 
 
 def test_transfer_directory_single_vs_multi_thread_consistency(sample_directory_structure, tmp_path):
-    """Verifies that single-threaded and multithreaded transfers produce identical results.
-
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies that single-threaded and multithreaded transfers produce identical results."""
     source = sample_directory_structure
     dest_single = tmp_path / "dest_single"
     dest_multi = tmp_path / "dest_multi"
@@ -507,11 +412,7 @@ def test_transfer_directory_single_vs_multi_thread_consistency(sample_directory_
 
 
 def test_calculate_directory_checksum_basic(sample_directory_structure):
-    """Verifies basic checksum calculation functionality.
-
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-    """
+    """Verifies basic checksum calculation functionality."""
     checksum = calculate_directory_checksum(directory=sample_directory_structure, save_checksum=False)
 
     # Verifies checksum is a valid hex string
@@ -521,11 +422,7 @@ def test_calculate_directory_checksum_basic(sample_directory_structure):
 
 
 def test_calculate_directory_checksum_saves_file(sample_directory_structure):
-    """Verifies that the checksum file is saved when save_checksum=True.
-
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-    """
+    """Verifies that the checksum file is saved when save_checksum=True."""
     checksum = calculate_directory_checksum(directory=sample_directory_structure, save_checksum=True)
 
     # Verifies checksum file exists
@@ -538,11 +435,7 @@ def test_calculate_directory_checksum_saves_file(sample_directory_structure):
 
 
 def test_calculate_directory_checksum_consistency(sample_directory_structure):
-    """Verifies that calculating checksum multiple times produces identical results.
-
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-    """
+    """Verifies that calculating checksum multiple times produces identical results."""
     checksum1 = calculate_directory_checksum(directory=sample_directory_structure, save_checksum=False)
     checksum2 = calculate_directory_checksum(directory=sample_directory_structure, save_checksum=False)
     checksum3 = calculate_directory_checksum(directory=sample_directory_structure, save_checksum=False)
@@ -552,12 +445,7 @@ def test_calculate_directory_checksum_consistency(sample_directory_structure):
 
 @pytest.mark.parametrize("num_processes", [1, 2, 4, None])
 def test_calculate_directory_checksum_multiprocessing(sample_directory_structure, num_processes):
-    """Verifies that checksum calculation produces consistent results with different process counts.
-
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-        num_processes: Number of processes to use for checksum calculation.
-    """
+    """Verifies that checksum calculation produces consistent results with different process counts."""
     checksum = calculate_directory_checksum(
         directory=sample_directory_structure, num_processes=num_processes, save_checksum=False
     )
@@ -575,12 +463,7 @@ def test_calculate_directory_checksum_multiprocessing(sample_directory_structure
 
 @pytest.mark.parametrize("progress", [True, False])
 def test_calculate_directory_checksum_progress_mode(sample_directory_structure, progress):
-    """Verifies that progress mode produces identical checksums (only affects progress display).
-
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-        progress: Whether to enable progress tracking.
-    """
+    """Verifies that progress mode produces identical checksums (only affects progress display)."""
     checksum = calculate_directory_checksum(
         directory=sample_directory_structure, progress=progress, save_checksum=False
     )
@@ -591,11 +474,7 @@ def test_calculate_directory_checksum_progress_mode(sample_directory_structure, 
 
 
 def test_calculate_directory_checksum_excludes_service_files(tmp_path):
-    """Verifies that service files are excluded from checksum calculation.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies that service files are excluded from checksum calculation."""
     # Creates a directory with regular and service files
     test_dir = tmp_path / "test_exclude"
     test_dir.mkdir()
@@ -618,11 +497,7 @@ def test_calculate_directory_checksum_excludes_service_files(tmp_path):
 
 
 def test_calculate_directory_checksum_empty_directory(tmp_path):
-    """Verifies checksum calculation for an empty directory.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies checksum calculation for an empty directory."""
     empty_dir = tmp_path / "empty"
     empty_dir.mkdir()
 
@@ -634,11 +509,7 @@ def test_calculate_directory_checksum_empty_directory(tmp_path):
 
 
 def test_calculate_directory_checksum_content_sensitivity(tmp_path):
-    """Verifies that checksum changes when file content changes.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies that checksum changes when file content changes."""
     test_dir = tmp_path / "content_test"
     test_dir.mkdir()
 
@@ -655,11 +526,7 @@ def test_calculate_directory_checksum_content_sensitivity(tmp_path):
 
 
 def test_calculate_directory_checksum_structure_sensitivity(tmp_path):
-    """Verifies that checksum changes when the directory structure changes.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies that checksum changes when the directory structure changes."""
     test_dir = tmp_path / "structure_test"
     test_dir.mkdir()
 
@@ -676,11 +543,7 @@ def test_calculate_directory_checksum_structure_sensitivity(tmp_path):
 
 
 def test_calculate_directory_checksum_path_sensitivity(tmp_path):
-    """Verifies that checksum reflects file paths (not just content).
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies that checksum reflects file paths (not just content)."""
     # Creates two directories with the same content but different paths
     dir1 = tmp_path / "dir1"
     dir1.mkdir()
@@ -700,11 +563,7 @@ def test_calculate_directory_checksum_path_sensitivity(tmp_path):
 
 
 def test_calculate_directory_checksum_large_files(tmp_path):
-    """Verifies checksum calculation with large files (tests chunked reading).
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies checksum calculation with large files (tests chunked reading)."""
     test_dir = tmp_path / "large_files"
     test_dir.mkdir()
 
@@ -724,11 +583,7 @@ def test_calculate_directory_checksum_large_files(tmp_path):
 
 
 def test_calculate_directory_checksum_nested_structure(tmp_path):
-    """Verifies checksum calculation with deeply nested directory structures.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies checksum calculation with deeply nested directory structures."""
     # Creates a deeply nested structure
     test_dir = tmp_path / "nested"
     current = test_dir
@@ -745,11 +600,7 @@ def test_calculate_directory_checksum_nested_structure(tmp_path):
 
 
 def test_calculate_directory_checksum_with_existing_checksum_file(tmp_path):
-    """Verifies behavior when the checksum file already exists.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies behavior when the checksum file already exists."""
     test_dir = tmp_path / "existing_checksum"
     test_dir.mkdir()
     (test_dir / "file.txt").write_text("content")
@@ -767,11 +618,7 @@ def test_calculate_directory_checksum_with_existing_checksum_file(tmp_path):
 
 
 def test_calculate_directory_checksum_different_structures(tmp_path):
-    """Verifies that different directory structures produce different checksums.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies that different directory structures produce different checksums."""
     # Creates first structure
     dir1 = tmp_path / "struct1"
     dir1.mkdir()
@@ -794,11 +641,7 @@ def test_calculate_directory_checksum_different_structures(tmp_path):
 
 
 def test_calculate_directory_checksum_binary_files(tmp_path):
-    """Verifies checksum calculation with binary files.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-    """
+    """Verifies checksum calculation with binary files."""
     test_dir = tmp_path / "binary_test"
     test_dir.mkdir()
 
@@ -820,11 +663,6 @@ def test_calculate_directory_checksum_binary_files(tmp_path):
 
 def test_transfer_directory_integrity_check_detects_corruption(sample_directory_structure, tmp_path, monkeypatch):
     """Verifies that integrity verification detects corrupted transfers.
-
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-        tmp_path: Pytest fixture providing a temporary directory path.
-        monkeypatch: Pytest fixture for modifying behavior.
 
     This test simulates a corrupted file transfer by monkeypatching the checksum
     calculation to return different values for source and destination.
@@ -873,10 +711,6 @@ def test_transfer_directory_integrity_check_detects_corruption(sample_directory_
 
 def test_transfer_directory_checksum_path_truncation(tmp_path, monkeypatch):
     """Verifies that error messages truncate long paths to the last 6 parts.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        monkeypatch: Pytest fixture for modifying behavior.
 
     This test verifies the Path(*parts[-6:]) truncation in error messages.
     """
@@ -928,11 +762,6 @@ def test_transfer_directory_integrity_check_corruption_prevents_removal(
 ):
     """Verifies that the source is NOT removed when an integrity check fails.
 
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-        tmp_path: Pytest fixture providing a temporary directory path.
-        monkeypatch: Pytest fixture for modifying behavior.
-
     This test ensures that if a transfer is corrupted, the source data is preserved.
     """
     source = sample_directory_structure
@@ -970,10 +799,6 @@ def test_transfer_directory_integrity_check_corruption_prevents_removal(
 def test_transfer_directory_integrity_check_with_progress(sample_directory_structure, tmp_path):
     """Verifies that integrity verification works with progress tracking enabled.
 
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-        tmp_path: Pytest fixture providing a temporary directory path.
-
     This test ensures progress bars don't interfere with integrity verification.
     """
     source = sample_directory_structure
@@ -998,9 +823,6 @@ def test_transfer_directory_integrity_check_with_progress(sample_directory_struc
 
 def test_transfer_directory_creates_checksum_when_missing(tmp_path):
     """Verifies that checksum is automatically created if missing when verify_integrity=True.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
 
     This test ensures the function handles missing checksums gracefully.
     """
@@ -1033,10 +855,6 @@ def test_transfer_directory_creates_checksum_when_missing(tmp_path):
 def test_transfer_directory_preserves_checksum_file(sample_directory_structure, tmp_path):
     """Verifies that the original checksum file is preserved in the source.
 
-    Args:
-        sample_directory_structure: Fixture providing a sample directory structure.
-        tmp_path: Pytest fixture providing a temporary directory path.
-
     This test ensures the checksum file created during transfer remains in the source.
     """
     source = sample_directory_structure
@@ -1063,10 +881,6 @@ def test_transfer_directory_preserves_checksum_file(sample_directory_structure, 
 
 def test_transfer_directory_integrity_multithread_consistency(large_directory_structure, tmp_path):
     """Verifies that integrity checking works correctly with multithreaded transfers.
-
-    Args:
-        large_directory_structure: Fixture providing a large directory structure.
-        tmp_path: Pytest fixture providing a temporary directory path.
 
     This test ensures parallel file transfers don't compromise integrity verification.
     """

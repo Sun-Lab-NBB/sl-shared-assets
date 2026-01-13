@@ -1,3 +1,5 @@
+"""Contains tests for classes and methods provided by the data_classes module."""
+
 from pathlib import Path
 
 import pytest
@@ -42,11 +44,7 @@ from sl_shared_assets.data_classes.configuration_data import (
 
 @pytest.fixture
 def sample_mesoscope_config() -> MesoscopeSystemConfiguration:
-    """Creates a sample MesoscopeSystemConfiguration for testing.
-
-    Returns:
-        A configured MesoscopeSystemConfiguration instance.
-    """
+    """Creates a sample MesoscopeSystemConfiguration for testing."""
     config = MesoscopeSystemConfiguration()
     config.filesystem.root_directory = Path("/data/projects")
     config.filesystem.server_directory = Path("/mnt/server/projects")
@@ -59,11 +57,7 @@ def sample_mesoscope_config() -> MesoscopeSystemConfiguration:
 
 @pytest.fixture
 def sample_experiment_config() -> MesoscopeExperimentConfiguration:
-    """Creates a sample MesoscopeExperimentConfiguration for testing.
-
-    Returns:
-        A configured MesoscopeExperimentConfiguration instance.
-    """
+    """Creates a sample MesoscopeExperimentConfiguration for testing."""
     state = MesoscopeExperimentState(
         experiment_state_code=1,
         system_state_code=0,
@@ -108,15 +102,7 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
 
 @pytest.fixture
 def clean_working_directory(tmp_path, monkeypatch):
-    """Sets up a clean temporary working directory for testing.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
-    Returns:
-        Path to the temporary working directory.
-    """
+    """Sets up a clean temporary working directory for testing."""
     # Patches appdirs to use temporary directory
     app_dir = tmp_path / "app_data"
     app_dir.mkdir()
@@ -130,14 +116,7 @@ def clean_working_directory(tmp_path, monkeypatch):
 
 @pytest.fixture
 def sample_session_hierarchy(tmp_path) -> Path:
-    """Creates a sample session directory hierarchy for testing.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    Returns:
-        Path to the root session directory.
-    """
+    """Creates a sample session directory hierarchy for testing."""
     # Creates the session hierarchy: root/project/animal/session/raw_data
     root = tmp_path / "data"
     session_path = root / "test_project" / "test_animal" / "2024-01-15-12-30-45-123456" / "raw_data"
@@ -212,9 +191,6 @@ def test_raw_data_default_initialization():
 def test_raw_data_resolve_paths(tmp_path):
     """Verifies that resolve_paths correctly generates all data paths.
 
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
     This test ensures all paths are properly resolved from the root directory.
     """
     raw_data = RawData()
@@ -234,9 +210,6 @@ def test_raw_data_resolve_paths(tmp_path):
 
 def test_raw_data_make_directories(tmp_path):
     """Verifies that make_directories creates all required subdirectories.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
 
     This test ensures the directory creation method works correctly.
     """
@@ -271,9 +244,6 @@ def test_processed_data_default_initialization():
 def test_processed_data_resolve_paths(tmp_path):
     """Verifies that resolve_paths correctly generates all data paths.
 
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
     This test ensures all paths are properly resolved from the root directory.
     """
     processed_data = ProcessedData()
@@ -289,9 +259,6 @@ def test_processed_data_resolve_paths(tmp_path):
 
 def test_processed_data_make_directories(tmp_path):
     """Verifies that make_directories creates all required subdirectories.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
 
     This test ensures the directory creation method works correctly.
     """
@@ -322,9 +289,6 @@ def test_tracking_data_default_initialization():
 def test_tracking_data_resolve_paths(tmp_path):
     """Verifies that resolve_paths correctly generates all data paths.
 
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
     This test ensures all paths are properly resolved from the root directory.
     """
     tracking_data = TrackingData()
@@ -337,9 +301,6 @@ def test_tracking_data_resolve_paths(tmp_path):
 
 def test_tracking_data_make_directories(tmp_path):
     """Verifies that make_directories creates the tracking directory.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
 
     This test ensures the directory creation method works correctly.
     """
@@ -375,11 +336,6 @@ def test_session_data_post_init_creates_nested_instances():
 def test_session_data_create_requires_valid_session_type(clean_working_directory, sample_mesoscope_config, monkeypatch):
     """Verifies that create() raises ValueError for invalid session types.
 
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        sample_mesoscope_config: Fixture providing a sample configuration.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures only valid SessionTypes are accepted.
     """
     app_dir = clean_working_directory.parent / "app_data"
@@ -408,11 +364,6 @@ def test_session_data_create_requires_valid_session_type(clean_working_directory
 
 def test_session_data_create_generates_session_directory(clean_working_directory, sample_mesoscope_config, monkeypatch):
     """Verifies that create() generates the complete session directory structure.
-
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        sample_mesoscope_config: Fixture providing a sample configuration.
-        monkeypatch: Pytest fixture for modifying environment variables.
 
     This test ensures all session directories are created correctly.
     """
@@ -448,11 +399,6 @@ def test_session_data_create_generates_session_directory(clean_working_directory
 def test_session_data_create_saves_session_data_yaml(clean_working_directory, sample_mesoscope_config, monkeypatch):
     """Verifies that create() saves the session_data.yaml file.
 
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        sample_mesoscope_config: Fixture providing a sample configuration.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures the session metadata file is created.
     """
     app_dir = clean_working_directory.parent / "app_data"
@@ -486,11 +432,6 @@ def test_session_data_create_saves_session_data_yaml(clean_working_directory, sa
 def test_session_data_create_marks_with_nk_file(clean_working_directory, sample_mesoscope_config, monkeypatch):
     """Verifies that create() marks new sessions with the nk.bin file.
 
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        sample_mesoscope_config: Fixture providing a sample configuration.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures new sessions are properly marked for initialization tracking.
     """
     app_dir = clean_working_directory.parent / "app_data"
@@ -521,9 +462,6 @@ def test_session_data_create_marks_with_nk_file(clean_working_directory, sample_
 def test_session_data_load_finds_session_data_yaml(sample_session_hierarchy):
     """Verifies that load() successfully finds and loads session_data.yaml.
 
-    Args:
-        sample_session_hierarchy: Fixture providing a sample session directory structure.
-
     This test ensures the load method can locate the session data file.
     """
     # Creates a session_data.yaml file
@@ -553,9 +491,6 @@ sl_experiment_version: 3.0.0
 def test_session_data_load_raises_error_no_session_data_file(tmp_path):
     """Verifies that load() raises FileNotFoundError when no session_data.yaml exists.
 
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
     This test ensures proper error handling for missing session data files.
     """
     empty_dir = tmp_path / "empty_session"
@@ -567,9 +502,6 @@ def test_session_data_load_raises_error_no_session_data_file(tmp_path):
 
 def test_session_data_load_raises_error_multiple_session_data_files(tmp_path):
     """Verifies that load() raises FileNotFoundError when multiple session_data.yaml files exist.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
 
     This test ensures proper error handling for ambiguous session hierarchies.
     """
@@ -588,9 +520,6 @@ def test_session_data_load_raises_error_multiple_session_data_files(tmp_path):
 
 def test_session_data_load_resolves_all_paths(sample_session_hierarchy):
     """Verifies that load() resolves all RawData, ProcessedData, and TrackingData paths.
-
-    Args:
-        sample_session_hierarchy: Fixture providing a sample session directory structure.
 
     This test ensures all session data paths are properly initialized after loading.
     """
@@ -626,9 +555,6 @@ sl_experiment_version: 3.0.0
 def test_session_data_load_creates_processed_and_tracking_directories(sample_session_hierarchy):
     """Verifies that load() creates processed_data and tracking_data directories.
 
-    Args:
-        sample_session_hierarchy: Fixture providing a sample session directory structure.
-
     This test ensures missing processing directories are created during load() runtime.
     """
     raw_data_path = sample_session_hierarchy / "raw_data"
@@ -655,9 +581,6 @@ sl_experiment_version: 3.0.0
 
 def test_session_data_runtime_initialized_removes_nk_file(sample_session_hierarchy):
     """Verifies that runtime_initialized() removes the nk.bin marker file.
-
-    Args:
-        sample_session_hierarchy: Fixture providing a sample session directory structure.
 
     This test ensures the initialization marker is properly removed.
     """
@@ -692,9 +615,6 @@ sl_experiment_version: 3.0.0
 def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy):
     """Verifies that save() converts SessionTypes and AcquisitionSystems to strings.
 
-    Args:
-        sample_session_hierarchy: Fixture providing a sample session directory structure.
-
     This test ensures enum values are properly serialized in YAML.
     """
     raw_data_path = sample_session_hierarchy / "raw_data"
@@ -720,9 +640,6 @@ def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy):
 
 def test_session_data_save_does_not_include_path_objects(sample_session_hierarchy):
     """Verifies that save() excludes path objects from the saved YAML.
-
-    Args:
-        sample_session_hierarchy: Fixture providing a sample session directory structure.
 
     This test ensures only metadata is saved, not path instances.
     """
@@ -854,7 +771,7 @@ def test_water_reward_trial_initialization():
         stimulus_location_cm=190.0,
     )
 
-    # Create config to populate derived fields
+    # Creates config to populate derived fields
     config = _create_test_config_with_trial(trial)
     populated_trial = config.trial_structures["test_trial"]
 
@@ -881,7 +798,7 @@ def test_gas_puff_trial_initialization():
         stimulus_location_cm=190.0,
     )
 
-    # Create config to populate derived fields
+    # Creates config to populate derived fields
     config = _create_test_config_with_trial(trial)
     populated_trial = config.trial_structures["test_trial"]
 
@@ -908,7 +825,7 @@ def test_trial_types():
         stimulus_location_cm=190.0,
     )
 
-    # Create config to populate derived fields
+    # Creates config to populate derived fields
     config = _create_test_config_with_trial(water_trial)
     water_trial = config.trial_structures["test_trial"]
 
@@ -930,7 +847,7 @@ def test_trial_types():
         stimulus_location_cm=190.0,
     )
 
-    # Create config to populate derived fields
+    # Creates config to populate derived fields
     config = _create_test_config_with_trial(gas_trial)
     gas_trial = config.trial_structures["test_trial"]
 
@@ -1366,10 +1283,6 @@ def test_mesoscope_system_configuration_post_init_invalid_valve_calibration():
 def test_mesoscope_system_configuration_save_yaml(tmp_path, sample_mesoscope_config):
     """Verifies that save() correctly writes configuration to YAML file.
 
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        sample_mesoscope_config: Fixture providing a sample configuration.
-
     This test ensures configuration data is properly saved as YAML.
     """
     yaml_path = tmp_path / "test_config.yaml"
@@ -1388,10 +1301,6 @@ def test_mesoscope_system_configuration_save_yaml(tmp_path, sample_mesoscope_con
 def test_mesoscope_system_configuration_save_converts_paths(tmp_path, sample_mesoscope_config):
     """Verifies that save() converts Path objects to strings in YAML.
 
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        sample_mesoscope_config: Fixture providing a sample configuration.
-
     This test ensures Path objects are serialized as strings in the YAML file.
     """
     yaml_path = tmp_path / "test_config.yaml"
@@ -1408,10 +1317,6 @@ def test_mesoscope_system_configuration_save_converts_paths(tmp_path, sample_mes
 def test_mesoscope_system_configuration_save_converts_valve_calibration(tmp_path, sample_mesoscope_config):
     """Verifies that save() converts valve calibration tuple to dict in YAML.
 
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        sample_mesoscope_config: Fixture providing a sample configuration.
-
     This test ensures valve calibration data is serialized as a dictionary.
     """
     yaml_path = tmp_path / "test_config.yaml"
@@ -1426,10 +1331,6 @@ def test_mesoscope_system_configuration_save_converts_valve_calibration(tmp_path
 
 def test_mesoscope_system_configuration_save_does_not_modify_original(tmp_path, sample_mesoscope_config):
     """Verifies that save() does not modify the original configuration instance.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        sample_mesoscope_config: Fixture providing a sample configuration.
 
     This test ensures the original instance remains unchanged after saving.
     """
@@ -1448,10 +1349,6 @@ def test_mesoscope_system_configuration_save_does_not_modify_original(tmp_path, 
 
 def test_mesoscope_system_configuration_yaml_round_trip(tmp_path, sample_mesoscope_config):
     """Verifies that configuration can be saved and loaded without data loss.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        sample_mesoscope_config: Fixture providing a sample configuration.
 
     This test ensures YAML serialization/deserialization preserves all data.
     """
@@ -1480,9 +1377,6 @@ def test_mesoscope_system_configuration_yaml_round_trip(tmp_path, sample_mesosco
 def test_mesoscope_experiment_configuration_initialization(sample_experiment_config):
     """Verifies basic initialization of MesoscopeExperimentConfiguration.
 
-    Args:
-        sample_experiment_config: Fixture providing a sample experiment configuration.
-
     This test ensures all fields are properly assigned during initialization.
     """
     assert len(sample_experiment_config.cues) == 3
@@ -1495,9 +1389,6 @@ def test_mesoscope_experiment_configuration_initialization(sample_experiment_con
 
 def test_mesoscope_experiment_configuration_nested_structures(sample_experiment_config):
     """Verifies nested dataclass structures in MesoscopeExperimentConfiguration.
-
-    Args:
-        sample_experiment_config: Fixture providing a sample experiment configuration.
 
     This test ensures nested experiment states and trials are properly initialized.
     """
@@ -1512,10 +1403,6 @@ def test_mesoscope_experiment_configuration_nested_structures(sample_experiment_
 
 def test_mesoscope_experiment_configuration_yaml_serialization(tmp_path, sample_experiment_config):
     """Verifies that MesoscopeExperimentConfiguration can be saved as YAML.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        sample_experiment_config: Fixture providing a sample experiment configuration.
 
     This test ensures the experiment configuration is properly serialized to YAML.
     """
@@ -1532,10 +1419,6 @@ def test_mesoscope_experiment_configuration_yaml_serialization(tmp_path, sample_
 
 def test_mesoscope_experiment_configuration_yaml_deserialization(tmp_path, sample_experiment_config):
     """Verifies that MesoscopeExperimentConfiguration can be loaded from YAML.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        sample_experiment_config: Fixture providing a sample experiment configuration.
 
     This test ensures the experiment configuration is properly deserialized from YAML.
     """
@@ -1555,10 +1438,6 @@ def test_mesoscope_experiment_configuration_yaml_deserialization(tmp_path, sampl
 def test_set_working_directory_creates_directory(clean_working_directory, monkeypatch):
     """Verifies that set_working_directory creates the directory if it does not exist.
 
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures the function creates missing directories.
     """
     new_dir = clean_working_directory.parent / "new_working_dir"
@@ -1576,10 +1455,6 @@ def test_set_working_directory_creates_directory(clean_working_directory, monkey
 def test_set_working_directory_writes_path_file(clean_working_directory, monkeypatch):
     """Verifies that set_working_directory writes the path to the cache file.
 
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures the working directory path is cached correctly.
     """
     app_dir = clean_working_directory.parent / "app_data"
@@ -1594,10 +1469,6 @@ def test_set_working_directory_writes_path_file(clean_working_directory, monkeyp
 
 def test_set_working_directory_creates_app_directory(tmp_path, monkeypatch):
     """Verifies that set_working_directory creates the app data directory.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        monkeypatch: Pytest fixture for modifying environment variables.
 
     This test ensures the application data directory is created if missing.
     """
@@ -1614,10 +1485,6 @@ def test_set_working_directory_creates_app_directory(tmp_path, monkeypatch):
 
 def test_set_working_directory_overwrites_existing(clean_working_directory, monkeypatch):
     """Verifies that set_working_directory overwrites an existing cached path.
-
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
 
     This test ensures the function can update an existing working directory path.
     """
@@ -1644,10 +1511,6 @@ def test_set_working_directory_overwrites_existing(clean_working_directory, monk
 def test_get_working_directory_returns_cached_path(clean_working_directory, monkeypatch):
     """Verifies that get_working_directory returns the cached directory path.
 
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures the function retrieves the correct cached path.
     """
     app_dir = clean_working_directory.parent / "app_data"
@@ -1662,10 +1525,6 @@ def test_get_working_directory_returns_cached_path(clean_working_directory, monk
 def test_get_working_directory_raises_error_if_not_set(tmp_path, monkeypatch):
     """Verifies that get_working_directory raises FileNotFoundError if not configured.
 
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures the function raises an appropriate error when unconfigured.
     """
     app_dir = tmp_path / "empty_app_data"
@@ -1677,10 +1536,6 @@ def test_get_working_directory_raises_error_if_not_set(tmp_path, monkeypatch):
 
 def test_get_working_directory_raises_error_if_directory_missing(clean_working_directory, monkeypatch):
     """Verifies that get_working_directory raises error if cached directory does not exist.
-
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
 
     This test ensures the function detects when the cached path no longer exists.
     """
@@ -1704,10 +1559,6 @@ def test_get_working_directory_raises_error_if_directory_missing(clean_working_d
 def test_set_google_credentials_path_creates_cache_file(tmp_path, monkeypatch):
     """Verifies that set_google_credentials_path creates the credentials' cache file.
 
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures the credentials' path is properly cached.
     """
     app_dir = tmp_path / "app_data"
@@ -1726,10 +1577,6 @@ def test_set_google_credentials_path_creates_cache_file(tmp_path, monkeypatch):
 def test_set_google_credentials_path_raises_error_file_not_exists(tmp_path, monkeypatch):
     """Verifies that set_google_credentials_path raises error for non-existent files.
 
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures the function validates file existence.
     """
     app_dir = tmp_path / "app_data"
@@ -1743,10 +1590,6 @@ def test_set_google_credentials_path_raises_error_file_not_exists(tmp_path, monk
 
 def test_set_google_credentials_path_raises_error_wrong_extension(tmp_path, monkeypatch):
     """Verifies that set_google_credentials_path raises error for non-JSON files.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        monkeypatch: Pytest fixture for modifying environment variables.
 
     This test ensures the function validates the file extension.
     """
@@ -1766,10 +1609,6 @@ def test_set_google_credentials_path_raises_error_wrong_extension(tmp_path, monk
 def test_get_google_credentials_path_returns_cached_path(tmp_path, monkeypatch):
     """Verifies that get_google_credentials_path returns the cached credentials path.
 
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures the function retrieves the correct cached credentials path.
     """
     app_dir = tmp_path / "app_data"
@@ -1787,10 +1626,6 @@ def test_get_google_credentials_path_returns_cached_path(tmp_path, monkeypatch):
 def test_get_google_credentials_path_raises_error_if_not_set(tmp_path, monkeypatch):
     """Verifies that get_google_credentials_path raises an error if not configured.
 
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures the function raises an error when the credentials' path is not set.
     """
     app_dir = tmp_path / "empty_app_data"
@@ -1802,10 +1637,6 @@ def test_get_google_credentials_path_raises_error_if_not_set(tmp_path, monkeypat
 
 def test_get_google_credentials_path_raises_error_if_file_missing(tmp_path, monkeypatch):
     """Verifies that get_google_credentials_path raises an error if the cached file no longer exists.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        monkeypatch: Pytest fixture for modifying environment variables.
 
     This test ensures the function detects when the cached credentials file is missing.
     """
@@ -1830,10 +1661,6 @@ def test_get_google_credentials_path_raises_error_if_file_missing(tmp_path, monk
 def test_create_system_configuration_file_mesoscope_vr(clean_working_directory, monkeypatch):
     """Verifies that create_system_configuration_file creates a Mesoscope-VR config file.
 
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures the function creates the correct configuration file.
     """
     app_dir = clean_working_directory.parent / "app_data"
@@ -1849,10 +1676,6 @@ def test_create_system_configuration_file_mesoscope_vr(clean_working_directory, 
 
 def test_create_system_configuration_file_removes_existing(clean_working_directory, monkeypatch):
     """Verifies that create_system_configuration_file removes existing config files.
-
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
 
     This test ensures only one configuration file exists after creation.
     """
@@ -1879,10 +1702,6 @@ def test_create_system_configuration_file_removes_existing(clean_working_directo
 def test_create_system_configuration_file_invalid_system(clean_working_directory, monkeypatch):
     """Verifies that create_system_configuration_file raises ValueError for invalid systems.
 
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures the function rejects unsupported acquisition systems.
     """
     app_dir = clean_working_directory.parent / "app_data"
@@ -1896,10 +1715,6 @@ def test_create_system_configuration_file_invalid_system(clean_working_directory
 
 def test_create_system_configuration_file_creates_valid_yaml(clean_working_directory, monkeypatch):
     """Verifies that create_system_configuration_file creates valid YAML content.
-
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
 
     This test ensures the created configuration file has a valid YAML structure.
     """
@@ -1928,11 +1743,6 @@ def test_get_system_configuration_data_loads_mesoscope_config(
 ):
     """Verifies that get_system_configuration_data loads MesoscopeSystemConfiguration.
 
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        sample_mesoscope_config: Fixture providing a sample configuration.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures the function correctly loads configuration data.
     """
     app_dir = clean_working_directory.parent / "app_data"
@@ -1954,10 +1764,6 @@ def test_get_system_configuration_data_loads_mesoscope_config(
 def test_get_system_configuration_data_raises_error_no_config(clean_working_directory, monkeypatch):
     """Verifies that get_system_configuration_data raises an error when no config exists.
 
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures the function raises an error when no configuration file is found.
     """
     app_dir = clean_working_directory.parent / "app_data"
@@ -1971,10 +1777,6 @@ def test_get_system_configuration_data_raises_error_no_config(clean_working_dire
 
 def test_get_system_configuration_data_raises_error_multiple_configs(clean_working_directory, monkeypatch):
     """Verifies that get_system_configuration_data raises error with multiple configs.
-
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
 
     This test ensures the function rejects directories with multiple configuration files.
     """
@@ -1994,10 +1796,6 @@ def test_get_system_configuration_data_raises_error_multiple_configs(clean_worki
 def test_get_system_configuration_data_raises_error_unsupported_config(clean_working_directory, monkeypatch):
     """Verifies that get_system_configuration_data raises error for unsupported config names.
 
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures the function rejects unrecognized configuration file names.
     """
     app_dir = clean_working_directory.parent / "app_data"
@@ -2014,11 +1812,6 @@ def test_get_system_configuration_data_raises_error_unsupported_config(clean_wor
 
 def test_get_system_configuration_data_path_types(clean_working_directory, sample_mesoscope_config, monkeypatch):
     """Verifies that get_system_configuration_data returns Path objects (not strings).
-
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        sample_mesoscope_config: Fixture providing a sample configuration.
-        monkeypatch: Pytest fixture for modifying environment variables.
 
     This test ensures path fields are properly converted to Path objects after loading.
     """
@@ -2043,11 +1836,6 @@ def test_get_system_configuration_data_valve_calibration_tuple(
 ):
     """Verifies that get_system_configuration_data returns valve_calibration_data as a tuple.
 
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        sample_mesoscope_config: Fixture providing a sample configuration.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures valve calibration data is converted to tuple format after loading.
     """
     app_dir = clean_working_directory.parent / "app_data"
@@ -2069,11 +1857,6 @@ def test_session_data_create_raises_error_if_project_does_not_exist(
     clean_working_directory, sample_mesoscope_config, monkeypatch
 ):
     """Verifies that create() raises FileNotFoundError when the project doesn't exist.
-
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        sample_mesoscope_config: Fixture providing a sample configuration.
-        monkeypatch: Pytest fixture for modifying environment variables.
 
     This test ensures sessions cannot be created for non-existent projects.
     """
@@ -2107,12 +1890,6 @@ def test_session_data_create_copies_experiment_configuration(
     clean_working_directory, sample_mesoscope_config, sample_experiment_config, monkeypatch
 ):
     """Verifies that create() copies experiment configuration when experiment_name is provided.
-
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        sample_mesoscope_config: Fixture providing a sample configuration.
-        sample_experiment_config: Fixture providing a sample experiment configuration.
-        monkeypatch: Pytest fixture for modifying environment variables.
 
     This test ensures experiment configuration files are copied to session directories.
     """
@@ -2162,11 +1939,6 @@ def test_session_data_create_without_experiment_name_skips_experiment_config(
 ):
     """Verifies that create() does not copy experiment config when experiment_name is None.
 
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        sample_mesoscope_config: Fixture providing a sample configuration.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures experiment configuration is only copied for experiment sessions.
     """
     app_dir = clean_working_directory.parent / "app_data"
@@ -2203,11 +1975,6 @@ def test_session_data_create_without_experiment_name_skips_experiment_config(
 
 def test_session_data_create_saves_system_configuration(clean_working_directory, sample_mesoscope_config, monkeypatch):
     """Verifies that create() saves the system configuration to the session directory.
-
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        sample_mesoscope_config: Fixture providing a sample configuration.
-        monkeypatch: Pytest fixture for modifying environment variables.
 
     This test ensures the system configuration snapshot is saved with each session.
     """
@@ -2303,9 +2070,6 @@ def test_server_configuration_custom_initialization():
 def test_server_configuration_yaml_round_trip(tmp_path):
     """Verifies that ServerConfiguration survives YAML serialization.
 
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
     This test ensures YAML round-trip preserves all data.
     """
     yaml_path = tmp_path / "server_config.yaml"
@@ -2331,10 +2095,6 @@ def test_server_configuration_yaml_round_trip(tmp_path):
 def test_create_server_configuration_file(clean_working_directory, monkeypatch):
     """Verifies that create_server_configuration_file creates user config.
 
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures the user server configuration is created correctly.
     """
     app_dir = clean_working_directory.parent / "app_data"
@@ -2358,10 +2118,6 @@ def test_create_server_configuration_file(clean_working_directory, monkeypatch):
 
 def test_create_server_configuration_file_custom_parameters(clean_working_directory, monkeypatch):
     """Verifies that create_server_configuration_file accepts custom parameters.
-
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
 
     This test ensures custom server parameters are preserved.
     """
@@ -2394,10 +2150,6 @@ def test_create_server_configuration_file_custom_parameters(clean_working_direct
 def test_get_server_configuration_user(clean_working_directory, monkeypatch):
     """Verifies that get_server_configuration loads user config.
 
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
-
     This test ensures user configuration can be retrieved.
     """
     app_dir = clean_working_directory.parent / "app_data"
@@ -2420,10 +2172,6 @@ def test_get_server_configuration_user(clean_working_directory, monkeypatch):
 
 def test_get_server_configuration_raises_error_if_missing(clean_working_directory, monkeypatch):
     """Verifies that get_server_configuration raises error when config missing.
-
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
 
     This test ensures proper error handling for missing configurations.
     """

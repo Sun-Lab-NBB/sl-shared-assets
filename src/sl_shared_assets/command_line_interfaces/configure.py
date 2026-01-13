@@ -27,7 +27,7 @@ CONTEXT_SETTINGS = {"max_content_width": 120}  # pragma: no cover
 
 @click.group("configure", context_settings=CONTEXT_SETTINGS)
 def configure() -> None:  # pragma: no cover
-    """This Command-Line Interface allows configuring major components of the Sun lab data workflow."""
+    """Configures major components of the Sun lab data workflow."""
 
 
 @configure.command("directory")

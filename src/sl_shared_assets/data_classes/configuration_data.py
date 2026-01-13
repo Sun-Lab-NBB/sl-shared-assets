@@ -20,8 +20,8 @@ class AcquisitionSystems(StrEnum):
     """Defines the data acquisition systems currently used in the Sun lab."""
 
     MESOSCOPE_VR = "mesoscope"
-    """This system is built around the 2-Photon Random Access Mesoscope (2P-RAM) and relies on Virtual Reality (VR)
-    environments running in Unity game engine to conduct experiments."""
+    """Uses the 2-Photon Random Access Mesoscope (2P-RAM) with Virtual Reality (VR) environments running in Unity game
+    engine to conduct experiments."""
 
 
 @dataclass()
@@ -600,7 +600,7 @@ class ServerConfiguration(YamlConfig):
 
     def __post_init__(self) -> None:
         """Resolves all server-side directory paths."""
-        # Stores directory paths as strings as this is used by the paramiko bindings in the Server class from the
+        # Stores directory paths as strings, as this is required by the paramiko bindings in the Server class from the
         # sl-forgery library.
         self.shared_storage_root = str(Path(self.storage_root).joinpath(self.shared_directory_name))
         self.shared_working_root = str(Path(self.working_root).joinpath(self.shared_directory_name))

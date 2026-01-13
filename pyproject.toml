@@ -3,10 +3,10 @@
 requires = ["hatchling>=1,<2"]
 build-backend = "hatchling.build"
 
-# Project metdata section. Provides the genral ID information about the project.
+# Project metadata section. Provides the general ID information about the project.
 [project]
 name = "sl-shared-assets"
-version = "6.2.0rc3"
+version = "6.2.0"
 description = "Provides data acquisition and processing assets shared between Sun (NeuroAI) lab libraries."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -110,7 +110,7 @@ lint.ignore = [
     "C901",  # Sometimes complex functions are necessary
     "PLR0913",  # Sometimes complex functions are necessary
     "PLR0912",  # Sometimes complex functions are necessary
-    "PLR0915",  # Sometimes complex type defenitions are necessary
+    "PLR0915",  # Sometimes complex type definitions are necessary
     "PLR0911", # Sometimes complex return graphs are necessary
     "COM812", # Conflicts with the formatter
     "ISC001", # Conflicts with the formatter
