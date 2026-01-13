@@ -58,6 +58,18 @@ actual library state to prevent integration errors.
 
 - `/explore-codebase` - Perform in-depth codebase exploration
 - `/sun-lab-style` - Apply Sun Lab coding and documentation conventions (REQUIRED for all code and documentation changes)
+- `/experiment-design` - Interactive guidance for building experiment configurations via MCP tools
+
+## MCP Server
+
+This library exposes an MCP server for agentic configuration management. Start with: `sl-configure mcp`
+
+The MCP server provides tools for:
+- **Setup**: Set working directory, create projects, configure system and server
+- **Experiment Design**: Create templates, add cues/segments/trials/states incrementally
+- **Query**: Read configurations, list components, validate completeness
+
+See the `/experiment-design` skill for interactive configuration building guidance.
 
 ## Downstream Library Integration
 

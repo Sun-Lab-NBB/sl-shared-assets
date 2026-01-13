@@ -314,3 +314,19 @@ def generate_experiment_configuration_file(
         f"'configuration' directory.",
         level=LogLevel.SUCCESS,
     )
+
+
+@configure.command("mcp")
+@click.option(
+    "-t",
+    "--transport",
+    type=str,
+    default="stdio",
+    show_default=True,
+    help="The MCP transport type to use ('stdio', 'sse', or 'streamable-http').",
+)
+def start_mcp_server(transport: str) -> None:  # pragma: no cover
+    """Starts the MCP server for agentic configuration management."""
+    from ..mcp_server import run_server
+
+    run_server(transport=transport)
