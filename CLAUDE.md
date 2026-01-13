@@ -59,6 +59,25 @@ actual library state to prevent integration errors.
 - `/explore-codebase` - Perform in-depth codebase exploration
 - `/sun-lab-style` - Apply Sun Lab coding and documentation conventions (REQUIRED for all code and documentation changes)
 
+## Downstream Library Integration
+
+This library provides shared assets consumed by multiple Sun lab libraries. Two libraries may require coordinated
+changes to this codebase:
+
+| Library | Relationship | Common Change Triggers |
+|---------|--------------|------------------------|
+| **sl-experiment** | Data acquisition | New session types, acquisition system configs, raw data structures |
+| **sl-forgery** | Data processing | New processing pipelines, trackers, processed data structures |
+
+**When working on sl-experiment or sl-forgery**, changes to the following often require modifications here first:
+- `SessionTypes`, `AcquisitionSystems` enums
+- `ProcessingPipelines`, `ProcessingTrackers`, `DatasetTrackers` enums
+- `SessionData`, `RawData`, `ProcessedData`, `TrackingData` dataclasses
+- Experiment configuration structures (`MesoscopeExperimentConfiguration`, etc.)
+- System configuration structures (`MesoscopeSystemConfiguration`, etc.)
+
+**Workflow**: Make changes to sl-shared-assets first, then update the dependent library.
+
 ## Project Context
 
 This is **sl-shared-assets**, a Python library that provides data acquisition and processing assets shared between
