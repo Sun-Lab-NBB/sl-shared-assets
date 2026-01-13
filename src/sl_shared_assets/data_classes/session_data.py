@@ -19,16 +19,15 @@ class SessionTypes(StrEnum):
     """Defines the data acquisition session types supported by all data acquisition systems used in the Sun lab."""
 
     LICK_TRAINING = "lick training"
-    """A Mesoscope-VR session designed to teach animals to use the water delivery port while being head-fixed."""
+    """Teaches animals to use the water delivery port while being head-fixed on the Mesoscope-VR system."""
     RUN_TRAINING = "run training"
-    """A Mesoscope-VR session designed to teach animals to run on the treadmill while being head-fixed."""
+    """Teaches animals to run on the treadmill while being head-fixed on the Mesoscope-VR system."""
     MESOSCOPE_EXPERIMENT = "mesoscope experiment"
-    """A Mesoscope-VR experiment session. The session uses the Unity game engine to run virtual reality tasks and 
-    collects brain activity data using 2-Photon Random Access Mesoscope (2P-RAM)."""
+    """Runs virtual reality tasks using Unity game engine and collects brain activity data using the 2-Photon Random
+    Access Mesoscope (2P-RAM)."""
     WINDOW_CHECKING = "window checking"
-    """A Mesoscope-VR session designed to evaluate the quality of the cranial window implantation procedure and the 
-    suitability of the animal for experiment sessions. The session uses the Mesoscope to assess the quality 
-    of the cell activity data."""
+    """Evaluates the quality of the cranial window implantation procedure and the suitability of the animal for
+    experiment sessions using the Mesoscope."""
 
 
 @dataclass()

@@ -1,4 +1,5 @@
 # sl-shared-assets
+
 A Python library that provides data acquisition and processing assets shared between Sun (NeuroAI) lab libraries.
 
 ![PyPI - Version](https://img.shields.io/pypi/v/sl-shared-assets)
@@ -10,7 +11,7 @@ A Python library that provides data acquisition and processing assets shared bet
 ![PyPI - Status](https://img.shields.io/pypi/status/sl-shared-assets)
 ![PyPI - Wheel](https://img.shields.io/pypi/wheel/sl-shared-assets)
 
----
+___
 
 ## Detailed Description
 
@@ -22,7 +23,7 @@ The library broadly stores two types of assets. First, it stores dataclasses use
 and configure data acquisition and processing runtimes. Second, it provides the low-level tools and methods used to 
 manage the data at all stages of Sun lab data workflow: acquisition, processing, and analysis.
 
----
+___
 
 ## Table of Contents
 
@@ -33,16 +34,16 @@ manage the data at all stages of Sun lab data workflow: acquisition, processing,
 - [Versioning](#versioning)
 - [Authors](#authors)
 - [License](#license)
-- [Acknowledgements](#Acknowledgments)
+- [Acknowledgments](#acknowledgments)
 
----
+___
 
 ## Dependencies
 
 All library dependencies are installed automatically by all supported installation methods 
 (see the [Installation](#installation) section).
 
----
+___
 
 ## Installation
 
@@ -62,7 +63,7 @@ Note, installation from source is ***highly discouraged*** for anyone who is not
 
 Use the following command to install the library using pip: ```pip install sl-shared-assets```.
 
----
+___
 
 ## Usage
 
@@ -71,9 +72,11 @@ assets for data acquisition and preprocessing, see the [sl-experiment](https://g
 library. For details on using shared assets for data processing and dataset formation, see the 
 [sl-forgery](https://github.com/Sun-Lab-NBB/sl-forgery) library.
 
-***Warning!*** End users should not use any component of this library directly or install this library into any Python 
-environment. All assets from this library are intended to be used exclusively by developers working on other Sun lab 
+***Warning!*** End users should not use any component of this library directly or install this library into any Python
+environment. All assets from this library are intended to be used exclusively by developers working on other Sun lab
 libraries.
+
+___
 
 ## API Documentation
 
@@ -84,7 +87,7 @@ classes exposed by components of this library.
 **Note!** The API documentation includes important information about the 'configuration' Command-Line Interface (CLI) 
 exposed by this library.
 
----
+___
 
 ## Versioning
 
@@ -92,7 +95,7 @@ This project uses [semantic versioning](https://semver.org/). See the
 [tags on this repository](https://github.com/Sun-Lab-NBB/sl-shared-assets/tags) for the available project 
 releases.
 
----
+___
 
 ## Authors
 
@@ -100,13 +103,13 @@ releases.
 - Kushaan Gupta ([kushaangupta](https://github.com/kushaangupta))
 - Natalie Yeung
 
----
+___
 
 ## License
 
 This project is licensed under the GPL3 License: see the [LICENSE](LICENSE) file for details.
 
----
+___
 
 ## Acknowledgments
 
@@ -114,4 +117,4 @@ This project is licensed under the GPL3 License: see the [LICENSE](LICENSE) file
   development of this library.
 - The creators of all other dependencies and projects listed in the [pyproject.toml](pyproject.toml) file.
 
----
+___
