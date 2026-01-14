@@ -7,15 +7,17 @@ description: >-
 
 # Codebase Exploration
 
-When this skill is invoked, perform a thorough exploration of the codebase to build deep
-understanding before any coding work begins.
+When this skill is invoked, perform a thorough exploration of the codebase to build deep understanding before any
+coding work begins.
+
+---
 
 ## Exploration Requirements
 
 You MUST use the Task tool with `subagent_type: Explore` to investigate the following areas:
 
 ### 1. Project Overview
-- Read README, pyproject.toml, setup.py, and documentation
+- Read README.md, pyproject.toml, setup.py, and documentation
 - Understand the project's purpose, goals, and primary use cases
 - Identify the target users/audience
 
@@ -61,6 +63,8 @@ You MUST use the Task tool with `subagent_type: Explore` to investigate the foll
 - List the most important files with brief descriptions
 - Include file paths and line counts where relevant
 
+---
+
 ## Output Format
 
 After exploration, provide a structured summary with:
@@ -70,6 +74,8 @@ After exploration, provide a structured summary with:
 - Important files list with paths
 - Notable patterns or conventions
 - Any areas of complexity or concern
+
+---
 
 ## Usage
 

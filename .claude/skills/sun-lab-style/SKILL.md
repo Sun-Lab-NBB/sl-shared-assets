@@ -8,10 +8,11 @@ description: >-
 
 # Sun Lab Style Guide
 
-When writing, reviewing, or refactoring Python code, apply the conventions defined in the Sun Lab
-style guide.
+When writing, reviewing, or refactoring Python code, apply the conventions defined in the Sun Lab style guide.
 
 See @SUN_LAB_STYLE_GUIDE.md for complete guidelines.
+
+---
 
 ## Key Conventions
 
@@ -24,3 +25,5 @@ See @SUN_LAB_STYLE_GUIDE.md for complete guidelines.
 - **Numba**: Always use `cache=True`; use `parallel=True` with `prange` only when safe
 - **Line length**: Maximum 120 characters
 - **MCP responses**: Concise single-line output; use `Key: value | Key: value` format
+- **Comments**: Third-person imperative mood; explain non-obvious logic, not implementation details
+- **Commit messages**: Past tense verbs (Added, Fixed, Updated); end with periods; 72-char header limit

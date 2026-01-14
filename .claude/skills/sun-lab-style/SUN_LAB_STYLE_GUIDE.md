@@ -966,12 +966,136 @@ under the Usage section anchor or as a separate entry if it warrants its own top
 
 ---
 
+## Skill and Asset Files
+
+Claude Code skill files (`.md` files in `.claude/skills/`) and related documentation assets follow specific
+formatting conventions to ensure readability and consistency.
+
+### Line Length
+
+All skill and asset markdown files must adhere to the **120 character line limit**. This matches the Python code
+formatting standard and ensures consistent readability across all project files.
+
+- Wrap prose text at 120 characters
+- Break long sentences at natural boundaries (after punctuation, between clauses)
+- Code blocks may exceed 120 characters only when necessary for readability
+
+### Table Formatting
+
+Use **pretty table formatting** with proper column alignment and consistent column widths:
+
+**Good - Properly formatted table:**
+
+```markdown
+| Field                  | Type        | Required | Description                              |
+|------------------------|-------------|----------|------------------------------------------|
+| `name`                 | str         | Yes      | Visual identifier (e.g., 'A', 'Gray')    |
+| `code`                 | int         | Yes      | Unique uint8 code for MQTT communication |
+| `length_cm`            | float       | Yes      | Length of the cue in centimeters         |
+| `transition_probs`     | list[float] | No       | Probabilities to other segments          |
+```
+
+**Avoid - Inconsistent column widths:**
+
+```markdown
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | str | Yes | Visual identifier |
+| `code` | int | Yes | Unique uint8 code |
+```
+
+### Table Formatting Rules
+
+1. **Column separators**: Align all `|` characters vertically
+2. **Header separator**: Use dashes (`-`) that span the full column width
+3. **Cell padding**: Pad all cells in a column to match the length of the longest cell in that column
+4. **Code formatting**: Use backticks for field names, types, and values in tables
+
+### Section Organization
+
+Organize skill files with clear hierarchical sections:
+
+```markdown
+# Skill Name
+
+Brief description of the skill's purpose.
+
+---
+
+## When to Use
+
+- Bullet points describing use cases
+
+---
+
+## Main Content Section
+
+### Subsection
+
+Content with tables, code blocks, and explanations.
+
+---
+
+## Additional Sections
+
+Continue with logical organization.
+```
+
+### Code Blocks in Skills
+
+Use fenced code blocks with language identifiers:
+
+````markdown
+```yaml
+cues:
+  - name: "A"
+    code: 1
+```
+
+```bash
+grep -n "pattern" file.txt
+```
+
+```python
+def process_data() -> None:
+    pass
+```
+````
+
+### Voice and Directional Language
+
+Skill files use two voice styles depending on context:
+
+- **Descriptive content**: Use third person imperative (same as code documentation). Example: "Extracts zone positions
+  from configuration files."
+- **Agent directives**: Use second person with "You MUST", "You should", etc. when instructing the agent to perform
+  specific actions. Example: "You MUST use the Task tool with `subagent_type: Explore`."
+
+Directional language is appropriate for skills because they are instructions for an AI agent, not documentation for
+human readers.
+
+### Skill File Checklist
+
+When creating or modifying skill files:
+
+1. **Line length**: All lines ≤ 120 characters
+2. **Tables**: Use pretty formatting with aligned columns
+3. **Sections**: Separate major sections with horizontal rules (`---`)
+4. **Code blocks**: Include language identifiers
+5. **Voice**: Third person imperative for descriptions; second person directives for agent instructions
+6. **Headers**: Use sentence case for section headers
+
+---
+
 ## Commit Messages
 
 Commit messages follow a consistent format across all Sun Lab repositories. Well-written commit messages make it
 easier to understand project history and generate changelogs.
 
 ### Format
+
+**Header line limit**: The first line (header) must be no longer than 72 characters. This ensures proper display in
+Git logs, GitHub, and other tools.
 
 **Single-line commits**: Use for focused, single-purpose changes.
 

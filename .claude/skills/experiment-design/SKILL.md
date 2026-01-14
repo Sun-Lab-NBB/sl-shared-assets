@@ -1,11 +1,22 @@
+---
+name: experiment-design
+description: >-
+  Interactive guidance for building Sun lab experiment configurations using MCP tools. Covers cue
+  and segment design, trial structure configuration, and experiment state definition.
+---
+
 # Experiment Design Skill
 
 This skill provides guidance for interactively building Sun lab experiment configurations using the MCP tools
 exposed by this library. Use this skill when helping users design new experiments or modify existing ones.
 
+---
+
 ## MCP Server
 
 Start the MCP server with: `sl-configure mcp`
+
+---
 
 ## Interactive Design Workflow
 
@@ -61,34 +72,47 @@ For each state, configure:
 
 Always validate the final configuration using `validate_experiment_configuration_tool`.
 
+---
+
 ## MCP Tools Reference
 
 ### Setup Tools
-- `set_working_directory_tool`: Set local working directory
-- `create_project_tool`: Create new project structure
-- `create_experiment_template_tool`: Create empty experiment template
+
+| Tool                               | Description                            |
+|------------------------------------|----------------------------------------|
+| `set_working_directory_tool`       | Sets the local working directory       |
+| `create_project_tool`              | Creates a new project structure        |
+| `create_experiment_template_tool`  | Creates an empty experiment template   |
 
 ### Configuration Tools
-- `add_cue_tool`: Add visual cue
-- `remove_cue_tool`: Remove visual cue
-- `add_segment_tool`: Add segment (cue sequence)
-- `remove_segment_tool`: Remove segment
-- `add_water_reward_trial_tool`: Add reinforcing trial
-- `add_gas_puff_trial_tool`: Add aversive trial
-- `remove_trial_tool`: Remove trial structure
-- `add_experiment_state_tool`: Add experiment state
-- `update_experiment_state_tool`: Modify existing state
-- `remove_experiment_state_tool`: Remove state
-- `set_vr_environment_tool`: Configure VR corridor settings
-- `set_experiment_metadata_tool`: Set scene name and offset
+
+| Tool                           | Description                       |
+|--------------------------------|-----------------------------------|
+| `add_cue_tool`                 | Adds a visual cue                 |
+| `remove_cue_tool`              | Removes a visual cue              |
+| `add_segment_tool`             | Adds a segment (cue sequence)     |
+| `remove_segment_tool`          | Removes a segment                 |
+| `add_water_reward_trial_tool`  | Adds a reinforcing trial          |
+| `add_gas_puff_trial_tool`      | Adds an aversive trial            |
+| `remove_trial_tool`            | Removes a trial structure         |
+| `add_experiment_state_tool`    | Adds an experiment state          |
+| `update_experiment_state_tool` | Modifies an existing state        |
+| `remove_experiment_state_tool` | Removes a state                   |
+| `set_vr_environment_tool`      | Configures VR corridor settings   |
+| `set_experiment_metadata_tool` | Sets scene name and offset        |
 
 ### Query Tools
-- `read_experiment_configuration_tool`: Read full config summary
-- `list_experiment_cues_tool`: List all defined cues
-- `list_experiment_segments_tool`: List all segments
-- `list_experiment_trials_tool`: List all trial structures
-- `list_experiment_states_tool`: List all states
-- `validate_experiment_configuration_tool`: Validate completeness
+
+| Tool                                     | Description                   |
+|------------------------------------------|-------------------------------|
+| `read_experiment_configuration_tool`     | Reads full config summary     |
+| `list_experiment_cues_tool`              | Lists all defined cues        |
+| `list_experiment_segments_tool`          | Lists all segments            |
+| `list_experiment_trials_tool`            | Lists all trial structures    |
+| `list_experiment_states_tool`            | Lists all states              |
+| `validate_experiment_configuration_tool` | Validates completeness        |
+
+---
 
 ## Example Configuration Structure
 
@@ -139,12 +163,16 @@ experiment_states:
     reinforcing_recovery_guided_trials: 3
 ```
 
+---
+
 ## Reference Configurations
 
 Valid configuration examples are available in the sl-unity-tasks repository:
 - `Assets/InfiniteCorridorTask/Configurations/MF_Reward.yaml` - Cyclic 8-cue reward task
 - `Assets/InfiniteCorridorTask/Configurations/MF_Aversion_Reward.yaml` - Combined aversion/reward task
 - `Assets/InfiniteCorridorTask/Configurations/SSO_*.yaml` - Various sequence learning tasks
+
+---
 
 ## Best Practices
 

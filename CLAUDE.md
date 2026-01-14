@@ -17,6 +17,7 @@ the Sun Lab conventions. This applies to ALL file types including:
 - Python source files (`.py`)
 - Documentation files (`README.md`, docstrings)
 - Configuration files when adding comments or descriptions
+- Git commit messages
 
 All contributions must strictly follow these conventions and all reviews must check for compliance. Key conventions
 include:
@@ -26,6 +27,7 @@ include:
 - Third person imperative mood for comments and documentation
 - Proper error handling with `console.error()`
 - README structure and formatting standards
+- Commit messages use past tense verbs (Added, Fixed, Updated) and end with periods
 
 ## Cross-Referenced Library Verification
 
