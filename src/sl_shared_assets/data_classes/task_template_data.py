@@ -200,9 +200,7 @@ class TaskTemplate(YamlConfig):
             self._validate_zone_positions(trial_name, trial_structure, segment_length)
 
     @staticmethod
-    def _validate_zone_positions(
-        trial_name: str, trial_structure: TrialStructure, segment_length: float
-    ) -> None:
+    def _validate_zone_positions(trial_name: str, trial_structure: TrialStructure, segment_length: float) -> None:
         """Validates that zone positions are within the segment bounds.
 
         Args:

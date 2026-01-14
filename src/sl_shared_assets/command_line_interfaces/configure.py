@@ -16,6 +16,7 @@ from ..data_classes import (
     MesoscopeExperimentConfiguration,
     set_working_directory,
     set_google_credentials_path,
+    set_task_templates_directory,
     get_system_configuration_data,
     create_server_configuration_file,
     create_system_configuration_file,
@@ -150,6 +151,19 @@ def configure_google_credentials(credentials: Path) -> None:  # pragma: no cover
         message=f"Google Sheets credentials path set to: {credentials.resolve()}.",
         level=LogLevel.SUCCESS,
     )
+
+
+@configure.command("templates")
+@click.option(
+    "-d",
+    "--directory",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=True,
+    help="The absolute path to the sl-unity-tasks project's Configurations (Template) directory.",
+)
+def configure_task_templates_directory(directory: Path) -> None:  # pragma: no cover
+    """Sets the path to the sl-unity-tasks task templates directory."""
+    set_task_templates_directory(path=directory)
 
 
 @configure.command("project")

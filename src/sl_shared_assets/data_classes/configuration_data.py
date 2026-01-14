@@ -767,14 +767,96 @@ def get_google_credentials_path() -> Path:
     # If the credentials' file does not exist at the cached path, aborts with an error
     if not credentials_path.exists():
         message = (
-            "Unable to resolve the path to the Google account credentials file, as the previously configured "
+            f"Unable to resolve the path to the Google account credentials file, as the previously configured "
             f"credentials file does not exist at the expected path ({credentials_path}). Set a new credentials path "
-            "by using the 'sl-configure google' CLI command."
+            f"by using the 'sl-configure google' CLI command."
         )
         console.error(message=message, error=FileNotFoundError)
 
     # Returns the path to the credentials' file
     return credentials_path
+
+
+def set_task_templates_directory(path: Path) -> None:
+    """Configures the local machine (PC) to use the specified directory as the path to the sl-unity-tasks project's
+    Configurations (Template) directory.
+
+    Notes:
+        This function caches the path to the task templates directory in the user's data directory.
+
+    Args:
+        path: The path to the sl-unity-tasks project's Configurations (Template) directory.
+
+    Raises:
+        FileNotFoundError: If the specified directory does not exist at the provided path.
+    """
+    # Verifies that the specified directory exists
+    if not path.exists():
+        message = (
+            f"Unable to set the task templates directory path. The specified directory ({path}) does not exist. "
+            f"Ensure the directory exists at the specified path before calling this function."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    # Verifies that the path points to a directory
+    if not path.is_dir():
+        message = (
+            f"Unable to set the task templates directory path. The specified path ({path}) does not point to a "
+            f"directory. Provide the path to the sl-unity-tasks project's Configurations (Template) directory."
+        )
+        console.error(message=message, error=ValueError)
+
+    # Resolves the path to the static .txt file used to store the path to the task templates directory
+    app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
+    path_file = app_dir.joinpath("task_templates_directory_path.txt")
+
+    # In case this function is called before the app directory is created, ensures the app directory exists
+    ensure_directory_exists(path_file)
+
+    # Writes the absolute path to the task templates directory
+    with path_file.open("w") as f:
+        f.write(str(path.resolve()))
+
+    console.echo(message=f"Task templates directory path set to: {path.resolve()}.", level=LogLevel.SUCCESS)
+
+
+def get_task_templates_directory() -> Path:
+    """Resolves and returns the path to the sl-unity-tasks project's Configurations (Template) directory.
+
+    Returns:
+        The path to the task templates directory.
+
+    Raises:
+        FileNotFoundError: If the task templates directory path has not been configured for the host-machine, or if
+            the previously configured directory no longer exists at the expected path.
+    """
+    # Uses appdirs to locate the user data directory and resolve the path to the task templates directory cache file
+    app_dir = Path(appdirs.user_data_dir(appname="sun_lab_data", appauthor="sun_lab"))
+    path_file = app_dir.joinpath("task_templates_directory_path.txt")
+
+    # If the cache file does not exist, aborts with an error
+    if not path_file.exists():
+        message = (
+            "Unable to resolve the path to the task templates directory, as it has not been set. "
+            "Set the task templates directory path by using the 'sl-configure templates' CLI command."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    # Once the location of the path storage file is resolved, reads the directory path from the file
+    with path_file.open() as f:
+        templates_directory = Path(f.read().strip())
+
+    # If the templates directory does not exist at the cached path, aborts with an error
+    if not templates_directory.exists():
+        message = (
+            f"Unable to resolve the path to the task templates directory, as the previously configured "
+            f"directory does not exist at the expected path ({templates_directory}). Set a new directory path "
+            f"by using the 'sl-configure templates' CLI command."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    # Returns the path to the task templates directory
+    return templates_directory
 
 
 def create_server_configuration_file(

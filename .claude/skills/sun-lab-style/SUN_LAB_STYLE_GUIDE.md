@@ -588,6 +588,25 @@ message = (
 )
 ```
 
+- **F-string consistency**: When any line in a multi-line string requires interpolation, use the `f` prefix on
+  **all** lines for consistency. Do not mix f-strings and regular strings within the same parenthesized expression:
+
+```python
+# Good - consistent f-prefix on all lines
+message = (
+    f"Unable to resolve the path to the credentials file, as the previously configured "
+    f"file does not exist at the expected path ({credentials_path}). Set a new path "
+    f"by using the 'sl-configure credentials' CLI command."
+)
+
+# Avoid - inconsistent prefixes (only middle line has f-prefix)
+message = (
+    "Unable to resolve the path to the credentials file, as the previously configured "
+    f"file does not exist at the expected path ({credentials_path}). Set a new path "
+    "by using the 'sl-configure credentials' CLI command."
+)
+```
+
 ---
 
 ## Linting and Code Quality

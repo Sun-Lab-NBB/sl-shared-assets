@@ -38,13 +38,6 @@ from .processing_data import (
     ProcessingTrackers,
     ProcessingPipelines,
 )
-from .task_template_data import (
-    Cue,
-    Segment,
-    TaskTemplate,
-    VREnvironment,
-    TrialStructure,
-)
 from .configuration_data import (
     GasPuffTrial,
     MesoscopeCameras,
@@ -63,9 +56,18 @@ from .configuration_data import (
     get_server_configuration,
     get_google_credentials_path,
     set_google_credentials_path,
+    get_task_templates_directory,
+    set_task_templates_directory,
     get_system_configuration_data,
     create_server_configuration_file,
     create_system_configuration_file,
+)
+from .task_template_data import (
+    Cue,
+    Segment,
+    TaskTemplate,
+    VREnvironment,
+    TrialStructure,
 )
 
 __all__ = [
@@ -119,7 +121,9 @@ __all__ = [
     "get_google_credentials_path",
     "get_server_configuration",
     "get_system_configuration_data",
+    "get_task_templates_directory",
     "get_working_directory",
     "set_google_credentials_path",
+    "set_task_templates_directory",
     "set_working_directory",
 ]

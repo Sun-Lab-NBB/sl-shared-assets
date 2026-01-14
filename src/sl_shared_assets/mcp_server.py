@@ -6,11 +6,9 @@ operations (creating and modifying configurations).
 """
 
 from pathlib import Path
-from dataclasses import asdict
 
 from mcp.server.fastmcp import FastMCP
 from ataraxis_base_utilities import ensure_directory_exists
-from ataraxis_data_structures import YamlConfig
 
 from .data_classes import (
     Cue,
@@ -24,10 +22,12 @@ from .data_classes import (
     MesoscopeExperimentConfiguration,
     get_working_directory,
     set_working_directory as _set_working_directory,
-    get_system_configuration_data,
     get_server_configuration,
     get_google_credentials_path,
     set_google_credentials_path as _set_google_credentials_path,
+    get_task_templates_directory,
+    set_task_templates_directory as _set_task_templates_directory,
+    get_system_configuration_data,
     create_system_configuration_file,
 )
 
@@ -143,6 +143,20 @@ def get_google_credentials_tool() -> str:
 
 
 @mcp.tool()
+def get_task_templates_directory_tool() -> str:
+    """Returns the path to the sl-unity-tasks project's Configurations (Template) directory.
+
+    Returns:
+        The task templates directory path, or an error message if not configured.
+    """
+    try:
+        path = get_task_templates_directory()
+        return f"Task templates directory: {path}"
+    except FileNotFoundError as e:
+        return f"Error: {e}"
+
+
+@mcp.tool()
 def read_experiment_configuration_tool(project: str, experiment: str) -> str:
     """Reads and returns an experiment configuration file contents.
 
@@ -204,6 +218,24 @@ def set_google_credentials_tool(credentials_path: str) -> str:
         path = Path(credentials_path)
         _set_google_credentials_path(path=path)
         return f"Google credentials path set to: {path}"
+    except (FileNotFoundError, ValueError) as e:
+        return f"Error: {e}"
+
+
+@mcp.tool()
+def set_task_templates_directory_tool(directory: str) -> str:
+    """Sets the path to the sl-unity-tasks project's Configurations (Template) directory.
+
+    Args:
+        directory: The absolute path to the task templates directory.
+
+    Returns:
+        A confirmation message or error description.
+    """
+    try:
+        path = Path(directory)
+        _set_task_templates_directory(path=path)
+        return f"Task templates directory set to: {path}"
     except (FileNotFoundError, ValueError) as e:
         return f"Error: {e}"
 
