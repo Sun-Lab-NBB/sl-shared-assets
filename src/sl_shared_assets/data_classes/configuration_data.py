@@ -9,11 +9,8 @@ import appdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 
-# Constants for validation
-_UINT8_MAX = 255
-"""Maximum value for uint8 cue codes."""
-_PROBABILITY_SUM_TOLERANCE = 0.001
-"""Tolerance for validating probability sums to 1.0."""
+# Imports base classes from task_template_data module.
+from .task_template_data import Cue, Segment, VREnvironment, TrialStructure
 
 
 class AcquisitionSystems(StrEnum):
@@ -24,80 +21,8 @@ class AcquisitionSystems(StrEnum):
     engine to conduct experiments."""
 
 
-@dataclass()
-class Cue:
-    """Defines a single visual cue used in the experiment task's Virtual Reality (VR) environment.
-
-    Notes:
-        Each cue has a unique name (used in the Unity segment (prefab) definitions) and a unique uint8 code (used during
-        MQTT communication and analysis). Cues are not loaded as individual prefabs - they are baked into segment
-        prefabs.
-    """
-
-    name: str
-    """The visual identifier for the cue (e.g., 'A', 'B', 'Gray'). Used to reference the cue in segment definitions."""
-    code: int
-    """The unique uint8 code (0-255) that identifies the cue during MQTT communication and data analysis."""
-    length_cm: float
-    """The length of the cue in centimeters."""
-
-    def __post_init__(self) -> None:
-        """Validates cue definition parameters."""
-        if not 0 <= self.code <= _UINT8_MAX:
-            message = f"Cue code must be a uint8 value (0-255), got {self.code} for cue '{self.name}'."
-            console.error(message=message, error=ValueError)
-        if self.length_cm <= 0:
-            message = f"Cue length must be positive, got {self.length_cm} cm for cue '{self.name}'."
-            console.error(message=message, error=ValueError)
-
-
-@dataclass()
-class Segment:
-    """Defines a visual segment (sequence of cues) used in the experiment task's Virtual Reality (VR) environment.
-
-    Notes:
-        Segments are the building blocks of the infinite corridor, each containing a sequence of visual cues
-        and optional transition probabilities for segment-to-segment transitions.
-    """
-
-    name: str
-    """The unique identifier of the segment's Unity prefab file."""
-    cue_sequence: list[str]
-    """The ordered sequence of cue names that comprise this segment."""
-    transition_probabilities: list[float] | None = None
-    """Optional transition probabilities to other segments that make up the task's corridor environment. If provided,
-    must sum to 1.0."""
-
-    def __post_init__(self) -> None:
-        """Validates segment definition parameters."""
-        if not self.cue_sequence:
-            message = f"Segment '{self.name}' must have at least one cue in its cue_sequence."
-            console.error(message=message, error=ValueError)
-
-        if self.transition_probabilities:
-            prob_sum = sum(self.transition_probabilities)
-            if abs(prob_sum - 1.0) > _PROBABILITY_SUM_TOLERANCE:
-                message = f"Segment '{self.name}' transition probabilities sum to {prob_sum}, but must sum to 1.0."
-                console.error(message=message, error=ValueError)
-
-
-@dataclass()
-class VREnvironment:
-    """Defines the Unity VR corridor system configuration.
-
-    Notes:
-        This class is primarily used by Unity to configure the task environment. Python parses these values
-        from the YAML configuration file but does not use them at runtime.
-    """
-
-    corridor_spacing_cm: float = 20.0
-    """The horizontal spacing between corridor instances in centimeters."""
-    segments_per_corridor: int = 3
-    """The number of segments visible in each corridor instance (corridor depth)."""
-    padding_prefab_name: str = "Padding"
-    """The name of the Unity prefab used for corridor padding."""
-    cm_per_unity_unit: float = 10.0
-    """The conversion factor from centimeters to Unity units."""
+# Note: Cue, Segment, VREnvironment, and TrialStructure are imported from task_template_data module.
+# These base classes are shared between task templates (Unity) and experiment configurations (sl-experiment).
 
 
 @dataclass()
@@ -130,33 +55,23 @@ class MesoscopeExperimentState:
 
 
 @dataclass()
-class _MesoscopeBaseTrial:
-    """Defines the shared structure and task parameters common to all supported experiment trial types.
+class _MesoscopeBaseTrial(TrialStructure):
+    """Extends TrialStructure with experiment runtime fields common to all supported experiment trial types.
 
     Notes:
-        The trigger mode and guidance behavior are determined by the trial type:
-        - WaterRewardTrial: Uses 'lick' trigger mode; guidance delivers stimulus on collision.
-        - GasPuffTrial: Uses 'occupancy' trigger mode; guidance emits OccupancyFailed for movement blocking.
+        Inherits all spatial configuration fields from TrialStructure, including segment mapping and zone positions.
+
+        The trigger mode and guidance behavior are determined by the trial type. WaterRewardTrial uses lick-based
+        triggering where guidance delivers stimulus on collision. GasPuffTrial uses occupancy-based triggering where
+        guidance emits OccupancyFailed for movement blocking.
     """
 
-    segment_name: str
-    """The name of the Unity Segment this trial is based on."""
-    stimulus_trigger_zone_start_cm: float
-    """The position of the trial stimulus trigger zone starting boundary, in centimeters."""
-    stimulus_trigger_zone_end_cm: float
-    """The position of the trial stimulus trigger zone ending boundary, in centimeters."""
-    stimulus_location_cm: float
-    """The location of the invisible boundary (wall) with which the animal must collide to elicit the stimulus."""
-    show_stimulus_collision_boundary: bool = False
-    """Determines whether the stimulus collision boundary is visible to the animal during this trial type. When True,
-    the boundary marker is displayed in the Virtual Reality environment at the stimulus location."""
-
-    # Derived fields - populated by MesoscopeExperimentConfiguration.__post_init__
     cue_sequence: list[int] = field(default_factory=list)
-    """The sequence of segment wall cues identifiers experienced by the animal when participating in this type of
-    trials."""
+    """The sequence of segment wall cue identifiers experienced by the animal when participating in this type of
+    trials. This field is populated by MesoscopeExperimentConfiguration.__post_init__."""
     trial_length_cm: float = 0.0
-    """The total length of the trial environment in centimeters."""
+    """The total length of the trial environment in centimeters. This field is populated by
+    MesoscopeExperimentConfiguration.__post_init__."""
 
     def validate_zones(self) -> None:
         """Validates stimulus zone positions.
@@ -301,7 +216,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
 
     def __post_init__(self) -> None:
         """Validates experiment configuration and populates derived trial fields."""
-        # Ensures cue codes are unique
+        # Ensures cue codes are unique.
         codes = [cue.code for cue in self.cues]
         if len(codes) != len(set(codes)):
             duplicate_codes = [c for c in codes if codes.count(c) > 1]
@@ -311,7 +226,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
             )
             console.error(message=message, error=ValueError)
 
-        # Ensures cue names are unique
+        # Ensures cue names are unique.
         names = [cue.name for cue in self.cues]
         if len(names) != len(set(names)):
             duplicate_names = [n for n in names if names.count(n) > 1]
@@ -321,21 +236,21 @@ class MesoscopeExperimentConfiguration(YamlConfig):
             )
             console.error(message=message, error=ValueError)
 
-        # Ensures segment cue sequences reference valid cues
+        # Ensures segment cue sequences reference valid cues.
         cue_names = {cue.name for cue in self.cues}
         for seg in self.segments:
             for cue_name in seg.cue_sequence:
                 if cue_name not in cue_names:
                     message = (
-                        f"Segment '{seg.name}'  references unknown cue '{cue_name}'. "
+                        f"Segment '{seg.name}' references unknown cue '{cue_name}'. "
                         f"Available cues: {', '.join(sorted(cue_names))}."
                     )
                     console.error(message=message, error=ValueError)
 
-        # Populates the derived trial fields and validates them
+        # Populates the derived trial fields and validates them.
         segment_names = {seg.name for seg in self.segments}
         for trial_name, trial in self.trial_structures.items():
-            # Validates segment reference
+            # Validates segment reference.
             if trial.segment_name not in segment_names:
                 message = (
                     f"Trial '{trial_name}' references unknown segment '{trial.segment_name}'. "
@@ -343,13 +258,13 @@ class MesoscopeExperimentConfiguration(YamlConfig):
                 )
                 console.error(message=message, error=ValueError)
 
-            # Populates cue_sequence from segment
+            # Populates cue_sequence from segment.
             trial.cue_sequence = self._get_segment_cue_codes(trial.segment_name)
 
-            # Populates trial_length_cm from segment
+            # Populates trial_length_cm from segment.
             trial.trial_length_cm = self._get_segment_length_cm(trial.segment_name)
 
-            # Validates zone positions with populated trial_length_cm
+            # Validates zone positions with populated trial_length_cm.
             trial.validate_zones()
 
 
@@ -554,10 +469,11 @@ class MesoscopeSystemConfiguration(YamlConfig):
         Args:
             path: The path to the .YAML file to save the data to.
         """
-        # Copies instance data to prevent it from being modified by reference when executing the steps below
+        # Copies instance data to prevent it from being modified by reference when executing the steps below.
         original = deepcopy(self)
 
-        # Converts all Path objects to strings before dumping the data, as .YAML encoder does not recognize Path objects
+        # Converts all Path objects to strings before dumping the data, as the YAML encoder does not recognize Path
+        # objects.
         original.filesystem.root_directory = str(original.filesystem.root_directory)  # type: ignore[assignment]
         original.filesystem.server_directory = str(original.filesystem.server_directory)  # type: ignore[assignment]
         original.filesystem.nas_directory = str(original.filesystem.nas_directory)  # type: ignore[assignment]
@@ -565,11 +481,11 @@ class MesoscopeSystemConfiguration(YamlConfig):
             original.filesystem.mesoscope_directory
         )
 
-        # Converts valve calibration data into dictionary format
+        # Converts valve calibration data into dictionary format.
         if isinstance(original.microcontrollers.valve_calibration_data, tuple):
             original.microcontrollers.valve_calibration_data = dict(original.microcontrollers.valve_calibration_data)
 
-        # Saves the data to the YAML file
+        # Saves the data to the YAML file.
         original.to_yaml(file_path=path)
 
 

@@ -17,6 +17,7 @@ from .data_classes import (
     SessionData,
     SubjectData,
     SurgeryData,
+    TaskTemplate,
     GasPuffTrial,
     SessionTypes,
     TrackingData,
@@ -25,6 +26,7 @@ from .data_classes import (
     ProcessedData,
     VREnvironment,
     ZaberPositions,
+    TrialStructure,
     DatasetTrackers,
     SessionMetadata,
     ManagingTrackers,
@@ -62,7 +64,7 @@ from .data_transfer import (
     calculate_directory_checksum,
 )
 
-# Ensures console is enabled when this library is imported
+# Ensures console is enabled when this library is imported.
 if not console.enabled:
     console.enable()
 
@@ -105,7 +107,9 @@ __all__ = [
     "SessionTypes",
     "SubjectData",
     "SurgeryData",
+    "TaskTemplate",
     "TrackingData",
+    "TrialStructure",
     "VREnvironment",
     "WaterRewardTrial",
     "WindowCheckingDescriptor",

@@ -38,11 +38,15 @@ from .processing_data import (
     ProcessingTrackers,
     ProcessingPipelines,
 )
-from .configuration_data import (
+from .task_template_data import (
     Cue,
     Segment,
-    GasPuffTrial,
+    TaskTemplate,
     VREnvironment,
+    TrialStructure,
+)
+from .configuration_data import (
+    GasPuffTrial,
     MesoscopeCameras,
     WaterRewardTrial,
     AcquisitionSystems,
@@ -103,7 +107,9 @@ __all__ = [
     "SessionTypes",
     "SubjectData",
     "SurgeryData",
+    "TaskTemplate",
     "TrackingData",
+    "TrialStructure",
     "VREnvironment",
     "WaterRewardTrial",
     "WindowCheckingDescriptor",
