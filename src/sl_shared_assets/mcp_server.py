@@ -11,10 +11,8 @@ from mcp.server.fastmcp import FastMCP
 from ataraxis_base_utilities import ensure_directory_exists
 
 from .data_classes import (
-    Cue,
-    Segment,
     GasPuffTrial,
-    VREnvironment,
+    TaskTemplate,
     WaterRewardTrial,
     AcquisitionSystems,
     ServerConfiguration,
@@ -28,6 +26,7 @@ from .data_classes import (
     get_task_templates_directory,
     set_task_templates_directory as _set_task_templates_directory,
     get_system_configuration_data,
+    create_experiment_from_template,
     create_system_configuration_file,
 )
 
@@ -154,6 +153,61 @@ def get_task_templates_directory_tool() -> str:
         return f"Task templates directory: {path}"
     except FileNotFoundError as e:
         return f"Error: {e}"
+
+
+@mcp.tool()
+def list_available_templates_tool() -> str:
+    """Lists all available task templates in the configured templates directory.
+
+    Returns:
+        A formatted list of available template names, or an error message if not configured.
+    """
+    try:
+        templates_dir = get_task_templates_directory()
+        templates = sorted([f.stem for f in templates_dir.glob("*.yaml")])
+        if not templates:
+            return f"No templates found in {templates_dir}"
+        return "Available templates:\n- " + "\n- ".join(templates)
+    except FileNotFoundError as e:
+        return f"Error: {e}"
+
+
+@mcp.tool()
+def get_template_info_tool(template_name: str) -> str:
+    """Returns detailed information about a specific task template.
+
+    Args:
+        template_name: The name of the template (without .yaml extension).
+
+    Returns:
+        A summary of the template contents including cues, segments, and trial structures.
+    """
+    try:
+        templates_dir = get_task_templates_directory()
+        template_path = templates_dir.joinpath(f"{template_name}.yaml")
+        if not template_path.exists():
+            available = sorted([f.stem for f in templates_dir.glob("*.yaml")])
+            return f"Error: Template '{template_name}' not found. Available: {', '.join(available)}"
+
+        template = TaskTemplate.from_yaml(file_path=template_path)
+
+        cue_summary = ", ".join([f"{c.name}(code={c.code})" for c in template.cues])
+        segment_summary = ", ".join([s.name for s in template.segments])
+        trial_summary = []
+        for name, trial in template.trial_structures.items():
+            trial_summary.append(f"{name} ({trial.trigger_type}): segment={trial.segment_name}")
+
+        return (
+            f"Template: {template_name}\n"
+            f"Cue offset: {template.cue_offset_cm}cm\n"
+            f"Cues: {cue_summary}\n"
+            f"Segments: {segment_summary}\n"
+            f"Trial structures:\n  - " + "\n  - ".join(trial_summary)
+        )
+    except FileNotFoundError as e:
+        return f"Error: {e}"
+    except Exception as e:
+        return f"Error loading template: {e}"
 
 
 @mcp.tool()
@@ -334,200 +388,92 @@ def create_server_configuration_template_tool(
 
 
 @mcp.tool()
-def create_experiment_template_tool(project: str, experiment: str, unity_scene_name: str = "") -> str:
-    """Creates a new experiment configuration template with default values.
+def create_experiment_from_template_tool(
+    project: str,
+    experiment: str,
+    template_name: str,
+    default_reward_size_ul: float = 5.0,
+    default_reward_tone_duration_ms: int = 300,
+    default_puff_duration_ms: int = 100,
+    default_occupancy_duration_ms: int = 1000,
+) -> str:
+    """Creates a new experiment configuration from a task template.
 
-    This creates a minimal template that can be incrementally built up using the add_* tools.
+    The template provides all VR structure (cues, segments, trial zones). Only experiment-specific parameters
+    like reward sizes, puff durations, and experiment states can be customized after creation.
 
     Args:
         project: The name of the project.
         experiment: The name of the experiment.
-        unity_scene_name: The Unity scene name for the VR environment.
+        template_name: The name of the task template to use (without .yaml extension).
+        default_reward_size_ul: Default water reward volume in microliters for lick-type trials.
+        default_reward_tone_duration_ms: Default reward tone duration in milliseconds for lick-type trials.
+        default_puff_duration_ms: Default gas puff duration in milliseconds for occupancy-type trials.
+        default_occupancy_duration_ms: Default occupancy threshold duration in milliseconds.
 
     Returns:
         A confirmation message with the file path, or an error description.
     """
     try:
-        # Verifies project exists
+        # Verifies project exists.
         system_config = get_system_configuration_data()
         project_path = system_config.filesystem.root_directory.joinpath(project)
         if not project_path.exists():
             return f"Error: Project '{project}' does not exist. Create it first with create_project_tool."
 
-        # Creates minimal template with placeholder cue and segment
-        config = MesoscopeExperimentConfiguration(
-            cues=[Cue(name="Gray", code=0, length_cm=30.0)],
-            segments=[Segment(name="Segment_default", cue_sequence=["Gray"])],
-            trial_structures={},
-            experiment_states={},
-            vr_environment=VREnvironment(),
-            unity_scene_name=unity_scene_name,
-            cue_offset_cm=10.0,
+        # Loads the task template.
+        templates_dir = get_task_templates_directory()
+        template_path = templates_dir.joinpath(f"{template_name}.yaml")
+        if not template_path.exists():
+            available = sorted([f.stem for f in templates_dir.glob("*.yaml")])
+            return f"Error: Template '{template_name}' not found. Available: {', '.join(available)}"
+
+        task_template = TaskTemplate.from_yaml(file_path=template_path)
+
+        # Creates experiment configuration from template.
+        config = create_experiment_from_template(
+            template=task_template,
+            unity_scene_name=template_name,
+            default_reward_size_ul=default_reward_size_ul,
+            default_reward_tone_duration_ms=default_reward_tone_duration_ms,
+            default_puff_duration_ms=default_puff_duration_ms,
+            default_occupancy_duration_ms=default_occupancy_duration_ms,
         )
 
         config_path = _get_experiment_config_path(project=project, experiment=experiment)
         config.to_yaml(file_path=config_path)
 
-        return f"Experiment template created at: {config_path}"
+        trial_count = len(config.trial_structures)
+        water_count = sum(1 for t in config.trial_structures.values() if isinstance(t, WaterRewardTrial))
+        puff_count = sum(1 for t in config.trial_structures.values() if isinstance(t, GasPuffTrial))
+
+        return (
+            f"Experiment created from template '{template_name}' at: {config_path}\n"
+            f"Trials: {trial_count} ({water_count} water reward, {puff_count} gas puff)\n"
+            f"Next: Use add_experiment_state_tool to add experiment states."
+        )
     except (FileNotFoundError, ValueError) as e:
         return f"Error: {e}"
 
 
 @mcp.tool()
-def add_cue_tool(project: str, experiment: str, name: str, code: int, length_cm: float) -> str:
-    """Adds a visual cue to an experiment configuration.
-
-    Args:
-        project: The name of the project.
-        experiment: The name of the experiment.
-        name: The cue name (e.g., 'A', 'B', 'Gray').
-        code: The unique uint8 code (0-255) for MQTT communication.
-        length_cm: The cue length in centimeters.
-
-    Returns:
-        A confirmation message or error description.
-    """
-    try:
-        config = _load_experiment_config(project=project, experiment=experiment)
-
-        # Checks for duplicate name or code
-        existing_names = {cue.name for cue in config.cues}
-        existing_codes = {cue.code for cue in config.cues}
-
-        if name in existing_names:
-            return f"Error: Cue with name '{name}' already exists."
-        if code in existing_codes:
-            return f"Error: Cue with code {code} already exists."
-
-        # Adds new cue
-        new_cue = Cue(name=name, code=code, length_cm=length_cm)
-        config.cues.append(new_cue)
-
-        _save_experiment_config(project=project, experiment=experiment, config=config)
-        return f"Added cue: {name} (code={code}, length={length_cm}cm)"
-    except (FileNotFoundError, ValueError) as e:
-        return f"Error: {e}"
-
-
-@mcp.tool()
-def remove_cue_tool(project: str, experiment: str, name: str) -> str:
-    """Removes a visual cue from an experiment configuration.
-
-    Args:
-        project: The name of the project.
-        experiment: The name of the experiment.
-        name: The name of the cue to remove.
-
-    Returns:
-        A confirmation message or error description.
-    """
-    try:
-        config = _load_experiment_config(project=project, experiment=experiment)
-
-        # Finds and removes cue
-        original_count = len(config.cues)
-        config.cues = [cue for cue in config.cues if cue.name != name]
-
-        if len(config.cues) == original_count:
-            return f"Error: Cue '{name}' not found."
-
-        _save_experiment_config(project=project, experiment=experiment, config=config)
-        return f"Removed cue: {name}"
-    except (FileNotFoundError, ValueError) as e:
-        return f"Error: {e}"
-
-
-@mcp.tool()
-def add_segment_tool(project: str, experiment: str, name: str, cue_sequence: list[str]) -> str:
-    """Adds a segment (cue sequence) to an experiment configuration.
-
-    Args:
-        project: The name of the project.
-        experiment: The name of the experiment.
-        name: The segment name (Unity prefab name).
-        cue_sequence: The ordered list of cue names comprising this segment.
-
-    Returns:
-        A confirmation message or error description.
-    """
-    try:
-        config = _load_experiment_config(project=project, experiment=experiment)
-
-        # Checks for duplicate name
-        existing_names = {seg.name for seg in config.segments}
-        if name in existing_names:
-            return f"Error: Segment with name '{name}' already exists."
-
-        # Validates cue references
-        available_cues = {cue.name for cue in config.cues}
-        invalid_cues = [c for c in cue_sequence if c not in available_cues]
-        if invalid_cues:
-            return f"Error: Unknown cues in sequence: {invalid_cues}. Available: {sorted(available_cues)}"
-
-        # Adds new segment
-        new_segment = Segment(name=name, cue_sequence=cue_sequence)
-        config.segments.append(new_segment)
-
-        _save_experiment_config(project=project, experiment=experiment, config=config)
-        return f"Added segment: {name} with cues {cue_sequence}"
-    except (FileNotFoundError, ValueError) as e:
-        return f"Error: {e}"
-
-
-@mcp.tool()
-def remove_segment_tool(project: str, experiment: str, name: str) -> str:
-    """Removes a segment from an experiment configuration.
-
-    Args:
-        project: The name of the project.
-        experiment: The name of the experiment.
-        name: The name of the segment to remove.
-
-    Returns:
-        A confirmation message or error description.
-    """
-    try:
-        config = _load_experiment_config(project=project, experiment=experiment)
-
-        # Finds and removes segment
-        original_count = len(config.segments)
-        config.segments = [seg for seg in config.segments if seg.name != name]
-
-        if len(config.segments) == original_count:
-            return f"Error: Segment '{name}' not found."
-
-        _save_experiment_config(project=project, experiment=experiment, config=config)
-        return f"Removed segment: {name}"
-    except (FileNotFoundError, ValueError) as e:
-        return f"Error: {e}"
-
-
-@mcp.tool()
-def add_water_reward_trial_tool(
+def update_water_reward_trial_tool(
     project: str,
     experiment: str,
-    name: str,
-    segment_name: str,
-    stimulus_trigger_zone_start_cm: float,
-    stimulus_trigger_zone_end_cm: float,
-    stimulus_location_cm: float,
-    reward_size_ul: float = 5.0,
-    reward_tone_duration_ms: int = 300,
-    show_stimulus_collision_boundary: bool = False,
+    trial_name: str,
+    reward_size_ul: float | None = None,
+    reward_tone_duration_ms: int | None = None,
 ) -> str:
-    """Adds a water reward (reinforcing) trial structure to an experiment configuration.
+    """Updates the parameters of a water reward trial.
+
+    Only provided parameters are updated; others remain unchanged.
 
     Args:
         project: The name of the project.
         experiment: The name of the experiment.
-        name: The trial structure name.
-        segment_name: The segment this trial is based on.
-        stimulus_trigger_zone_start_cm: Start of the trigger zone in cm.
-        stimulus_trigger_zone_end_cm: End of the trigger zone in cm.
-        stimulus_location_cm: Location of the stimulus boundary in cm.
-        reward_size_ul: Water reward volume in microliters.
-        reward_tone_duration_ms: Auditory tone duration in milliseconds.
-        show_stimulus_collision_boundary: Whether to show the boundary marker.
+        trial_name: The name of the trial to update.
+        reward_size_ul: New water reward volume in microliters (optional).
+        reward_tone_duration_ms: New reward tone duration in milliseconds (optional).
 
     Returns:
         A confirmation message or error description.
@@ -535,59 +481,42 @@ def add_water_reward_trial_tool(
     try:
         config = _load_experiment_config(project=project, experiment=experiment)
 
-        # Checks for duplicate name
-        if name in config.trial_structures:
-            return f"Error: Trial '{name}' already exists."
+        if trial_name not in config.trial_structures:
+            return f"Error: Trial '{trial_name}' not found."
 
-        # Validates segment reference
-        segment_names = {seg.name for seg in config.segments}
-        if segment_name not in segment_names:
-            return f"Error: Unknown segment '{segment_name}'. Available: {sorted(segment_names)}"
+        trial = config.trial_structures[trial_name]
+        if not isinstance(trial, WaterRewardTrial):
+            return f"Error: Trial '{trial_name}' is not a water reward trial."
 
-        # Adds new trial
-        new_trial = WaterRewardTrial(
-            segment_name=segment_name,
-            stimulus_trigger_zone_start_cm=stimulus_trigger_zone_start_cm,
-            stimulus_trigger_zone_end_cm=stimulus_trigger_zone_end_cm,
-            stimulus_location_cm=stimulus_location_cm,
-            reward_size_ul=reward_size_ul,
-            reward_tone_duration_ms=reward_tone_duration_ms,
-            show_stimulus_collision_boundary=show_stimulus_collision_boundary,
-        )
-        config.trial_structures[name] = new_trial
+        if reward_size_ul is not None:
+            trial.reward_size_ul = reward_size_ul
+        if reward_tone_duration_ms is not None:
+            trial.reward_tone_duration_ms = reward_tone_duration_ms
 
         _save_experiment_config(project=project, experiment=experiment, config=config)
-        return f"Added water reward trial: {name} (segment={segment_name}, reward={reward_size_ul}ul)"
+        return f"Updated trial '{trial_name}': reward={trial.reward_size_ul}ul, tone={trial.reward_tone_duration_ms}ms"
     except (FileNotFoundError, ValueError) as e:
         return f"Error: {e}"
 
 
 @mcp.tool()
-def add_gas_puff_trial_tool(
+def update_gas_puff_trial_tool(
     project: str,
     experiment: str,
-    name: str,
-    segment_name: str,
-    stimulus_trigger_zone_start_cm: float,
-    stimulus_trigger_zone_end_cm: float,
-    stimulus_location_cm: float,
-    puff_duration_ms: int = 100,
-    occupancy_duration_ms: int = 1000,
-    show_stimulus_collision_boundary: bool = False,
+    trial_name: str,
+    puff_duration_ms: int | None = None,
+    occupancy_duration_ms: int | None = None,
 ) -> str:
-    """Adds a gas puff (aversive) trial structure to an experiment configuration.
+    """Updates the parameters of a gas puff trial.
+
+    Only provided parameters are updated; others remain unchanged.
 
     Args:
         project: The name of the project.
         experiment: The name of the experiment.
-        name: The trial structure name.
-        segment_name: The segment this trial is based on.
-        stimulus_trigger_zone_start_cm: Start of the trigger zone in cm.
-        stimulus_trigger_zone_end_cm: End of the trigger zone in cm.
-        stimulus_location_cm: Location of the stimulus boundary in cm.
-        puff_duration_ms: Gas puff duration in milliseconds.
-        occupancy_duration_ms: Required zone occupancy time in milliseconds.
-        show_stimulus_collision_boundary: Whether to show the boundary marker.
+        trial_name: The name of the trial to update.
+        puff_duration_ms: New gas puff duration in milliseconds (optional).
+        occupancy_duration_ms: New occupancy threshold duration in milliseconds (optional).
 
     Returns:
         A confirmation message or error description.
@@ -595,55 +524,22 @@ def add_gas_puff_trial_tool(
     try:
         config = _load_experiment_config(project=project, experiment=experiment)
 
-        # Checks for duplicate name
-        if name in config.trial_structures:
-            return f"Error: Trial '{name}' already exists."
+        if trial_name not in config.trial_structures:
+            return f"Error: Trial '{trial_name}' not found."
 
-        # Validates segment reference
-        segment_names = {seg.name for seg in config.segments}
-        if segment_name not in segment_names:
-            return f"Error: Unknown segment '{segment_name}'. Available: {sorted(segment_names)}"
+        trial = config.trial_structures[trial_name]
+        if not isinstance(trial, GasPuffTrial):
+            return f"Error: Trial '{trial_name}' is not a gas puff trial."
 
-        # Adds new trial
-        new_trial = GasPuffTrial(
-            segment_name=segment_name,
-            stimulus_trigger_zone_start_cm=stimulus_trigger_zone_start_cm,
-            stimulus_trigger_zone_end_cm=stimulus_trigger_zone_end_cm,
-            stimulus_location_cm=stimulus_location_cm,
-            puff_duration_ms=puff_duration_ms,
-            occupancy_duration_ms=occupancy_duration_ms,
-            show_stimulus_collision_boundary=show_stimulus_collision_boundary,
+        if puff_duration_ms is not None:
+            trial.puff_duration_ms = puff_duration_ms
+        if occupancy_duration_ms is not None:
+            trial.occupancy_duration_ms = occupancy_duration_ms
+
+        _save_experiment_config(project=project, experiment=experiment, config=config)
+        return (
+            f"Updated trial '{trial_name}': puff={trial.puff_duration_ms}ms, occupancy={trial.occupancy_duration_ms}ms"
         )
-        config.trial_structures[name] = new_trial
-
-        _save_experiment_config(project=project, experiment=experiment, config=config)
-        return f"Added gas puff trial: {name} (segment={segment_name}, puff={puff_duration_ms}ms)"
-    except (FileNotFoundError, ValueError) as e:
-        return f"Error: {e}"
-
-
-@mcp.tool()
-def remove_trial_tool(project: str, experiment: str, name: str) -> str:
-    """Removes a trial structure from an experiment configuration.
-
-    Args:
-        project: The name of the project.
-        experiment: The name of the experiment.
-        name: The name of the trial to remove.
-
-    Returns:
-        A confirmation message or error description.
-    """
-    try:
-        config = _load_experiment_config(project=project, experiment=experiment)
-
-        if name not in config.trial_structures:
-            return f"Error: Trial '{name}' not found."
-
-        del config.trial_structures[name]
-
-        _save_experiment_config(project=project, experiment=experiment, config=config)
-        return f"Removed trial: {name}"
     except (FileNotFoundError, ValueError) as e:
         return f"Error: {e}"
 
@@ -813,76 +709,6 @@ def remove_experiment_state_tool(project: str, experiment: str, name: str) -> st
 
 
 @mcp.tool()
-def set_vr_environment_tool(
-    project: str,
-    experiment: str,
-    corridor_spacing_cm: float = 20.0,
-    segments_per_corridor: int = 3,
-    padding_prefab_name: str = "Padding",
-    cm_per_unity_unit: float = 10.0,
-) -> str:
-    """Configures the VR environment settings for an experiment.
-
-    Args:
-        project: The name of the project.
-        experiment: The name of the experiment.
-        corridor_spacing_cm: Horizontal spacing between corridor instances.
-        segments_per_corridor: Number of visible segments per corridor.
-        padding_prefab_name: Unity prefab name for corridor padding.
-        cm_per_unity_unit: Centimeters per Unity unit conversion factor.
-
-    Returns:
-        A confirmation message or error description.
-    """
-    try:
-        config = _load_experiment_config(project=project, experiment=experiment)
-
-        config.vr_environment = VREnvironment(
-            corridor_spacing_cm=corridor_spacing_cm,
-            segments_per_corridor=segments_per_corridor,
-            padding_prefab_name=padding_prefab_name,
-            cm_per_unity_unit=cm_per_unity_unit,
-        )
-
-        _save_experiment_config(project=project, experiment=experiment, config=config)
-        return f"VR environment updated: spacing={corridor_spacing_cm}cm, depth={segments_per_corridor}"
-    except (FileNotFoundError, ValueError) as e:
-        return f"Error: {e}"
-
-
-@mcp.tool()
-def set_experiment_metadata_tool(
-    project: str,
-    experiment: str,
-    unity_scene_name: str | None = None,
-    cue_offset_cm: float | None = None,
-) -> str:
-    """Updates experiment metadata (scene name and cue offset).
-
-    Args:
-        project: The name of the project.
-        experiment: The name of the experiment.
-        unity_scene_name: The Unity scene name (optional).
-        cue_offset_cm: The cue offset in centimeters (optional).
-
-    Returns:
-        A confirmation message or error description.
-    """
-    try:
-        config = _load_experiment_config(project=project, experiment=experiment)
-
-        if unity_scene_name is not None:
-            config.unity_scene_name = unity_scene_name
-        if cue_offset_cm is not None:
-            config.cue_offset_cm = cue_offset_cm
-
-        _save_experiment_config(project=project, experiment=experiment, config=config)
-        return f"Experiment metadata updated: scene={config.unity_scene_name}, offset={config.cue_offset_cm}cm"
-    except (FileNotFoundError, ValueError) as e:
-        return f"Error: {e}"
-
-
-@mcp.tool()
 def validate_experiment_configuration_tool(project: str, experiment: str) -> str:
     """Validates an experiment configuration for completeness and correctness.
 
@@ -1025,7 +851,8 @@ def list_experiment_states_tool(project: str, experiment: str) -> str:
             return "No states defined"
 
         state_list = [
-            f"{name} (code={state.experiment_state_code}, duration={state.state_duration_s}s, trials={state.supports_trials})"
+            f"{name} (code={state.experiment_state_code}, duration={state.state_duration_s}s, "
+            f"trials={state.supports_trials})"
             for name, state in config.experiment_states.items()
         ]
         return "States:\n- " + "\n- ".join(state_list)

@@ -6,18 +6,17 @@ import click  # pragma: no cover
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists  # pragma: no cover
 
 from ..data_classes import (
-    Cue,
-    Segment,
     GasPuffTrial,
-    VREnvironment,
+    TaskTemplate,
     WaterRewardTrial,
     AcquisitionSystems,
     MesoscopeExperimentState,
-    MesoscopeExperimentConfiguration,
     set_working_directory,
     set_google_credentials_path,
+    get_task_templates_directory,
     set_task_templates_directory,
     get_system_configuration_data,
+    create_experiment_from_template,
     create_server_configuration_file,
     create_system_configuration_file,
 )  # pragma: no cover
@@ -201,34 +200,60 @@ def configure_project(project: str) -> None:  # pragma: no cover
     help="The name of the experiment for which to create the configuration file.",
 )
 @click.option(
+    "-t",
+    "--template",
+    type=str,
+    required=True,
+    help="The name of the task template to use (filename without .yaml extension).",
+)
+@click.option(
     "-sc",
-    "--state_count",
+    "--state-count",
     type=int,
     required=True,
+    default=1,
     help="The number of runtime states supported by the experiment.",
 )
 @click.option(
-    "-wc",
-    "--water_reward_count",
-    type=int,
-    required=True,
-    default=0,
-    help="The number of water reward (reinforcing) trial types supported by the experiment.",
+    "--reward-size",
+    type=float,
+    default=5.0,
+    show_default=True,
+    help="Default water reward volume in microliters for lick-type trials.",
 )
 @click.option(
-    "-gc",
-    "--gas_puff_count",
+    "--reward-tone-duration",
     type=int,
-    required=True,
-    default=0,
-    help="The number of gas puff (aversive) trial types supported by the experiment.",
+    default=300,
+    show_default=True,
+    help="Default reward tone duration in milliseconds for lick-type trials.",
+)
+@click.option(
+    "--puff-duration",
+    type=int,
+    default=100,
+    show_default=True,
+    help="Default gas puff duration in milliseconds for occupancy-type trials.",
+)
+@click.option(
+    "--occupancy-duration",
+    type=int,
+    default=1000,
+    show_default=True,
+    help="Default occupancy threshold duration in milliseconds for occupancy-type trials.",
 )
 def generate_experiment_configuration_file(
-    project: str, experiment: str, state_count: int, water_reward_count: int, gas_puff_count: int
+    project: str,
+    experiment: str,
+    template: str,
+    state_count: int,
+    reward_size: float,
+    reward_tone_duration: int,
+    puff_duration: int,
+    occupancy_duration: int,
 ) -> None:  # pragma: no cover
-    """Configures the local data acquisition system to execute the specified project's experiment."""
-    # Resolves the acquisition system configuration. Uses the path to the local project directory and the project name
-    # to determine where to save the experiment configuration file.
+    """Creates an experiment configuration from a task template."""
+    # Resolves acquisition system configuration.
     acquisition_system = get_system_configuration_data()
     file_path = acquisition_system.filesystem.root_directory.joinpath(project, "configuration", f"{experiment}.yaml")
 
@@ -239,58 +264,46 @@ def generate_experiment_configuration_file(
             f"'sl-configure project' CLI command to create the project before creating new experiment configuration(s)."
         )
         console.error(message=message, error=ValueError)
-        # Fallback to appease mypy, should not be reachable
         raise ValueError(message)
 
-    # Generates precursor cue definitions
-    cues = [
-        Cue(name="Gray", code=0, length_cm=30.0),
-        Cue(name="A", code=1, length_cm=30.0),
-        Cue(name="B", code=2, length_cm=30.0),
-        Cue(name="C", code=3, length_cm=30.0),
-        Cue(name="D", code=4, length_cm=30.0),
-    ]
-
-    # Generates precursor segment definitions
-    segments = [
-        Segment(
-            name="Segment_abcd",
-            cue_sequence=["A", "Gray", "B", "Gray", "C", "Gray", "D", "Gray"],
-        ),
-    ]
-
-    # Generates precursor trial structures for water reward (reinforcing) trials.
-    trials: dict[str, WaterRewardTrial | GasPuffTrial] = {}
-    trial_names: list[str] = []
-    for trial in range(water_reward_count):
-        trial_name = f"water_reward_{trial + 1}"
-        trial_names.append(trial_name)
-        trials[trial_name] = WaterRewardTrial(
-            segment_name="Segment_abcd",
-            stimulus_trigger_zone_start_cm=208.0,
-            stimulus_trigger_zone_end_cm=222.0,
-            stimulus_location_cm=208.0,
+    # Loads the task template from the configured template's directory.
+    templates_dir = get_task_templates_directory()
+    template_path = templates_dir.joinpath(f"{template}.yaml")
+    if not template_path.exists():
+        available = sorted([f.stem for f in templates_dir.glob("*.yaml")])
+        message = (
+            f"Template '{template}' not found in {templates_dir}. "
+            f"Available templates: {', '.join(available) if available else 'none'}."
         )
+        console.error(message=message, error=FileNotFoundError)
+        raise FileNotFoundError(message)
 
-    # Generates precursor trial structures for gas puff (aversive) trials.
-    for trial in range(gas_puff_count):
-        trial_name = f"gas_puff_{trial + 1}"
-        trial_names.append(trial_name)
-        trials[trial_name] = GasPuffTrial(
-            segment_name="Segment_abcd",
-            stimulus_trigger_zone_start_cm=208.0,
-            stimulus_trigger_zone_end_cm=222.0,
-            stimulus_location_cm=208.0,
-        )
+    task_template = TaskTemplate.from_yaml(file_path=template_path)
 
-    # Generates a precursor experiment state field inside the 'states' dictionary for each requested experiment state.
-    states = {}
-    for state in range(state_count):
-        states[f"state_{state + 1}"] = MesoscopeExperimentState(
-            experiment_state_code=state + 1,  # Assumes experiment state sequences are 1-based
+    # Creates experiment configuration from template.
+    experiment_configuration = create_experiment_from_template(
+        template=task_template,
+        unity_scene_name=template,
+        default_reward_size_ul=reward_size,
+        default_reward_tone_duration_ms=reward_tone_duration,
+        default_puff_duration_ms=puff_duration,
+        default_occupancy_duration_ms=occupancy_duration,
+    )
+
+    # Determines trial type counts for guidance parameters.
+    water_reward_count = sum(
+        1 for t in experiment_configuration.trial_structures.values() if isinstance(t, WaterRewardTrial)
+    )
+    gas_puff_count = sum(1 for t in experiment_configuration.trial_structures.values() if isinstance(t, GasPuffTrial))
+
+    # Generates experiment states with guidance parameters.
+    for state_num in range(state_count):
+        state_name = f"state_{state_num + 1}"
+        experiment_configuration.experiment_states[state_name] = MesoscopeExperimentState(
+            experiment_state_code=state_num + 1,
             system_state_code=0,
             state_duration_s=60,
-            supports_trials=bool(trial_names),
+            supports_trials=True,
             reinforcing_initial_guided_trials=3 if water_reward_count > 0 else 0,
             reinforcing_recovery_failed_threshold=9 if water_reward_count > 0 else 0,
             reinforcing_recovery_guided_trials=3 if water_reward_count > 0 else 0,
@@ -299,33 +312,9 @@ def generate_experiment_configuration_file(
             aversive_recovery_guided_trials=3 if gas_puff_count > 0 else 0,
         )
 
-    # Depending on the acquisition system, packs the resolved data into the experiment configuration class and
-    # saves it to the project's configuration directory as a .yaml file.
-    if acquisition_system.name == AcquisitionSystems.MESOSCOPE_VR:
-        experiment_configuration = MesoscopeExperimentConfiguration(
-            cues=cues,
-            segments=segments,
-            trial_structures=trials,
-            experiment_states=states,
-            vr_environment=VREnvironment(),
-            unity_scene_name="",
-            cue_offset_cm=10.0,
-        )
-
-    else:
-        message = (
-            f"Unable to generate the {experiment} experiment's configuration file for the {project} project, as the "
-            f"local data acquisition system {acquisition_system.name} is not recognized (not supported). Currently, "
-            f"only the following acquisition systems are supported: {','.join(list(AcquisitionSystems))}."
-        )
-        console.error(message=message, error=ValueError)
-        # Fallback to appease mypy, should not be reachable
-        raise ValueError(message)
-
     experiment_configuration.to_yaml(file_path=file_path)
     console.echo(
-        message=f"{experiment} experiment's configuration file: created under the {project} project's "
-        f"'configuration' directory.",
+        message=f"{experiment} experiment's configuration file: created from template '{template}'.",
         level=LogLevel.SUCCESS,
     )
 

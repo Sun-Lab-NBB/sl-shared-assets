@@ -59,6 +59,7 @@ from .configuration_data import (
     get_task_templates_directory,
     set_task_templates_directory,
     get_system_configuration_data,
+    create_experiment_from_template,
     create_server_configuration_file,
     create_system_configuration_file,
 )
@@ -116,6 +117,7 @@ __all__ = [
     "WaterRewardTrial",
     "WindowCheckingDescriptor",
     "ZaberPositions",
+    "create_experiment_from_template",
     "create_server_configuration_file",
     "create_system_configuration_file",
     "get_google_credentials_path",

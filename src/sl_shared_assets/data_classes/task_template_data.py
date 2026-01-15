@@ -101,6 +101,9 @@ class TrialStructure:
         This base class contains ONLY the spatial data needed by Unity for prefab generation and runtime zone
         configuration. Experiment-specific parameters (reward sizes, puff durations, etc.) are added by subclasses
         in configuration_data.py.
+
+        The trigger_type field specifies the stimulus trigger zone behavior and determines which experiment trial
+        class (WaterRewardTrial or GasPuffTrial) is created when loading this template for experiment configuration.
     """
 
     segment_name: str
@@ -114,6 +117,9 @@ class TrialStructure:
     show_stimulus_collision_boundary: bool
     """Determines whether the stimulus collision boundary is visible to the animal during this trial type. When True,
     the boundary marker is displayed in the Virtual Reality environment at the stimulus location."""
+    trigger_type: str
+    """Specifies the stimulus trigger zone behavior. Valid values: 'lick' (GuidanceZone, used for water rewards) or
+    'occupancy' (OccupancyZone, used for gas puffs)."""
 
 
 @dataclass()
@@ -185,13 +191,22 @@ class TaskTemplate(YamlConfig):
                     )
                     console.error(message=message, error=ValueError)
 
-        # Validates trial structure segment references.
+        # Validates trial structure segment references and trigger types.
         segment_names = {seg.name for seg in self.segments}
+        valid_trigger_types = {"lick", "occupancy"}
         for trial_name, trial_structure in self.trial_structures.items():
             if trial_structure.segment_name not in segment_names:
                 message = (
                     f"Trial structure '{trial_name}' references unknown segment '{trial_structure.segment_name}'. "
                     f"Available segments: {', '.join(sorted(segment_names))}."
+                )
+                console.error(message=message, error=ValueError)
+
+            # Validates trigger_type values.
+            if trial_structure.trigger_type not in valid_trigger_types:
+                message = (
+                    f"Trial structure '{trial_name}' has invalid trigger_type '{trial_structure.trigger_type}'. "
+                    f"Valid values: {', '.join(sorted(valid_trigger_types))}."
                 )
                 console.error(message=message, error=ValueError)
 

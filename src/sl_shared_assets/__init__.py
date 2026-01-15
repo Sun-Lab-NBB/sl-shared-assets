@@ -58,6 +58,7 @@ from .data_classes import (
     get_google_credentials_path,
     get_task_templates_directory,
     get_system_configuration_data,
+    create_experiment_from_template,
 )
 from .data_transfer import (
     delete_directory,
@@ -116,6 +117,7 @@ __all__ = [
     "WindowCheckingDescriptor",
     "ZaberPositions",
     "calculate_directory_checksum",
+    "create_experiment_from_template",
     "delete_directory",
     "get_google_credentials_path",
     "get_server_configuration",

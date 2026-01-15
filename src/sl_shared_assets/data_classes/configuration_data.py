@@ -10,7 +10,7 @@ from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 
 # Imports base classes from task_template_data module.
-from .task_template_data import Cue, Segment, VREnvironment, TrialStructure
+from .task_template_data import Cue, Segment, TaskTemplate, TrialStructure, VREnvironment
 
 
 class AcquisitionSystems(StrEnum):
@@ -21,7 +21,7 @@ class AcquisitionSystems(StrEnum):
     engine to conduct experiments."""
 
 
-# Note: Cue, Segment, VREnvironment, and TrialStructure are imported from task_template_data module.
+# Note: Cue, Segment, TrialStructure, VREnvironment, and TaskTemplate are imported from task_template_data module.
 # These base classes are shared between task templates (Unity) and experiment configurations (sl-experiment).
 
 
@@ -59,13 +59,15 @@ class _MesoscopeBaseTrial(TrialStructure):
     """Extends TrialStructure with experiment runtime fields common to all supported experiment trial types.
 
     Notes:
-        Inherits all spatial configuration fields from TrialStructure, including segment mapping and zone positions.
+        Inherits spatial configuration fields from TrialStructure, including segment mapping and zone positions.
 
-        The trigger mode and guidance behavior are determined by the trial type. WaterRewardTrial uses lick-based
-        triggering where guidance delivers stimulus on collision. GasPuffTrial uses occupancy-based triggering where
-        guidance emits OccupancyFailed for movement blocking.
+        The trigger_type field is inherited but not used at runtime. Trial behavior is determined by the concrete
+        class type (WaterRewardTrial or GasPuffTrial), not the trigger_type value. The field exists only to maintain
+        schema compatibility with task templates.
     """
 
+    trigger_type: str = ""
+    """Inherited from TrialStructure but not used at runtime. Trial behavior is determined by concrete class type."""
     cue_sequence: list[int] = field(default_factory=list)
     """The sequence of segment wall cue identifiers experienced by the animal when participating in this type of
     trials. This field is populated by MesoscopeExperimentConfiguration.__post_init__."""
@@ -266,6 +268,71 @@ class MesoscopeExperimentConfiguration(YamlConfig):
 
             # Validates zone positions with populated trial_length_cm.
             trial.validate_zones()
+
+
+def create_experiment_from_template(
+    template: TaskTemplate,
+    unity_scene_name: str,
+    default_reward_size_ul: float = 5.0,
+    default_reward_tone_duration_ms: int = 300,
+    default_puff_duration_ms: int = 100,
+    default_occupancy_duration_ms: int = 1000,
+) -> MesoscopeExperimentConfiguration:
+    """Creates a MesoscopeExperimentConfiguration from a TaskTemplate.
+
+    Converts base TrialStructure instances from the template into WaterRewardTrial or GasPuffTrial instances based on
+    each trial's trigger_type field.
+
+    Args:
+        template: The TaskTemplate containing the VR structure (cues, segments, trial zones) to convert.
+        unity_scene_name: The Unity scene name for the experiment. Must match the template's scene file name.
+        default_reward_size_ul: Water reward volume in microliters for lick-type trials.
+        default_reward_tone_duration_ms: Reward tone duration in milliseconds for lick-type trials.
+        default_puff_duration_ms: Gas puff duration in milliseconds for occupancy-type trials.
+        default_occupancy_duration_ms: Occupancy threshold duration in milliseconds for occupancy-type trials.
+
+    Returns:
+        A MesoscopeExperimentConfiguration with trial types derived from template trigger_types.
+
+    Notes:
+        Trials with trigger_type 'lick' are converted to WaterRewardTrial (GuidanceZone in Unity). Trials with
+        trigger_type 'occupancy' are converted to GasPuffTrial (OccupancyZone in Unity).
+    """
+    # Converts base TrialStructure instances to experiment-specific trial types based on trigger_type.
+    trial_structures: dict[str, WaterRewardTrial | GasPuffTrial] = {}
+    for trial_name, base_trial in template.trial_structures.items():
+        if base_trial.trigger_type == "lick":
+            trial_structures[trial_name] = WaterRewardTrial(
+                segment_name=base_trial.segment_name,
+                stimulus_trigger_zone_start_cm=base_trial.stimulus_trigger_zone_start_cm,
+                stimulus_trigger_zone_end_cm=base_trial.stimulus_trigger_zone_end_cm,
+                stimulus_location_cm=base_trial.stimulus_location_cm,
+                show_stimulus_collision_boundary=base_trial.show_stimulus_collision_boundary,
+                trigger_type=base_trial.trigger_type,
+                reward_size_ul=default_reward_size_ul,
+                reward_tone_duration_ms=default_reward_tone_duration_ms,
+            )
+        elif base_trial.trigger_type == "occupancy":
+            trial_structures[trial_name] = GasPuffTrial(
+                segment_name=base_trial.segment_name,
+                stimulus_trigger_zone_start_cm=base_trial.stimulus_trigger_zone_start_cm,
+                stimulus_trigger_zone_end_cm=base_trial.stimulus_trigger_zone_end_cm,
+                stimulus_location_cm=base_trial.stimulus_location_cm,
+                show_stimulus_collision_boundary=base_trial.show_stimulus_collision_boundary,
+                trigger_type=base_trial.trigger_type,
+                puff_duration_ms=default_puff_duration_ms,
+                occupancy_duration_ms=default_occupancy_duration_ms,
+            )
+
+    return MesoscopeExperimentConfiguration(
+        cues=deepcopy(template.cues),
+        segments=deepcopy(template.segments),
+        trial_structures=trial_structures,
+        experiment_states={},
+        vr_environment=deepcopy(template.vr_environment),
+        unity_scene_name=unity_scene_name,
+        cue_offset_cm=template.cue_offset_cm,
+    )
 
 
 @dataclass()
