@@ -14,9 +14,16 @@ Data Transfer Assets
    :undoc-members:
    :show-inheritance:
 
-Data and Configuration Assets
-=============================
+Data Assets
+===========
 .. automodule:: sl_shared_assets.data_classes
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Configuration Assets
+====================
+.. automodule:: sl_shared_assets.configuration
    :members:
    :undoc-members:
    :show-inheritance:

@@ -105,22 +105,14 @@ lint.select = ["ALL"]
 
 # General ignore directives
 lint.ignore = [
-    "W291",  # Conflicts with docstring formatting
-    "TID252",  # Relative imports are important for the correct asset management in this library
-    "BLE001", # Catching blind excepts is required for some library functionalities
-    "ANN401",  # While suboptimal, ANY is a helpful type when used with caution
-    "C901",  # Sometimes complex functions are necessary
-    "PLR0913",  # Sometimes complex functions are necessary
-    "PLR0912",  # Sometimes complex functions are necessary
-    "PLR0915",  # Sometimes complex type definitions are necessary
-    "PLR0911", # Sometimes complex return graphs are necessary
-    "COM812", # Conflicts with the formatter
-    "ISC001", # Conflicts with the formatter
-    "PT001", # https://github.com/astral-sh/ruff/issues/8796#issuecomment-182590771
-    "PT023", # https://github.com/astral-sh/ruff/issues/8796#issuecomment-1825907715
-    "D107", # Project-specific, __init__ is documented inside the main class docstring where applicable
-    "D205", # Bugs out for file descriptions
-    "PLW0603", # While global statement usage is not ideal, it greatly streamlines certain development patterns
+    "W291",     # Trailing whitespace in multi-line docstrings is handled by formatter
+    "TID252",   # Relative imports are important for correct asset management in this library
+    "BLE001",   # Blind except needed for robust error handling in data transfer and MCP tools
+    "C901",     # Complex update functions with many optional parameters are necessary
+    "PLR0912",  # Complex branching in update functions is necessary
+    "PLR0913",  # Complex configuration functions require many arguments
+    "COM812",   # Conflicts with the formatter
+    "D205",     # Multi-line docstring summaries are used intentionally
 ]
 
 # Additional formatting configurations

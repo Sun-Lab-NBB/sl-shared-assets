@@ -62,6 +62,10 @@ actual library state to prevent integration errors.
 - `/sun-lab-style` - Apply Sun Lab coding and documentation conventions (REQUIRED for all code and documentation changes)
 - `/experiment-design` - Interactive guidance for building experiment configurations via MCP tools
 
+**Skills in downstream libraries (use MCP tools from this library):**
+- `/machine-setup` - Located in sl-forgery (configures working directory, server credentials)
+- `/acquisition-system-setup` - Located in sl-experiment (configures acquisition system parameters)
+
 ## MCP Server
 
 This library exposes an MCP server for agentic configuration management. Start with: `sl-configure mcp`

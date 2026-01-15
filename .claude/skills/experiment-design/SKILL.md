@@ -1,20 +1,42 @@
 ---
-name: experiment-design
+name: designing-experiments
 description: >-
   Interactive guidance for building Sun lab experiment configurations using MCP tools. Covers cue
-  and segment design, trial structure configuration, and experiment state definition.
+  and segment design, trial structure configuration, and experiment state definition. Use when creating
+  new experiments, modifying experiment configurations, setting up trial parameters, or when the user
+  asks about experiment design, templates, or MCP configuration tools.
 ---
 
 # Experiment Design Skill
 
-This skill provides guidance for interactively building Sun lab experiment configurations using the MCP tools
-exposed by this library. Use this skill when helping users design new experiments or modify existing ones.
+Provides guidance for interactively building Sun lab experiment configurations using the MCP tools exposed by this
+library. Use this skill when helping users design new experiments or modify existing ones.
 
 ---
 
 ## MCP Server
 
 Start the MCP server with: `sl-configure mcp`
+
+---
+
+## Workflow Checklist
+
+Copy this checklist and track your progress when creating a new experiment:
+
+```
+Experiment Creation Progress:
+- [ ] Step 1: Verify templates directory is configured
+- [ ] Step 2: List and select appropriate template
+- [ ] Step 3: Review template details (cues, segments, trials)
+- [ ] Step 4: Create project structure
+- [ ] Step 5: Create experiment from template
+- [ ] Step 6: Add baseline state (if needed)
+- [ ] Step 7: Add experiment state with trial parameters
+- [ ] Step 8: Add cooldown state (if needed)
+- [ ] Step 9: Customize trial parameters (if needed)
+- [ ] Step 10: Validate final configuration
+```
 
 ---
 
@@ -105,45 +127,45 @@ Always validate the final configuration:
 
 ### Template Discovery Tools
 
-| Tool                           | Description                              |
-|--------------------------------|------------------------------------------|
-| `list_available_templates_tool` | Lists templates in configured directory |
-| `get_template_info_tool`        | Shows template details (cues, segments, trials) |
+| Tool                            | Description                                      |
+|---------------------------------|--------------------------------------------------|
+| `list_available_templates_tool` | Lists templates in configured directory          |
+| `get_template_info_tool`        | Shows template details (cues, segments, trials)  |
 
 ### Setup Tools
 
-| Tool                                     | Description                            |
-|------------------------------------------|----------------------------------------|
-| `set_working_directory_tool`             | Sets the local working directory       |
-| `set_task_templates_directory_tool`      | Sets the templates directory path      |
-| `create_project_tool`                    | Creates a new project structure        |
-| `create_experiment_from_template_tool`   | Creates experiment from a template     |
+| Tool                                   | Description                            |
+|----------------------------------------|----------------------------------------|
+| `set_working_directory_tool`           | Sets the local working directory       |
+| `set_task_templates_directory_tool`    | Sets the templates directory path      |
+| `create_project_tool`                  | Creates a new project structure        |
+| `create_experiment_from_template_tool` | Creates experiment from a template     |
 
 ### Trial Parameter Tools
 
-| Tool                            | Description                                    |
-|---------------------------------|------------------------------------------------|
-| `update_water_reward_trial_tool` | Updates reward size and tone duration         |
-| `update_gas_puff_trial_tool`     | Updates puff and occupancy durations          |
+| Tool                            | Description                            |
+|---------------------------------|----------------------------------------|
+| `update_water_reward_trial_tool` | Updates reward size and tone duration |
+| `update_gas_puff_trial_tool`     | Updates puff and occupancy durations  |
 
 ### Experiment State Tools
 
-| Tool                           | Description                       |
-|--------------------------------|-----------------------------------|
-| `add_experiment_state_tool`    | Adds an experiment state          |
-| `update_experiment_state_tool` | Modifies an existing state        |
-| `remove_experiment_state_tool` | Removes a state                   |
+| Tool                           | Description                 |
+|--------------------------------|-----------------------------|
+| `add_experiment_state_tool`    | Adds an experiment state    |
+| `update_experiment_state_tool` | Modifies an existing state  |
+| `remove_experiment_state_tool` | Removes a state             |
 
 ### Query Tools
 
-| Tool                                     | Description                   |
-|------------------------------------------|-------------------------------|
-| `read_experiment_configuration_tool`     | Reads full config summary     |
-| `list_experiment_cues_tool`              | Lists all defined cues        |
-| `list_experiment_segments_tool`          | Lists all segments            |
-| `list_experiment_trials_tool`            | Lists all trial structures    |
-| `list_experiment_states_tool`            | Lists all states              |
-| `validate_experiment_configuration_tool` | Validates completeness        |
+| Tool                                     | Description                 |
+|------------------------------------------|-----------------------------|
+| `read_experiment_configuration_tool`     | Reads full config summary   |
+| `list_experiment_cues_tool`              | Lists all defined cues      |
+| `list_experiment_segments_tool`          | Lists all segments          |
+| `list_experiment_trials_tool`            | Lists all trial structures  |
+| `list_experiment_states_tool`            | Lists all states            |
+| `validate_experiment_configuration_tool` | Validates completeness      |
 
 ---
 

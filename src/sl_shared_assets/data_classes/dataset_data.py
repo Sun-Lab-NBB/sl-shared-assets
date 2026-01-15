@@ -9,7 +9,7 @@ from ataraxis_base_utilities import console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 
 from .session_data import SessionTypes
-from .configuration_data import AcquisitionSystems
+from ..configuration import AcquisitionSystems
 
 
 @dataclass(frozen=True)

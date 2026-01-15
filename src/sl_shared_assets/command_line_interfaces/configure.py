@@ -5,7 +5,8 @@ from pathlib import Path  # pragma: no cover
 import click  # pragma: no cover
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists  # pragma: no cover
 
-from ..data_classes import (
+from ..mcp_server import run_server  # pragma: no cover
+from ..configuration import (
     GasPuffTrial,
     TaskTemplate,
     WaterRewardTrial,
@@ -16,7 +17,7 @@ from ..data_classes import (
     get_task_templates_directory,
     set_task_templates_directory,
     get_system_configuration_data,
-    create_experiment_from_template,
+    create_experiment_configuration,
     create_server_configuration_file,
     create_system_configuration_file,
 )  # pragma: no cover
@@ -281,8 +282,9 @@ def generate_experiment_configuration_file(
     task_template = TaskTemplate.from_yaml(file_path=template_path)
 
     # Creates experiment configuration from template.
-    experiment_configuration = create_experiment_from_template(
+    experiment_configuration = create_experiment_configuration(
         template=task_template,
+        system=AcquisitionSystems.MESOSCOPE_VR,
         unity_scene_name=template,
         default_reward_size_ul=reward_size,
         default_reward_tone_duration_ms=reward_tone_duration,
@@ -330,6 +332,4 @@ def generate_experiment_configuration_file(
 )
 def start_mcp_server(transport: str) -> None:  # pragma: no cover
     """Starts the MCP server for agentic configuration management."""
-    from ..mcp_server import run_server
-
-    run_server(transport=transport)
+    run_server(transport=transport)  # type: ignore[arg-type]

@@ -1,8 +1,8 @@
-"""Provides base schema classes for VR task templates used by Unity and experiment configurations.
+"""Provides VR environment configuration classes for Unity task templates and experiment configurations.
 
 These classes define the schema for task template YAML files that Unity uses for prefab generation and runtime.
-Experiment configuration classes in configuration_data.py inherit from these base classes to add experiment-specific
-parameters.
+Experiment configuration classes in mesoscope_configuration.py inherit from these base classes to add
+experiment-specific parameters.
 """
 
 from dataclasses import dataclass
@@ -100,7 +100,7 @@ class TrialStructure:
     Notes:
         This base class contains ONLY the spatial data needed by Unity for prefab generation and runtime zone
         configuration. Experiment-specific parameters (reward sizes, puff durations, etc.) are added by subclasses
-        in configuration_data.py.
+        in mesoscope_configuration.py.
 
         The trigger_type field specifies the stimulus trigger zone behavior and determines which experiment trial
         class (WaterRewardTrial or GasPuffTrial) is created when loading this template for experiment configuration.
