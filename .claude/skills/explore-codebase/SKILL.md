@@ -62,7 +62,7 @@ Provide a structured summary including:
 
 ### Example Output
 
-```
+```markdown
 ## Project Purpose
 
 Provides shared data acquisition and processing assets for Sun Lab libraries. Decouples sl-experiment

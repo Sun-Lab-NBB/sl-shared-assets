@@ -79,49 +79,80 @@ libraries.
 
 ### MCP Server
 
-This library provides an MCP server that exposes configuration management tools for AI agent integration. The server
-enables agents to interactively build experiment and system configurations through a template-then-edit workflow.
+This library provides MCP servers that expose configuration management tools for AI agent integration. The servers
+enable agents to interactively build experiment and system configurations through a template-then-edit workflow.
+
+#### Server Architecture
+
+The library provides two MCP servers:
+
+- **Base Server** (`sl-shared-assets`) — Exposes shared tools that work across all data acquisition systems.
+- **Mesoscope Server** (`sl-mesoscope-vr`) — Exposes tools specific to the mesoscope-VR data acquisition system.
 
 #### Starting the Server
 
-Start the MCP server using the CLI:
+Start the mesoscope MCP server (default) using the CLI:
 
 ```bash
 sl-configure mcp
 ```
 
+Start the base MCP server for shared tools only:
+
+```bash
+sl-configure mcp --server base
+```
+
 #### Available Tools
 
-The server exposes 44 tools organized into five categories:
+**Base Server (10 tools):**
 
-- **Setup** — Configures the working environment.
-  - `set_working_directory_tool`, `set_google_credentials_tool`, `set_task_templates_directory_tool`,
-    `create_system_configuration_tool`, `create_project_tool`
-- **Read** — Queries current configuration state.
-  - `get_working_directory_tool`, `get_system_configuration_tool`, `get_server_configuration_tool`,
-    `get_google_credentials_tool`, `get_task_templates_directory_tool`, `list_available_templates_tool`,
-    `get_template_info_tool`, `read_experiment_configuration_tool`
-- **System Config** — Reads and updates system configuration sections (filesystem, cameras, microcontrollers,
-  sensors, external assets).
-  - `list_system_configuration_sections_tool`, `get_*_configuration_tool`, `update_*_configuration_tool`
+- **Setup** — Configures the shared working environment.
+  - `set_working_directory_tool`, `set_google_credentials_tool`, `set_task_templates_directory_tool`
+- **Read** — Queries shared configuration state.
+  - `get_working_directory_tool`, `get_server_configuration_tool`, `get_google_credentials_tool`,
+    `get_task_templates_directory_tool`, `list_available_templates_tool`, `get_template_info_tool`
 - **Server Config** — Creates server configuration templates with secure password handling.
   - `create_server_configuration_template_tool`
-- **Experiment** — Creates and modifies experiment configurations.
-  - `create_experiment_from_template_tool`, `update_water_reward_trial_tool`, `update_gas_puff_trial_tool`,
-    `add_experiment_state_tool`, `update_experiment_state_tool`, `remove_experiment_state_tool`,
-    `validate_experiment_configuration_tool`, `list_experiment_cues_tool`, `list_experiment_segments_tool`,
-    `list_experiment_trials_tool`, `list_experiment_states_tool`
+
+**Mesoscope Server (32 tools):**
+
+- **Setup** — Configures the mesoscope acquisition system.
+  - `mesoscope_create_system_configuration_tool`, `mesoscope_create_project_tool`
+- **Read** — Queries mesoscope system state.
+  - `mesoscope_get_system_configuration_tool`, `mesoscope_read_experiment_configuration_tool`
+- **System Config** — Reads and updates mesoscope system configuration sections.
+  - `mesoscope_list_system_configuration_sections_tool`, `mesoscope_get_*_configuration_tool`,
+    `mesoscope_update_*_configuration_tool`
+- **Experiment** — Creates and modifies mesoscope experiment configurations.
+  - `mesoscope_create_experiment_from_template_tool`, `mesoscope_update_water_reward_trial_tool`,
+    `mesoscope_update_gas_puff_trial_tool`, `mesoscope_add_experiment_state_tool`,
+    `mesoscope_update_experiment_state_tool`, `mesoscope_remove_experiment_state_tool`,
+    `mesoscope_validate_experiment_configuration_tool`, `mesoscope_list_experiment_*_tool`
 
 #### Claude Desktop Configuration
 
-Add the following to the Claude Desktop configuration file to enable the MCP server:
+Add the following to the Claude Desktop configuration file to enable the mesoscope MCP server:
+
+```json
+{
+  "mcpServers": {
+    "sl-mesoscope-vr": {
+      "command": "sl-configure",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+For the base server with shared tools only:
 
 ```json
 {
   "mcpServers": {
     "sl-shared-assets": {
       "command": "sl-configure",
-      "args": ["mcp"]
+      "args": ["mcp", "--server", "base"]
     }
   }
 }
