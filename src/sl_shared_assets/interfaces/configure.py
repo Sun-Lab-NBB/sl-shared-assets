@@ -5,7 +5,7 @@ from pathlib import Path  # pragma: no cover
 import click  # pragma: no cover
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists  # pragma: no cover
 
-from ..mcp_server import run_server  # pragma: no cover
+from .mcp_server import run_server  # pragma: no cover
 from ..configuration import (
     GasPuffTrial,
     TaskTemplate,

@@ -30,6 +30,7 @@ ___
 - [Dependencies](#dependencies)
 - [Installation](#installation)
 - [Usage](#usage)
+  - [MCP Server](#mcp-server)
 - [API Documentation](#api-documentation)
 - [Versioning](#versioning)
 - [Authors](#authors)
@@ -75,6 +76,56 @@ library. For details on using shared assets for data processing and dataset form
 ***Warning!*** End users should not use any component of this library directly or install this library into any Python
 environment. All assets from this library are intended to be used exclusively by developers working on other Sun lab
 libraries.
+
+### MCP Server
+
+This library provides an MCP server that exposes configuration management tools for AI agent integration. The server
+enables agents to interactively build experiment and system configurations through a template-then-edit workflow.
+
+#### Starting the Server
+
+Start the MCP server using the CLI:
+
+```bash
+sl-configure mcp
+```
+
+#### Available Tools
+
+The server exposes 44 tools organized into five categories:
+
+- **Setup** — Configures the working environment.
+  - `set_working_directory_tool`, `set_google_credentials_tool`, `set_task_templates_directory_tool`,
+    `create_system_configuration_tool`, `create_project_tool`
+- **Read** — Queries current configuration state.
+  - `get_working_directory_tool`, `get_system_configuration_tool`, `get_server_configuration_tool`,
+    `get_google_credentials_tool`, `get_task_templates_directory_tool`, `list_available_templates_tool`,
+    `get_template_info_tool`, `read_experiment_configuration_tool`
+- **System Config** — Reads and updates system configuration sections (filesystem, cameras, microcontrollers,
+  sensors, external assets).
+  - `list_system_configuration_sections_tool`, `get_*_configuration_tool`, `update_*_configuration_tool`
+- **Server Config** — Creates server configuration templates with secure password handling.
+  - `create_server_configuration_template_tool`
+- **Experiment** — Creates and modifies experiment configurations.
+  - `create_experiment_from_template_tool`, `update_water_reward_trial_tool`, `update_gas_puff_trial_tool`,
+    `add_experiment_state_tool`, `update_experiment_state_tool`, `remove_experiment_state_tool`,
+    `validate_experiment_configuration_tool`, `list_experiment_cues_tool`, `list_experiment_segments_tool`,
+    `list_experiment_trials_tool`, `list_experiment_states_tool`
+
+#### Claude Desktop Configuration
+
+Add the following to the Claude Desktop configuration file to enable the MCP server:
+
+```json
+{
+  "mcpServers": {
+    "sl-shared-assets": {
+      "command": "sl-configure",
+      "args": ["mcp"]
+    }
+  }
+}
+```
 
 ___
 

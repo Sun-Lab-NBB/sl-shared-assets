@@ -12,7 +12,7 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 from ataraxis_base_utilities import ensure_directory_exists
 
-from .configuration import (
+from ..configuration import (
     GasPuffTrial,
     TaskTemplate,
     ExperimentState,
