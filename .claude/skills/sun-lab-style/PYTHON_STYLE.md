@@ -33,7 +33,8 @@ Conventions for Python code in Sun Lab projects.
 
 ## Docstrings
 
-Use **Google-style docstrings** with sections in this order: **Summary → Extended Description → Notes → Args → Returns → Raises**
+Use **Google-style docstrings** with sections in this order:
+**Summary → Extended Description → Notes → Args → Returns → Raises**
 
 ```python
 def function_name(param1: int, param2: str = "default") -> bool:
@@ -366,6 +367,7 @@ if self._speed_axis is not None:
 - Don't reiterate the obvious (e.g., `# Set x to 5` before `x = 5`)
 - Don't add docstrings/comments to code you didn't write or modify
 - Don't add type annotations as comments (use actual type hints)
+- Don't use heavy section separator blocks (e.g., `# ======` or `# ------`). Use blank lines to separate sections
 
 ---
 
@@ -801,6 +803,7 @@ Transform code to match Sun Lab style:
 | `# Set x to 5` before `x = 5`           | States the obvious         | Remove or explain *why*                           |
 | Missing dtype in `NDArray`              | Type checking fails        | Always specify `NDArray[np.float32]`              |
 | `Whether to...` for booleans            | Incomplete phrasing        | Use `Determines whether to...`                    |
+| `# ======` section separators           | Visual clutter             | Use blank lines to separate sections              |
 
 ### Naming Anti-Patterns
 
@@ -843,6 +846,7 @@ Python Style Compliance:
 - [ ] Lines under 120 characters
 - [ ] Imports ordered: standard library, TYPE_CHECKING, third-party, local
 - [ ] Inline comments use third person imperative
+- [ ] No heavy section separator blocks (# ====== or # ------)
 - [ ] Numba functions use cache=True
 - [ ] Dataclasses use frozen=True for immutable configs (omit for mutable state)
 - [ ] I/O operations separated from processing logic
