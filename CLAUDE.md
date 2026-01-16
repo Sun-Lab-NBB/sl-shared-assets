@@ -17,6 +17,7 @@ the Sun Lab conventions. This applies to ALL file types including:
 - Python source files (`.py`)
 - Documentation files (`README.md`, docstrings)
 - Configuration files when adding comments or descriptions
+- Git commit messages
 
 All contributions must strictly follow these conventions and all reviews must check for compliance. Key conventions
 include:
@@ -26,6 +27,7 @@ include:
 - Third person imperative mood for comments and documentation
 - Proper error handling with `console.error()`
 - README structure and formatting standards
+- Commit messages use past tense verbs (Added, Fixed, Updated) and end with periods
 
 ## Cross-Referenced Library Verification
 
@@ -58,6 +60,22 @@ actual library state to prevent integration errors.
 
 - `/explore-codebase` - Perform in-depth codebase exploration
 - `/sun-lab-style` - Apply Sun Lab coding and documentation conventions (REQUIRED for all code and documentation changes)
+- `/experiment-design` - Interactive guidance for building experiment configurations via MCP tools
+
+**Skills in downstream libraries (use MCP tools from this library):**
+- `/machine-setup` - Located in sl-forgery (configures working directory, server credentials)
+- `/acquisition-system-setup` - Located in sl-experiment (configures acquisition system parameters)
+
+## MCP Server
+
+This library exposes an MCP server for agentic configuration management. Start with: `sl-configure mcp`
+
+The MCP server provides tools for:
+- **Setup**: Set working directory, create projects, configure system and server
+- **Experiment Design**: Create templates, add cues/segments/trials/states incrementally
+- **Query**: Read configurations, list components, validate completeness
+
+See the `/experiment-design` skill for interactive configuration building guidance.
 
 ## Downstream Library Integration
 

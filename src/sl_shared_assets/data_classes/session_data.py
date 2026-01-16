@@ -12,7 +12,7 @@ from ataraxis_base_utilities import console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 from ataraxis_time.time_helpers import TimestampFormats, get_timestamp
 
-from .configuration_data import AcquisitionSystems, get_system_configuration_data
+from ..configuration import AcquisitionSystems, get_system_configuration_data
 
 
 class SessionTypes(StrEnum):
