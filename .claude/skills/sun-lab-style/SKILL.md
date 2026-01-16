@@ -64,7 +64,7 @@ After reading the appropriate guide:
 
 ### README Files
 
-- Third person voice throughout
+- Third-person voice throughout
 - Present tense as default
 
 ### Skills & Templates

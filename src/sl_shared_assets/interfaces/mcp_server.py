@@ -1,7 +1,7 @@
-"""Provides the base MCP server for agentic configuration of Sun lab data workflow components.
+"""Provides the MCP server for agentic configuration of Sun lab data workflow components.
 
 This module exposes tools that enable AI agents to manage shared configuration assets that work across all data
-acquisition systems. System-specific tools are provided by specialized subservers.
+acquisition systems.
 """
 
 from typing import Literal

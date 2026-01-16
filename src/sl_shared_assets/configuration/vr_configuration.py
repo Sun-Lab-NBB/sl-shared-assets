@@ -5,16 +5,34 @@ System-agnostic and system-specific configuration classes in this library inheri
 experiment-specific parameters.
 """
 
+from enum import StrEnum
 from dataclasses import dataclass
 
 from ataraxis_base_utilities import console
 from ataraxis_data_structures import YamlConfig
 
-# Constants for validation
-_UINT8_MAX = 255
-"""Maximum value for uint8 cue codes."""
-_PROBABILITY_SUM_TOLERANCE = 0.001
-"""Tolerance for validating probability sums to 1.0."""
+
+class TriggerType(StrEnum):
+    """Enumerates the supported stimulus trigger zone activators for experiment trials.
+
+    Notes:
+        All Sun lab acquisition systems share these core trial types. LICK corresponds to GuidanceZone in Unity and
+        OCCUPANCY corresponds to OccupancyZone in Unity.
+    """
+
+    LICK = "lick"
+    """Indicates a lick-triggered trial where the animal must lick inside the stimulus trigger zone to trigger the 
+    stimulus delivery."""
+    OCCUPANCY = "occupancy"
+    """Indicates an occupancy-triggered trial where the animal must occupy the trigger zone for a specified duration to
+    disable the stimulus delivery."""
+
+
+# Maximum value for uint8 cue codes.
+_UINT8_MAX: int = 255
+
+# Tolerance for validating probability sums to 1.0.
+_PROBABILITY_SUM_TOLERANCE: float = 0.001
 
 
 @dataclass
@@ -117,9 +135,8 @@ class TrialStructure:
     show_stimulus_collision_boundary: bool
     """Determines whether the stimulus collision boundary is visible to the animal during this trial type. When True,
     the boundary marker is displayed in the Virtual Reality environment at the stimulus location."""
-    trigger_type: str
-    """Specifies the stimulus trigger zone behavior. Valid values: 'lick' (GuidanceZone, used for water rewards) or
-    'occupancy' (OccupancyZone, used for gas puffs)."""
+    trigger_type: str | TriggerType
+    """Specifies the stimulus trigger zone behavior. Must be one of the valid TriggerType enumeration members."""
 
 
 @dataclass
@@ -193,7 +210,7 @@ class TaskTemplate(YamlConfig):
 
         # Validates trial structure segment references and trigger types.
         segment_names = {seg.name for seg in self.segments}
-        valid_trigger_types = {"lick", "occupancy"}
+        valid_trigger_types = {t.value for t in TriggerType}
         for trial_name, trial_structure in self.trial_structures.items():
             if trial_structure.segment_name not in segment_names:
                 message = (
@@ -202,8 +219,13 @@ class TaskTemplate(YamlConfig):
                 )
                 console.error(message=message, error=ValueError)
 
-            # Validates trigger_type values.
-            if trial_structure.trigger_type not in valid_trigger_types:
+            # Validates trigger_type values. Accepts both TriggerType enum and string values for YAML compatibility.
+            trigger_value = (
+                trial_structure.trigger_type.value
+                if isinstance(trial_structure.trigger_type, TriggerType)
+                else trial_structure.trigger_type
+            )
+            if trigger_value not in valid_trigger_types:
                 message = (
                     f"Trial structure '{trial_name}' has invalid trigger_type '{trial_structure.trigger_type}'. "
                     f"Valid values: {', '.join(sorted(valid_trigger_types))}."

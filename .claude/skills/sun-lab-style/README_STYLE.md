@@ -207,7 +207,7 @@ README Style Compliance:
 - [ ] Horizontal rule (`___`) after badges
 - [ ] Detailed description section
 - [ ] Table of Contents with links to sections
-- [ ] Third person voice throughout (no "I", "we", "you")
+- [ ] Third-person voice throughout (no "I", "we", "you")
 - [ ] Present tense as default
 - [ ] All required sections included (Dependencies, Installation, Usage, etc.)
 - [ ] Technical descriptions cross-referenced against codebase

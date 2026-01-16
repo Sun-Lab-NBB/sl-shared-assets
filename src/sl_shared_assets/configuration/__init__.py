@@ -3,6 +3,7 @@
 from .vr_configuration import (
     Cue,
     Segment,
+    TriggerType,
     TaskTemplate,
     VREnvironment,
     TrialStructure,
@@ -59,6 +60,7 @@ __all__ = [
     "SystemConfiguration",
     "TaskTemplate",
     "TrialStructure",
+    "TriggerType",
     "VREnvironment",
     "WaterRewardTrial",
     "create_experiment_configuration",
