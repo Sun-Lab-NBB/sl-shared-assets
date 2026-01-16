@@ -41,6 +41,7 @@ from .configuration import (
     Cue,
     Segment,
     BaseTrial,
+    TriggerType,
     GasPuffTrial,
     TaskTemplate,
     VREnvironment,
@@ -68,6 +69,7 @@ from .data_transfer import (
     transfer_directory,
     calculate_directory_checksum,
 )
+from .data_processing import interpolate_data
 
 # Ensures console is enabled when this library is imported.
 if not console.enabled:
@@ -116,6 +118,7 @@ __all__ = [
     "TaskTemplate",
     "TrackingData",
     "TrialStructure",
+    "TriggerType",
     "VREnvironment",
     "WaterRewardTrial",
     "WindowCheckingDescriptor",
@@ -128,5 +131,6 @@ __all__ = [
     "get_system_configuration_data",
     "get_task_templates_directory",
     "get_working_directory",
+    "interpolate_data",
     "transfer_directory",
 ]

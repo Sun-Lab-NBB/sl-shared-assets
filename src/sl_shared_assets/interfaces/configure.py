@@ -2,17 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
 from pathlib import Path  # pragma: no cover
 
 import click  # pragma: no cover
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists  # pragma: no cover
 
-from .mcp_server import run_server as run_base_server  # pragma: no cover
+from .mcp_server import run_server  # pragma: no cover
 from ..configuration import (
     GasPuffTrial,
     TaskTemplate,
@@ -28,14 +23,6 @@ from ..configuration import (
     create_server_configuration_file,
     create_system_configuration_file,
 )  # pragma: no cover
-from .mesoscope_mcp_server import run_server as run_mesoscope_server  # pragma: no cover
-
-# To add a new MCP server: import the server's run_server function and add an entry to _MCP_SERVERS below.
-_MCP_SERVERS: dict[str, Callable[[Literal["stdio", "sse", "streamable-http"]], None]] = {
-    "base": run_base_server,
-    "mesoscope": run_mesoscope_server,
-}
-"""Maps MCP server names to their run functions."""
 
 CONTEXT_SETTINGS = {"max_content_width": 120}  # pragma: no cover
 """Ensures that displayed CLICK help messages are formatted according to the lab standard."""
@@ -337,14 +324,6 @@ def generate_experiment_configuration_file(
 
 @configure.command("mcp")
 @click.option(
-    "-s",
-    "--server",
-    type=click.Choice(list(_MCP_SERVERS.keys()), case_sensitive=False),
-    default="mesoscope",
-    show_default=True,
-    help="The MCP server to start ('base' for shared tools, 'mesoscope' for mesoscope-VR system tools).",
-)
-@click.option(
     "-t",
     "--transport",
     type=str,
@@ -352,10 +331,6 @@ def generate_experiment_configuration_file(
     show_default=True,
     help="The MCP transport type to use ('stdio', 'sse', or 'streamable-http').",
 )
-def start_mcp_server(server: str, transport: str) -> None:  # pragma: no cover
+def start_mcp_server(transport: str) -> None:  # pragma: no cover
     """Starts the MCP server for agentic configuration management."""
-    server_func = _MCP_SERVERS.get(server.lower())
-    if server_func is None:
-        message = f"Unknown MCP server: {server}. Available servers: {', '.join(_MCP_SERVERS.keys())}."
-        console.error(message=message, error=ValueError)
-    server_func(transport=transport)  # type: ignore[arg-type]
+    run_server(transport=transport)  # type: ignore[arg-type]

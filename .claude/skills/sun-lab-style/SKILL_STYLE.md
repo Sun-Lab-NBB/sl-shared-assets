@@ -21,7 +21,7 @@ Claude Code skill files (`.md` files in `.claude/skills/`) follow specific forma
 
 ### Line Length
 
-All skill and asset markdown files must adhere to the **120 character line limit**. This matches the Python code
+All skill and asset Markdown files must adhere to the **120 character line limit**. This matches the Python code
 formatting standard.
 
 - Wrap prose text at 120 characters
@@ -133,7 +133,7 @@ skill-name/
 └── EXAMPLES.md           # Usage examples (loaded as needed)
 ```
 
-Reference files using standard markdown links: `[REFERENCE.md](REFERENCE.md)`
+Reference files using standard Markdown links: `[REFERENCE.md](REFERENCE.md)`
 
 ---
 

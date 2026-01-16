@@ -14,7 +14,7 @@ import appdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 
-from .vr_configuration import TaskTemplate
+from .vr_configuration import TriggerType, TaskTemplate
 from .mesoscope_configuration import (
     MesoscopeSystemConfiguration,
     MesoscopeExperimentConfiguration,
@@ -566,7 +566,7 @@ def create_experiment_configuration(
     # Converts base TrialStructure instances to experiment-specific trial types based on trigger_type.
     trial_structures: dict[str, WaterRewardTrial | GasPuffTrial] = {}
     for trial_name, base_trial in template.trial_structures.items():
-        if base_trial.trigger_type == "lick":
+        if base_trial.trigger_type == TriggerType.LICK:
             trial_structures[trial_name] = WaterRewardTrial(
                 segment_name=base_trial.segment_name,
                 stimulus_trigger_zone_start_cm=base_trial.stimulus_trigger_zone_start_cm,
@@ -577,7 +577,7 @@ def create_experiment_configuration(
                 reward_size_ul=default_reward_size_ul,
                 reward_tone_duration_ms=default_reward_tone_duration_ms,
             )
-        elif base_trial.trigger_type == "occupancy":
+        elif base_trial.trigger_type == TriggerType.OCCUPANCY:
             trial_structures[trial_name] = GasPuffTrial(
                 segment_name=base_trial.segment_name,
                 stimulus_trigger_zone_start_cm=base_trial.stimulus_trigger_zone_start_cm,

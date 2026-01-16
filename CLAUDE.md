@@ -15,13 +15,13 @@ This ensures:
 Before writing, modifying, or reviewing any code or documentation, You MUST invoke the `/sun-lab-style` skill to load
 the Sun Lab conventions. Reference the appropriate style guide based on the task:
 
-| Task                              | Style Guide        | Key Requirements                                    |
-|-----------------------------------|--------------------|-----------------------------------------------------|
-| Writing Python code               | PYTHON_STYLE.md    | Type annotations, keyword arguments, error handling |
-| Writing docstrings and comments   | PYTHON_STYLE.md    | Google-style, third person imperative, no bullets   |
-| Creating or updating README files | README_STYLE.md    | Third person voice, present tense, standard sections|
-| Writing commit messages           | COMMIT_STYLE.md    | Past tense verbs, ≤72 char header, ends with period |
-| Creating skills or CLAUDE.md      | SKILL_STYLE.md     | 120 char lines, aligned tables, proper voice        |
+| Task                              | Style Guide     | Key Requirements                                     |
+|-----------------------------------|-----------------|------------------------------------------------------|
+| Writing Python code               | PYTHON_STYLE.md | Type annotations, keyword arguments, error handling  |
+| Writing docstrings and comments   | PYTHON_STYLE.md | Google-style, third person imperative, no bullets    |
+| Creating or updating README files | README_STYLE.md | Third person voice, present tense, standard sections |
+| Writing commit messages           | COMMIT_STYLE.md | Past tense verbs, ≤72 char header, ends with period  |
+| Creating skills or CLAUDE.md      | SKILL_STYLE.md  | 120 char lines, aligned tables, proper voice         |
 
 All contributions must strictly follow these conventions and all reviews must check for compliance.
 
@@ -64,20 +64,15 @@ actual library state to prevent integration errors.
 
 ## MCP Server
 
-This library exposes two MCP servers for agentic configuration management:
+This library exposes an MCP server (`sl-shared-assets`) for agentic configuration management. Start with:
+`sl-configure mcp`
 
-- **Base server** (`sl-shared-assets`): Shared tools that work across all acquisition systems. Start with:
-  `sl-configure mcp --server base`
-- **Mesoscope server** (`sl-mesoscope-vr`): Mesoscope-VR specific tools. Start with: `sl-configure mcp`
+The server provides tools for:
+- **Setup**: Set working directory, Google credentials, task templates directory
+- **Query**: Read configurations, list templates, get template details
+- **Server Config**: Create server configuration templates
 
-The servers provide tools for:
-- **Setup**: Set working directory, create projects, configure system and server
-- **Experiment Design**: Create templates, add cues/segments/trials/states incrementally
-- **Query**: Read configurations, list components, validate completeness
-
-Mesoscope-specific tools are prefixed with `mesoscope_` (e.g., `mesoscope_create_project_tool`).
-
-See the `/experiment-design` skill in sl-experiment for interactive configuration building guidance.
+See the `/experiment-design` skill in sl-experiment for interactive experiment configuration guidance.
 
 ## Downstream Library Integration
 
@@ -112,14 +107,11 @@ The codebase uses registry patterns to support multiple acquisition systems. To 
    - Extend `ExperimentConfiguration` union type
 4. **Register in `_SYSTEM_CONFIG_CLASSES`** dictionary
 5. **Add experiment factory function** and register in `_EXPERIMENT_CONFIG_FACTORIES`
-6. **(Optional) Create MCP server** for system-specific tools:
-   - Create `{system}_mcp_server.py` in interfaces
-   - Add entry to `_MCP_SERVERS` in `configure.py`
-7. **Update downstream libraries** (sl-experiment, sl-forgery) as needed
+6. **Update downstream libraries** (sl-experiment, sl-forgery) as needed
 
 Key files:
 - `configuration_utilities.py` - Registries and factory functions
-- `configure.py` - CLI and MCP server dispatcher
+- `configure.py` - CLI entry point
 
 ## Project Context
 
@@ -129,13 +121,14 @@ providing common dataclasses and low-level tools.
 
 ### Key Areas
 
-| Directory                             | Purpose                                               |
-|---------------------------------------|-------------------------------------------------------|
-| `src/sl_shared_assets/`               | Main library source code                              |
-| `src/sl_shared_assets/cli.py`         | CLI entry point for configuration management          |
-| `src/sl_shared_assets/configuration/` | Configuration dataclasses and management              |
-| `src/sl_shared_assets/data/`          | Data handling and storage utilities                   |
-| `tests/`                              | Test suite                                            |
+| Directory                                      | Purpose                                         |
+|------------------------------------------------|-------------------------------------------------|
+| `src/sl_shared_assets/`                        | Main library source code                        |
+| `src/sl_shared_assets/interfaces/configure.py` | CLI entry point for configuration management    |
+| `src/sl_shared_assets/configuration/`          | Configuration dataclasses and management        |
+| `src/sl_shared_assets/data_processing/`        | Data processing utilities (interpolation, etc.) |
+| `src/sl_shared_assets/data_transfer/`          | Data transfer and checksum utilities            |
+| `tests/`                                       | Test suite                                      |
 
 ### Architecture
 
