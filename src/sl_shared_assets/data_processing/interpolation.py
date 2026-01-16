@@ -1,11 +1,9 @@
 """Provides data interpolation utilities for time-series alignment across Sun lab libraries."""
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
+from numpy.typing import NDArray  # noqa: TC002
 
 
 def interpolate_data(

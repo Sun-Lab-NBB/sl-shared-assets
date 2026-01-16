@@ -15,7 +15,7 @@ Data Transfer Assets
    :show-inheritance:
 
 Data Processing Assets
-====================
+======================
 .. automodule:: sl_shared_assets.data_processing
    :members:
    :undoc-members:
