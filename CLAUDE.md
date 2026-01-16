@@ -2,39 +2,35 @@
 
 ## Session Start Behavior
 
-At the beginning of each coding session, before making any code changes, you should build a comprehensive
+At the beginning of each coding session, before making any code changes, You should build a comprehensive
 understanding of the codebase by invoking the `/explore-codebase` skill.
 
-This ensures you:
-- Understand the project architecture before modifying code
-- Follow existing patterns and conventions
-- Don't introduce inconsistencies or break integrations
+This ensures:
+- Understanding of the project architecture before modifying code
+- Following existing patterns and conventions
+- Avoiding inconsistencies or broken integrations
 
 ## Style Guide Compliance
 
-Before writing, modifying, or reviewing any code or documentation, you MUST invoke the `/sun-lab-style` skill to load
-the Sun Lab conventions. This applies to ALL file types including:
-- Python source files (`.py`)
-- Documentation files (`README.md`, docstrings)
-- Configuration files when adding comments or descriptions
-- Git commit messages
+Before writing, modifying, or reviewing any code or documentation, You MUST invoke the `/sun-lab-style` skill to load
+the Sun Lab conventions. Reference the appropriate style guide based on the task:
 
-All contributions must strictly follow these conventions and all reviews must check for compliance. Key conventions
-include:
-- Google-style docstrings with proper sections
-- Full type annotations with explicit array dtypes
-- Keyword arguments for function calls
-- Third person imperative mood for comments and documentation
-- Proper error handling with `console.error()`
-- README structure and formatting standards
-- Commit messages use past tense verbs (Added, Fixed, Updated) and end with periods
+| Task                              | Style Guide        | Key Requirements                                    |
+|-----------------------------------|--------------------|-----------------------------------------------------|
+| Writing Python code               | PYTHON_STYLE.md    | Type annotations, keyword arguments, error handling |
+| Writing docstrings and comments   | PYTHON_STYLE.md    | Google-style, third person imperative, no bullets   |
+| Creating or updating README files | README_STYLE.md    | Third person voice, present tense, standard sections|
+| Writing commit messages           | COMMIT_STYLE.md    | Past tense verbs, ≤72 char header, ends with period |
+| Creating skills or CLAUDE.md      | SKILL_STYLE.md     | 120 char lines, aligned tables, proper voice        |
+
+All contributions must strictly follow these conventions and all reviews must check for compliance.
 
 ## Cross-Referenced Library Verification
 
 Sun Lab projects often depend on other `ataraxis-*` or `sl-*` libraries. These libraries may be stored
 locally in the same parent directory as this project (`/home/cyberaxolotl/Desktop/GitHubRepos/`).
 
-**Before writing code that interacts with a cross-referenced library, you MUST:**
+**Before writing code that interacts with a cross-referenced library, You MUST:**
 
 1. **Check for local version**: Look for the library in the parent directory (e.g.,
    `../ataraxis-time/`, `../ataraxis-base-utilities/`).
@@ -59,7 +55,7 @@ actual library state to prevent integration errors.
 ## Available Skills
 
 - `/explore-codebase` - Perform in-depth codebase exploration
-- `/sun-lab-style` - Apply Sun Lab coding and documentation conventions (REQUIRED for all code and documentation changes)
+- `/sun-lab-style` - Apply Sun Lab conventions (REQUIRED for all code and documentation changes)
 
 **Skills in downstream libraries (use MCP tools from this library):**
 - `/machine-setup` - Located in sl-forgery (configures working directory, server credentials)
@@ -101,6 +97,29 @@ changes to this codebase:
 - System configuration structures (`MesoscopeSystemConfiguration`, etc.)
 
 **Workflow**: Make changes to sl-shared-assets first, then update the dependent library.
+
+## Adding New Acquisition Systems
+
+The codebase uses registry patterns to support multiple acquisition systems. To add a new system:
+
+1. **Add enum value** to `AcquisitionSystems` in `configuration_utilities.py`
+2. **Create system configuration module** (e.g., `new_system_configuration.py`) with:
+   - System configuration dataclass inheriting from `YamlConfig`
+   - Experiment configuration dataclass
+   - A `save()` method for custom serialization if needed
+3. **Update type aliases** in `configuration_utilities.py`:
+   - Extend `SystemConfiguration` union type
+   - Extend `ExperimentConfiguration` union type
+4. **Register in `_SYSTEM_CONFIG_CLASSES`** dictionary
+5. **Add experiment factory function** and register in `_EXPERIMENT_CONFIG_FACTORIES`
+6. **(Optional) Create MCP server** for system-specific tools:
+   - Create `{system}_mcp_server.py` in interfaces
+   - Add entry to `_MCP_SERVERS` in `configure.py`
+7. **Update downstream libraries** (sl-experiment, sl-forgery) as needed
+
+Key files:
+- `configuration_utilities.py` - Registries and factory functions
+- `configure.py` - CLI and MCP server dispatcher
 
 ## Project Context
 

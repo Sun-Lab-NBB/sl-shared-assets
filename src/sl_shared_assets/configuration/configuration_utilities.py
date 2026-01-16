@@ -8,12 +8,13 @@ from copy import deepcopy
 from enum import StrEnum
 from pathlib import Path
 from dataclasses import field, dataclass
+from collections.abc import Callable
 
 import appdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 
-from .vr_configuration import TaskTemplate  # noqa: TC001 (used at runtime)
+from .vr_configuration import TaskTemplate
 from .mesoscope_configuration import (
     MesoscopeSystemConfiguration,
     MesoscopeExperimentConfiguration,
@@ -27,6 +28,66 @@ class AcquisitionSystems(StrEnum):
     MESOSCOPE_VR = "mesoscope"
     """Uses the 2-Photon Random Access Mesoscope (2P-RAM) with Virtual Reality (VR) environments running in Unity game
     engine to conduct experiments."""
+
+
+# To add a new acquisition system: (1) add the system to AcquisitionSystems enum above, (2) create the system
+# configuration module, (3) add entries to _SYSTEM_CONFIG_CLASSES and _EXPERIMENT_CONFIG_FACTORIES below.
+
+SystemConfiguration = MesoscopeSystemConfiguration
+"""Type alias for system configuration classes. Extend this union when adding new systems."""
+
+ExperimentConfiguration = MesoscopeExperimentConfiguration
+"""Type alias for experiment configuration classes. Extend this union when adding new systems."""
+
+_SYSTEM_CONFIG_CLASSES: dict[str, type[SystemConfiguration]] = {
+    AcquisitionSystems.MESOSCOPE_VR: MesoscopeSystemConfiguration,
+}
+"""Maps acquisition system names to their system configuration classes."""
+
+_CONFIG_FILE_TO_CLASS: dict[str, type[SystemConfiguration]] = {
+    f"{system}_system_configuration.yaml": config_class for system, config_class in _SYSTEM_CONFIG_CLASSES.items()
+}
+"""Maps configuration file names to their configuration classes."""
+
+ExperimentConfigFactory = Callable[
+    [TaskTemplate, str, dict[str, WaterRewardTrial | GasPuffTrial], float],
+    ExperimentConfiguration,
+]
+"""Type alias for experiment configuration factory functions."""
+
+_EXPERIMENT_CONFIG_FACTORIES: dict[str, ExperimentConfigFactory] = {}
+"""Maps acquisition system names to their experiment configuration factory functions."""
+
+
+def _create_mesoscope_experiment_config(
+    template: TaskTemplate,
+    unity_scene_name: str,
+    trial_structures: dict[str, WaterRewardTrial | GasPuffTrial],
+    cue_offset_cm: float,
+) -> MesoscopeExperimentConfiguration:
+    """Creates a Mesoscope-VR experiment configuration from a TaskTemplate.
+
+    Args:
+        template: The TaskTemplate containing the VR structure.
+        unity_scene_name: The Unity scene name for the experiment.
+        trial_structures: The converted trial structures dictionary.
+        cue_offset_cm: The cue offset in centimeters.
+
+    Returns:
+        The initialized MesoscopeExperimentConfiguration instance.
+    """
+    return MesoscopeExperimentConfiguration(
+        cues=deepcopy(template.cues),
+        segments=deepcopy(template.segments),
+        trial_structures=trial_structures,
+        experiment_states={},
+        vr_environment=deepcopy(template.vr_environment),
+        unity_scene_name=unity_scene_name,
+        cue_offset_cm=cue_offset_cm,
+    )
+
+
+_EXPERIMENT_CONFIG_FACTORIES[AcquisitionSystems.MESOSCOPE_VR] = _create_mesoscope_experiment_config
 
 
 @dataclass
@@ -62,11 +123,6 @@ class ServerConfiguration(YamlConfig):
         self.shared_working_root = str(Path(self.working_root).joinpath(self.shared_directory_name))
         self.user_data_root = str(Path(self.storage_root).joinpath(f"{self.username}"))
         self.user_working_root = str(Path(self.working_root).joinpath(f"{self.username}"))
-
-
-# ==============================================================================================================
-# Working Directory Utilities
-# ==============================================================================================================
 
 
 def set_working_directory(path: Path) -> None:
@@ -136,11 +192,6 @@ def get_working_directory() -> Path:
 
     # Returns the path to the working directory
     return working_directory
-
-
-# ==============================================================================================================
-# Google Credentials Utilities
-# ==============================================================================================================
 
 
 def set_google_credentials_path(path: Path) -> None:
@@ -221,11 +272,6 @@ def get_google_credentials_path() -> Path:
 
     # Returns the path to the credentials' file
     return credentials_path
-
-
-# ==============================================================================================================
-# Task Templates Directory Utilities
-# ==============================================================================================================
 
 
 def set_task_templates_directory(path: Path) -> None:
@@ -310,11 +356,6 @@ def get_task_templates_directory() -> Path:
     return templates_directory
 
 
-# ==============================================================================================================
-# System Configuration Utilities
-# ==============================================================================================================
-
-
 def create_system_configuration_file(system: AcquisitionSystems | str) -> None:
     """Creates the .YAML configuration file for the requested Sun lab's data acquisition system and configures the local
     machine (PC) to use this file for all future acquisition-system-related calls.
@@ -328,43 +369,39 @@ def create_system_configuration_file(system: AcquisitionSystems | str) -> None:
     Raises:
         ValueError: If the input acquisition system name (type) is not recognized.
     """
-    # Resolves the path to the local Sun lab's working directory.
-    directory = get_working_directory()
-    directory = directory.joinpath("configuration")  # Navigates to the 'configuration' subdirectory
+    system_str = str(system)
+    if system_str not in _SYSTEM_CONFIG_CLASSES:
+        supported_systems = list(_SYSTEM_CONFIG_CLASSES.keys())
+        message = (
+            f"Unable to generate the system configuration file for the acquisition system '{system}'. The specified "
+            f"acquisition system is not supported (not recognized). Currently, only the following acquisition systems "
+            f"are supported: {', '.join(supported_systems)}."
+        )
+        console.error(message=message, error=ValueError)
 
-    # Removes any existing system configuration files to ensure only one system configuration exists on each configured
-    # machine
+    directory = get_working_directory()
+    directory = directory.joinpath("configuration")
+
+    # Removes any existing system configuration files to ensure only one system configuration exists on each machine.
     existing_configs = tuple(directory.glob("*_system_configuration.yaml"))
     for config_file in existing_configs:
         console.echo(f"Removing the existing configuration file {config_file.name}...")
         config_file.unlink()
 
-    if system == AcquisitionSystems.MESOSCOPE_VR:
-        # Creates the precursor configuration file for the Mesoscope-VR system
-        configuration = MesoscopeSystemConfiguration()
-        configuration_path = directory.joinpath(f"{system}_system_configuration.yaml")
-        configuration.save(path=configuration_path)
+    config_class = _SYSTEM_CONFIG_CLASSES[system_str]
+    configuration = config_class()
+    configuration_path = directory.joinpath(f"{system}_system_configuration.yaml")
+    configuration.save(path=configuration_path)
 
-        # Prompts the user to finish configuring the system by editing the parameters inside the configuration file
-        message = (
-            f"Mesoscope-VR data acquisition system configuration file: Saved to {configuration_path}. Edit the "
-            f"default parameters inside the configuration file to finish configuring the system."
-        )
-        console.echo(message=message, level=LogLevel.SUCCESS)
-        input("Enter anything to continue...")
-
-    # If the input acquisition system is not recognized, raises a ValueError
-    else:
-        systems = tuple(AcquisitionSystems)
-        message = (
-            f"Unable to generate the system configuration file for the acquisition system '{system}'. The specified "
-            f"acquisition system is not supported (not recognized). Currently, only the following acquisition systems "
-            f"are supported: {', '.join(systems)}."
-        )
-        console.error(message=message, error=ValueError)
+    message = (
+        f"{system} data acquisition system configuration file: Saved to {configuration_path}. Edit the default "
+        f"parameters inside the configuration file to finish configuring the system."
+    )
+    console.echo(message=message, level=LogLevel.SUCCESS)
+    input("Enter anything to continue...")
 
 
-def get_system_configuration_data() -> MesoscopeSystemConfiguration:
+def get_system_configuration_data() -> SystemConfiguration:
     """Resolves the path to the local data acquisition system configuration file and loads the configuration data as
     a SystemConfiguration instance.
 
@@ -373,20 +410,13 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
 
     Raises:
         FileNotFoundError: If the local machine does not have a valid data acquisition system configuration file.
+        ValueError: If the configuration file is not recognized.
     """
-    # Maps supported file names to configuration classes.
-    _supported_configuration_files = {
-        f"{AcquisitionSystems.MESOSCOPE_VR}_system_configuration.yaml": MesoscopeSystemConfiguration,
-    }
-
-    # Resolves the path to the local Sun lab's working directory.
     directory = get_working_directory()
-    directory = directory.joinpath("configuration")  # Navigates to the 'configuration' subdirectory
+    directory = directory.joinpath("configuration")
 
-    # Finds all configuration files stored in the local working directory.
     config_files = tuple(directory.glob("*_system_configuration.yaml"))
 
-    # Ensures exactly one configuration file exists in the working directory
     if len(config_files) != 1:
         file_names = [f.name for f in config_files]
         message = (
@@ -396,32 +426,22 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
             f"acquisition system configuration file."
         )
         console.error(message=message, error=FileNotFoundError)
-        # Fallback to appease mypy, should not be reachable
         raise FileNotFoundError(message)  # pragma: no cover
 
-    # Gets the single configuration file
     configuration_file = config_files[0]
     file_name = configuration_file.name
 
-    # Ensures that the file name is supported
-    if file_name not in _supported_configuration_files:
+    if file_name not in _CONFIG_FILE_TO_CLASS:
         message = (
             f"The data acquisition system configuration file '{file_name}' stored in the local Sun lab's working "
             f"directory is not recognized. Call the 'sl-configure system' CLI command to reconfigure the host-machine "
             f"to use a supported configuration file."
         )
         console.error(message=message, error=ValueError)
-        # Fallback to appease mypy, should not be reachable
         raise ValueError(message)  # pragma: no cover
 
-    # Loads and return the configuration data
-    configuration_class = _supported_configuration_files[file_name]
+    configuration_class = _CONFIG_FILE_TO_CLASS[file_name]
     return configuration_class.from_yaml(file_path=configuration_file)
-
-
-# ==============================================================================================================
-# Server Configuration Utilities
-# ==============================================================================================================
 
 
 def create_server_configuration_file(
@@ -502,11 +522,6 @@ def get_server_configuration() -> ServerConfiguration:
     return configuration
 
 
-# ==============================================================================================================
-# Experiment Configuration Factory
-# ==============================================================================================================
-
-
 def create_experiment_configuration(
     template: TaskTemplate,
     system: AcquisitionSystems | str,
@@ -515,7 +530,7 @@ def create_experiment_configuration(
     default_reward_tone_duration_ms: int = 300,
     default_puff_duration_ms: int = 100,
     default_occupancy_duration_ms: int = 1000,
-) -> MesoscopeExperimentConfiguration:
+) -> ExperimentConfiguration:
     """Creates an experiment configuration for the specified acquisition system from a TaskTemplate.
 
     Dispatches to the appropriate system-specific generator based on the system parameter. Converts base TrialStructure
@@ -538,13 +553,13 @@ def create_experiment_configuration(
         Trials with trigger_type 'lick' are converted to WaterRewardTrial (GuidanceZone in Unity). Trials with
         trigger_type 'occupancy' are converted to GasPuffTrial (OccupancyZone in Unity).
     """
-    # Validates the acquisition system.
-    if system != AcquisitionSystems.MESOSCOPE_VR:
-        systems = tuple(AcquisitionSystems)
+    system_str = str(system)
+    if system_str not in _EXPERIMENT_CONFIG_FACTORIES:
+        supported_systems = list(_EXPERIMENT_CONFIG_FACTORIES.keys())
         message = (
             f"Unable to create the experiment configuration for the acquisition system '{system}'. The specified "
             f"acquisition system is not supported. Currently, only the following acquisition systems are supported: "
-            f"{', '.join(systems)}."
+            f"{', '.join(supported_systems)}."
         )
         console.error(message=message, error=ValueError)
 
@@ -574,12 +589,10 @@ def create_experiment_configuration(
                 occupancy_duration_ms=default_occupancy_duration_ms,
             )
 
-    return MesoscopeExperimentConfiguration(
-        cues=deepcopy(template.cues),
-        segments=deepcopy(template.segments),
-        trial_structures=trial_structures,
-        experiment_states={},
-        vr_environment=deepcopy(template.vr_environment),
-        unity_scene_name=unity_scene_name,
-        cue_offset_cm=template.cue_offset_cm,
+    factory = _EXPERIMENT_CONFIG_FACTORIES[system_str]
+    return factory(
+        template,
+        unity_scene_name,
+        trial_structures,
+        template.cue_offset_cm,
     )

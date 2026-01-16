@@ -32,6 +32,8 @@ ___
 - [Usage](#usage)
   - [MCP Server](#mcp-server)
 - [API Documentation](#api-documentation)
+- [Development](#development)
+  - [Adding New Acquisition Systems](#adding-new-acquisition-systems)
 - [Versioning](#versioning)
 - [Authors](#authors)
 - [License](#license)
@@ -166,8 +168,58 @@ Developers working on integrating sl-shared-assets into other libraries should s
 [API documentation](https://sl-shared-assets-api-docs.netlify.app/) for the detailed description of the methods and 
 classes exposed by components of this library.
 
-**Note!** The API documentation includes important information about the 'configuration' Command-Line Interface (CLI) 
+**Note!** The API documentation includes important information about the 'configuration' Command-Line Interface (CLI)
 exposed by this library.
+
+___
+
+## Development
+
+This section provides guidance for developers extending this library.
+
+### Adding New Acquisition Systems
+
+The library uses registry patterns to support multiple data acquisition systems. Each system requires configuration
+dataclasses and optional MCP server tools. The following steps outline how to add support for a new acquisition system.
+
+**Step 1: Add the system to the AcquisitionSystems enum**
+
+In `configuration_utilities.py`, add a new entry to the `AcquisitionSystems` enum:
+
+```python
+from enum import StrEnum
+class AcquisitionSystems(StrEnum):
+    MESOSCOPE_VR = "mesoscope"
+    NEW_SYSTEM = "new_system"  # Add new system here
+```
+
+**Step 2: Create the system configuration module**
+
+Create a new file (e.g., `new_system_configuration.py`) containing:
+
+- A system configuration dataclass inheriting from `YamlConfig` with hardware and software settings
+- An experiment configuration dataclass for runtime experiment parameters
+- A `save()` method if custom serialization logic is needed
+
+**Step 3: Update type aliases and registries**
+
+In `configuration_utilities.py`:
+
+1. Extend the `SystemConfiguration` type alias to include the new configuration class
+2. Extend the `ExperimentConfiguration` type alias to include the new experiment configuration class
+3. Add an entry to `_SYSTEM_CONFIG_CLASSES` mapping the system name to its configuration class
+4. Create an experiment factory function and register it in `_EXPERIMENT_CONFIG_FACTORIES`
+
+**Step 4: (Optional) Create a system-specific MCP server**
+
+For systems requiring specialized configuration tools:
+
+1. Create `{system}_mcp_server.py` in the `interfaces` directory
+2. Add an entry to `_MCP_SERVERS` in `configure.py`
+
+**Step 5: Update downstream libraries**
+
+Coordinate changes with sl-experiment (data acquisition) and sl-forgery (data processing) as needed.
 
 ___
 

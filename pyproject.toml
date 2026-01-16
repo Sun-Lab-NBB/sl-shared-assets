@@ -105,14 +105,14 @@ lint.select = ["ALL"]
 
 # General ignore directives
 lint.ignore = [
-    "W291",     # Trailing whitespace in multi-line docstrings is handled by formatter
-    "TID252",   # Relative imports are important for correct asset management in this library
-    "BLE001",   # Blind except needed for robust error handling in data transfer and MCP tools
-    "C901",     # Complex update functions with many optional parameters are necessary
-    "PLR0912",  # Complex branching in update functions is necessary
-    "PLR0913",  # Complex configuration functions require many arguments
-    "COM812",   # Conflicts with the formatter
-    "D205",     # Multi-line docstring summaries are used intentionally
+    "W291",      # Trailing whitespace in multi-line docstrings is handled by formatter
+    "TID252",    # Relative imports are important for correct asset management in this library
+    "BLE001",    # Blind except needed for robust error handling in data transfer and MCP tools
+    "C901",      # Complex update functions with many optional parameters are necessary
+    "PLR0912",   # Complex branching in update functions is necessary
+    "PLR0913",   # Complex configuration functions require many arguments
+    "COM812",    # Conflicts with the formatter
+    "D205",      # Multi-line docstring summaries are used intentionally
 ]
 
 # Additional formatting configurations

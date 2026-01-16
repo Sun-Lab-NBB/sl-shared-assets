@@ -1,12 +1,18 @@
 """Provides the Command-Line Interface (CLI) for configuring major components of the Sun lab data workflow."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Literal
 from pathlib import Path  # pragma: no cover
 
 import click  # pragma: no cover
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists  # pragma: no cover
 
 from .mcp_server import run_server as run_base_server  # pragma: no cover
-from .mesoscope_mcp_server import run_server as run_mesoscope_server  # pragma: no cover
 from ..configuration import (
     GasPuffTrial,
     TaskTemplate,
@@ -22,9 +28,17 @@ from ..configuration import (
     create_server_configuration_file,
     create_system_configuration_file,
 )  # pragma: no cover
+from .mesoscope_mcp_server import run_server as run_mesoscope_server  # pragma: no cover
 
-# Ensures that displayed CLICK help messages are formatted according to the lab standard.
+# To add a new MCP server: import the server's run_server function and add an entry to _MCP_SERVERS below.
+_MCP_SERVERS: dict[str, Callable[[Literal["stdio", "sse", "streamable-http"]], None]] = {
+    "base": run_base_server,
+    "mesoscope": run_mesoscope_server,
+}
+"""Maps MCP server names to their run functions."""
+
 CONTEXT_SETTINGS = {"max_content_width": 120}  # pragma: no cover
+"""Ensures that displayed CLICK help messages are formatted according to the lab standard."""
 
 
 @click.group("configure", context_settings=CONTEXT_SETTINGS)
@@ -282,10 +296,9 @@ def generate_experiment_configuration_file(
 
     task_template = TaskTemplate.from_yaml(file_path=template_path)
 
-    # Creates experiment configuration from template.
     experiment_configuration = create_experiment_configuration(
         template=task_template,
-        system=AcquisitionSystems.MESOSCOPE_VR,
+        system=acquisition_system.name,
         unity_scene_name=template,
         default_reward_size_ul=reward_size,
         default_reward_tone_duration_ms=reward_tone_duration,
@@ -326,7 +339,7 @@ def generate_experiment_configuration_file(
 @click.option(
     "-s",
     "--server",
-    type=click.Choice(["base", "mesoscope"], case_sensitive=False),
+    type=click.Choice(list(_MCP_SERVERS.keys()), case_sensitive=False),
     default="mesoscope",
     show_default=True,
     help="The MCP server to start ('base' for shared tools, 'mesoscope' for mesoscope-VR system tools).",
@@ -341,7 +354,8 @@ def generate_experiment_configuration_file(
 )
 def start_mcp_server(server: str, transport: str) -> None:  # pragma: no cover
     """Starts the MCP server for agentic configuration management."""
-    if server.lower() == "base":
-        run_base_server(transport=transport)  # type: ignore[arg-type]
-    else:
-        run_mesoscope_server(transport=transport)  # type: ignore[arg-type]
+    server_func = _MCP_SERVERS.get(server.lower())
+    if server_func is None:
+        message = f"Unknown MCP server: {server}. Available servers: {', '.join(_MCP_SERVERS.keys())}."
+        console.error(message=message, error=ValueError)
+    server_func(transport=transport)  # type: ignore[arg-type]
