@@ -3,7 +3,7 @@
 
 Command Line Interfaces
 =======================
-.. click:: sl_shared_assets.command_line_interfaces.configure:configure
+.. click:: sl_shared_assets.interfaces.configure:configure
    :prog: sl-configure
    :nested: full
 

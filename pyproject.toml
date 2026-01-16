@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata section. Provides the general ID information about the project.
 [project]
 name = "sl-shared-assets"
-version = "6.2.0"
+version = "7.0.0"
 description = "Provides data acquisition and processing assets shared between Sun (NeuroAI) lab libraries."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -80,7 +80,7 @@ dev = [
 
 # Exports the CLI for configuring various components of the Sun lab's data workflow on the host-machine.
 [project.scripts]
-sl-configure = "sl_shared_assets.command_line_interfaces.configure:configure"
+sl-configure = "sl_shared_assets.interfaces.configure:configure"
 
 # Specifies files that should not be included in the source-code distribution but are also not part of gitignore.
 [tool.hatch.build.targets.sdist]

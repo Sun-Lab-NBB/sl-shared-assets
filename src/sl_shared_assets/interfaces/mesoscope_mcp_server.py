@@ -1,8 +1,7 @@
-"""Provides the MCP server for agentic configuration of Sun lab data workflow components.
+"""Provides the mesoscope-VR MCP server for agentic configuration of the mesoscope-vr data acquisition system.
 
-This module exposes tools that enable AI agents to interactively build complex experiment and system configurations
-through a template-then-edit workflow. The server supports both read operations (querying current state) and write
-operations (creating and modifying configurations).
+This module exposes tools specific to the Mesoscope-VR data acquisition system. These tools enable AI agents to create
+and modify system configurations, project structures, and experiment configurations for mesoscope imaging experiments.
 """
 
 import json
@@ -12,29 +11,23 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 from ataraxis_base_utilities import ensure_directory_exists
 
-from .configuration import (
+from ..configuration import (
     GasPuffTrial,
     TaskTemplate,
+    ExperimentState,
     WaterRewardTrial,
     AcquisitionSystems,
-    ServerConfiguration,
-    MesoscopeExperimentState,
     MesoscopeSystemConfiguration,
     MesoscopeExperimentConfiguration,
     get_working_directory,
-    set_working_directory as _set_working_directory,
-    get_server_configuration,
-    get_google_credentials_path,
-    set_google_credentials_path as _set_google_credentials_path,
     get_task_templates_directory,
-    set_task_templates_directory as _set_task_templates_directory,
     get_system_configuration_data,
     create_experiment_configuration,
     create_system_configuration_file,
 )
 
 # Initializes the MCP server with JSON response mode for structured output.
-mcp = FastMCP(name="sl-shared-assets", json_response=True)
+mcp = FastMCP(name="sl-mesoscope-vr", json_response=True)
 
 
 def _get_experiment_config_path(project: str, experiment: str) -> Path:
@@ -111,29 +104,9 @@ def _save_system_config(config: MesoscopeSystemConfiguration) -> None:
     config.save(path=config_path)
 
 
-# ==============================================================================================================
-# Read Operations - Query current configuration state
-# ==============================================================================================================
-
-
 @mcp.tool()
-def get_working_directory_tool() -> str:
-    """Returns the current Sun lab working directory path.
-
-    Returns:
-        The absolute path to the working directory, or an error message if not configured.
-    """
-    try:
-        path = get_working_directory()
-    except FileNotFoundError as e:
-        return f"Error: {e}"
-    else:
-        return f"Working directory: {path}"
-
-
-@mcp.tool()
-def get_system_configuration_tool() -> str:
-    """Returns the current data acquisition system configuration.
+def mesoscope_get_system_configuration_tool() -> str:
+    """Returns the current mesoscope data acquisition system configuration.
 
     Returns:
         The system configuration as a formatted string, or an error message if not configured.
@@ -147,109 +120,8 @@ def get_system_configuration_tool() -> str:
 
 
 @mcp.tool()
-def get_server_configuration_tool() -> str:
-    """Returns the current compute server configuration (password masked for security).
-
-    Returns:
-        The server configuration summary, or an error message if not configured.
-    """
-    try:
-        config = get_server_configuration()
-    except (FileNotFoundError, ValueError) as e:
-        return f"Error: {e}"
-    else:
-        return f"Server: {config.host} | User: {config.username} | Storage: {config.storage_root}"
-
-
-@mcp.tool()
-def get_google_credentials_tool() -> str:
-    """Returns the path to the Google service account credentials file.
-
-    Returns:
-        The credentials file path, or an error message if not configured.
-    """
-    try:
-        path = get_google_credentials_path()
-    except FileNotFoundError as e:
-        return f"Error: {e}"
-    else:
-        return f"Google credentials: {path}"
-
-
-@mcp.tool()
-def get_task_templates_directory_tool() -> str:
-    """Returns the path to the sl-unity-tasks project's Configurations (Template) directory.
-
-    Returns:
-        The task templates directory path, or an error message if not configured.
-    """
-    try:
-        path = get_task_templates_directory()
-    except FileNotFoundError as e:
-        return f"Error: {e}"
-    else:
-        return f"Task templates directory: {path}"
-
-
-@mcp.tool()
-def list_available_templates_tool() -> str:
-    """Lists all available task templates in the configured templates directory.
-
-    Returns:
-        A formatted list of available template names, or an error message if not configured.
-    """
-    try:
-        templates_dir = get_task_templates_directory()
-        templates = sorted([f.stem for f in templates_dir.glob("*.yaml")])
-    except FileNotFoundError as e:
-        return f"Error: {e}"
-    else:
-        if not templates:
-            return f"No templates found in {templates_dir}"
-        return "Available templates:\n- " + "\n- ".join(templates)
-
-
-@mcp.tool()
-def get_template_info_tool(template_name: str) -> str:
-    """Returns detailed information about a specific task template.
-
-    Args:
-        template_name: The name of the template (without .yaml extension).
-
-    Returns:
-        A summary of the template contents including cues, segments, and trial structures.
-    """
-    try:
-        templates_dir = get_task_templates_directory()
-        template_path = templates_dir.joinpath(f"{template_name}.yaml")
-        if not template_path.exists():
-            available = sorted([f.stem for f in templates_dir.glob("*.yaml")])
-            return f"Error: Template '{template_name}' not found. Available: {', '.join(available)}"
-
-        template = TaskTemplate.from_yaml(file_path=template_path)
-
-        cue_summary = ", ".join([f"{c.name}(code={c.code})" for c in template.cues])
-        segment_summary = ", ".join([s.name for s in template.segments])
-        trial_summary = []
-        for name, trial in template.trial_structures.items():
-            trial_summary.append(f"{name} ({trial.trigger_type}): segment={trial.segment_name}")
-    except FileNotFoundError as e:
-        return f"Error: {e}"
-    except Exception as e:
-        return f"Error loading template: {e}"
-    else:
-        return (
-            f"Template: {template_name}\n"
-            f"Cue offset: {template.cue_offset_cm}cm\n"
-            f"Cues: {cue_summary}\n"
-            f"Segments: {segment_summary}\n"
-            f"Trial structures:\n  - " + "\n  - ".join(trial_summary)
-        )
-
-
-@mcp.tool()
-def read_experiment_configuration_tool(project: str, experiment: str) -> str:
-    """Reads and returns an experiment configuration file contents.
+def mesoscope_read_experiment_configuration_tool(project: str, experiment: str) -> str:
+    """Reads and returns a mesoscope experiment configuration file contents.
 
     Args:
         project: The name of the project containing the experiment.
@@ -273,71 +145,9 @@ def read_experiment_configuration_tool(project: str, experiment: str) -> str:
         )
 
 
-# ==============================================================================================================
-# Setup Operations - Configure working environment
-# ==============================================================================================================
-
-
 @mcp.tool()
-def set_working_directory_tool(directory: str) -> str:
-    """Sets the Sun lab working directory.
-
-    Args:
-        directory: The absolute path to set as the working directory.
-
-    Returns:
-        A confirmation message or error description.
-    """
-    try:
-        path = Path(directory)
-        _set_working_directory(path=path)
-    except Exception as e:
-        return f"Error: {e}"
-    else:
-        return f"Working directory set to: {path}"
-
-
-@mcp.tool()
-def set_google_credentials_tool(credentials_path: str) -> str:
-    """Sets the path to the Google service account credentials file.
-
-    Args:
-        credentials_path: The absolute path to the credentials JSON file.
-
-    Returns:
-        A confirmation message or error description.
-    """
-    try:
-        path = Path(credentials_path)
-        _set_google_credentials_path(path=path)
-    except (FileNotFoundError, ValueError) as e:
-        return f"Error: {e}"
-    else:
-        return f"Google credentials path set to: {path}"
-
-
-@mcp.tool()
-def set_task_templates_directory_tool(directory: str) -> str:
-    """Sets the path to the sl-unity-tasks project's Configurations (Template) directory.
-
-    Args:
-        directory: The absolute path to the task templates directory.
-
-    Returns:
-        A confirmation message or error description.
-    """
-    try:
-        path = Path(directory)
-        _set_task_templates_directory(path=path)
-    except (FileNotFoundError, ValueError) as e:
-        return f"Error: {e}"
-    else:
-        return f"Task templates directory set to: {path}"
-
-
-@mcp.tool()
-def create_system_configuration_tool(system: str = "mesoscope") -> str:
-    """Creates a data acquisition system configuration file.
+def mesoscope_create_system_configuration_tool(system: str = "mesoscope") -> str:
+    """Creates a mesoscope data acquisition system configuration file.
 
     Args:
         system: The acquisition system type. Currently only 'mesoscope' is supported.
@@ -355,8 +165,8 @@ def create_system_configuration_tool(system: str = "mesoscope") -> str:
 
 
 @mcp.tool()
-def create_project_tool(project: str) -> str:
-    """Creates a new project directory structure.
+def mesoscope_create_project_tool(project: str) -> str:
+    """Creates a new project directory structure for mesoscope experiments.
 
     Args:
         project: The name of the project to create.
@@ -374,14 +184,9 @@ def create_project_tool(project: str) -> str:
         return f"Project '{project}' created at: {project_path.parent}"
 
 
-# ==============================================================================================================
-# System Configuration - Query and update acquisition system settings
-# ==============================================================================================================
-
-
 @mcp.tool()
-def list_system_configuration_sections_tool() -> str:
-    """Lists all configurable sections of the system configuration.
+def mesoscope_list_system_configuration_sections_tool() -> str:
+    """Lists all configurable sections of the mesoscope system configuration.
 
     Returns:
         A formatted list of configuration sections and their descriptions.
@@ -397,8 +202,8 @@ def list_system_configuration_sections_tool() -> str:
 
 
 @mcp.tool()
-def get_filesystem_configuration_tool() -> str:
-    """Returns the filesystem configuration section of the system configuration.
+def mesoscope_get_filesystem_configuration_tool() -> str:
+    """Returns the filesystem configuration section of the mesoscope system configuration.
 
     Returns:
         The filesystem configuration details, or an error message if not configured.
@@ -419,8 +224,8 @@ def get_filesystem_configuration_tool() -> str:
 
 
 @mcp.tool()
-def get_sheets_configuration_tool() -> str:
-    """Returns the Google Sheets configuration section of the system configuration.
+def mesoscope_get_sheets_configuration_tool() -> str:
+    """Returns the Google Sheets configuration section of the mesoscope system configuration.
 
     Returns:
         The Google Sheets configuration details, or an error message if not configured.
@@ -439,8 +244,8 @@ def get_sheets_configuration_tool() -> str:
 
 
 @mcp.tool()
-def get_cameras_configuration_tool() -> str:
-    """Returns the cameras configuration section of the system configuration.
+def mesoscope_get_cameras_configuration_tool() -> str:
+    """Returns the cameras configuration section of the mesoscope system configuration.
 
     Returns:
         The cameras configuration details, or an error message if not configured.
@@ -463,8 +268,8 @@ def get_cameras_configuration_tool() -> str:
 
 
 @mcp.tool()
-def get_microcontrollers_configuration_tool() -> str:
-    """Returns the microcontrollers configuration section of the system configuration.
+def mesoscope_get_microcontrollers_configuration_tool() -> str:
+    """Returns the microcontrollers configuration section of the mesoscope system configuration.
 
     Returns:
         The microcontrollers configuration details, or an error message if not configured.
@@ -504,8 +309,8 @@ def get_microcontrollers_configuration_tool() -> str:
 
 
 @mcp.tool()
-def get_external_assets_configuration_tool() -> str:
-    """Returns the external assets configuration section of the system configuration.
+def mesoscope_get_external_assets_configuration_tool() -> str:
+    """Returns the external assets configuration section of the mesoscope system configuration.
 
     Returns:
         The external assets configuration details, or an error message if not configured.
@@ -529,13 +334,13 @@ def get_external_assets_configuration_tool() -> str:
 
 
 @mcp.tool()
-def update_filesystem_configuration_tool(
+def mesoscope_update_filesystem_configuration_tool(
     root_directory: str | None = None,
     server_directory: str | None = None,
     nas_directory: str | None = None,
     mesoscope_directory: str | None = None,
 ) -> str:
-    """Updates the filesystem configuration section.
+    """Updates the filesystem configuration section of the mesoscope system.
 
     Only provided parameters are updated; others remain unchanged.
 
@@ -568,11 +373,11 @@ def update_filesystem_configuration_tool(
 
 
 @mcp.tool()
-def update_sheets_configuration_tool(
+def mesoscope_update_sheets_configuration_tool(
     surgery_sheet_id: str | None = None,
     water_log_sheet_id: str | None = None,
 ) -> str:
-    """Updates the Google Sheets configuration section.
+    """Updates the Google Sheets configuration section of the mesoscope system.
 
     Only provided parameters are updated; others remain unchanged.
 
@@ -599,7 +404,7 @@ def update_sheets_configuration_tool(
 
 
 @mcp.tool()
-def update_cameras_configuration_tool(
+def mesoscope_update_cameras_configuration_tool(
     face_camera_index: int | None = None,
     body_camera_index: int | None = None,
     face_camera_quantization: int | None = None,
@@ -607,7 +412,7 @@ def update_cameras_configuration_tool(
     body_camera_quantization: int | None = None,
     body_camera_preset: int | None = None,
 ) -> str:
-    """Updates the cameras configuration section.
+    """Updates the cameras configuration section of the mesoscope system.
 
     Only provided parameters are updated; others remain unchanged.
 
@@ -646,12 +451,12 @@ def update_cameras_configuration_tool(
 
 
 @mcp.tool()
-def update_microcontroller_ports_tool(
+def mesoscope_update_microcontroller_ports_tool(
     actor_port: str | None = None,
     sensor_port: str | None = None,
     encoder_port: str | None = None,
 ) -> str:
-    """Updates the microcontroller USB port assignments.
+    """Updates the microcontroller USB port assignments for the mesoscope system.
 
     Only provided parameters are updated; others remain unchanged.
 
@@ -681,7 +486,7 @@ def update_microcontroller_ports_tool(
 
 
 @mcp.tool()
-def update_wheel_configuration_tool(
+def mesoscope_update_wheel_configuration_tool(
     *,
     wheel_diameter_cm: float | None = None,
     wheel_encoder_ppr: int | None = None,
@@ -690,7 +495,7 @@ def update_wheel_configuration_tool(
     wheel_encoder_delta_threshold_pulse: int | None = None,
     wheel_encoder_polling_delay_us: int | None = None,
 ) -> str:
-    """Updates the running wheel and encoder configuration.
+    """Updates the running wheel and encoder configuration for the mesoscope system.
 
     Only provided parameters are updated; others remain unchanged.
 
@@ -730,11 +535,11 @@ def update_wheel_configuration_tool(
 
 
 @mcp.tool()
-def update_brake_configuration_tool(
+def mesoscope_update_brake_configuration_tool(
     minimum_brake_strength_g_cm: float | None = None,
     maximum_brake_strength_g_cm: float | None = None,
 ) -> str:
-    """Updates the running wheel brake configuration.
+    """Updates the running wheel brake configuration for the mesoscope system.
 
     Only provided parameters are updated; others remain unchanged.
 
@@ -762,13 +567,13 @@ def update_brake_configuration_tool(
 
 
 @mcp.tool()
-def update_lick_sensor_configuration_tool(
+def mesoscope_update_lick_sensor_configuration_tool(
     lick_threshold_adc: int | None = None,
     lick_signal_threshold_adc: int | None = None,
     lick_delta_threshold_adc: int | None = None,
     lick_averaging_pool_size: int | None = None,
 ) -> str:
-    """Updates the lick sensor calibration parameters.
+    """Updates the lick sensor calibration parameters for the mesoscope system.
 
     Only provided parameters are updated; others remain unchanged.
 
@@ -802,7 +607,7 @@ def update_lick_sensor_configuration_tool(
 
 
 @mcp.tool()
-def update_torque_sensor_configuration_tool(
+def mesoscope_update_torque_sensor_configuration_tool(
     *,
     torque_baseline_voltage_adc: int | None = None,
     torque_maximum_voltage_adc: int | None = None,
@@ -813,7 +618,7 @@ def update_torque_sensor_configuration_tool(
     torque_delta_threshold_adc: int | None = None,
     torque_averaging_pool_size: int | None = None,
 ) -> str:
-    """Updates the torque sensor calibration parameters.
+    """Updates the torque sensor calibration parameters for the mesoscope system.
 
     Only provided parameters are updated; others remain unchanged.
 
@@ -859,10 +664,10 @@ def update_torque_sensor_configuration_tool(
 
 
 @mcp.tool()
-def update_valve_calibration_tool(
+def mesoscope_update_valve_calibration_tool(
     calibration_points: str,
 ) -> str:
-    """Updates the water valve calibration data.
+    """Updates the water valve calibration data for the mesoscope system.
 
     The calibration maps valve open times (microseconds) to water volumes (microliters).
 
@@ -878,7 +683,8 @@ def update_valve_calibration_tool(
 
         # Parses the JSON string into calibration data.
         data = json.loads(calibration_points)
-        if not isinstance(data, list) or not all(isinstance(point, list) and len(point) == 2 for point in data):  # noqa: PLR2004
+        is_valid = isinstance(data, list) and all(isinstance(point, list) and len(point) == 2 for point in data)
+        if not is_valid:
             return "Error: calibration_points must be a JSON list of [time_us, volume_ul] pairs."
 
         # Converts to tuple of tuples.
@@ -896,13 +702,13 @@ def update_valve_calibration_tool(
 
 
 @mcp.tool()
-def update_timing_configuration_tool(
+def mesoscope_update_timing_configuration_tool(
     keepalive_interval_ms: int | None = None,
     sensor_polling_delay_ms: int | None = None,
     screen_trigger_pulse_duration_ms: int | None = None,
     cm_per_unity_unit: float | None = None,
 ) -> str:
-    """Updates the microcontroller timing and VR scale parameters.
+    """Updates the microcontroller timing and VR scale parameters for the mesoscope system.
 
     Only provided parameters are updated; others remain unchanged.
 
@@ -936,14 +742,14 @@ def update_timing_configuration_tool(
 
 
 @mcp.tool()
-def update_external_assets_configuration_tool(
+def mesoscope_update_external_assets_configuration_tool(
     headbar_port: str | None = None,
     lickport_port: str | None = None,
     wheel_port: str | None = None,
     unity_ip: str | None = None,
     unity_port: int | None = None,
 ) -> str:
-    """Updates the external assets configuration section.
+    """Updates the external assets configuration section of the mesoscope system.
 
     Only provided parameters are updated; others remain unchanged.
 
@@ -978,74 +784,17 @@ def update_external_assets_configuration_tool(
         return "External assets configuration updated successfully."
 
 
-# ==============================================================================================================
-# Server Configuration - Two-step process for sensitive credentials
-# ==============================================================================================================
-
-
 @mcp.tool()
-def create_server_configuration_template_tool(
-    username: str,
-    host: str = "cbsuwsun.biohpc.cornell.edu",
-    storage_root: str = "/local/storage",
-    working_root: str = "/local/workdir",
-    shared_directory: str = "sun_data",
-) -> str:
-    """Creates a server configuration template with a placeholder password.
-
-    The user must manually edit the generated file to add their password, then call get_server_configuration_tool
-    to validate the configuration.
-
-    Args:
-        username: The username for server authentication.
-        host: The server hostname or IP address.
-        storage_root: The path to the server's slow HDD RAID volume.
-        working_root: The path to the server's fast NVME RAID volume.
-        shared_directory: The name of the shared directory for Sun lab data.
-
-    Returns:
-        The path to the created template file and instructions for the user.
-    """
-    try:
-        output_directory = get_working_directory().joinpath("configuration")
-        config_path = output_directory.joinpath("server_configuration.yaml")
-
-        # Creates configuration with placeholder password
-        ServerConfiguration(
-            username=username,
-            password="ENTER_YOUR_PASSWORD_HERE",  # noqa: S106
-            host=host,
-            storage_root=storage_root,
-            working_root=working_root,
-            shared_directory_name=shared_directory,
-        ).to_yaml(file_path=config_path)
-    except (FileNotFoundError, ValueError) as e:
-        return f"Error: {e}"
-    else:
-        return (
-            f"Server configuration template created at: {config_path}\n"
-            f"ACTION REQUIRED: Edit the file to replace 'ENTER_YOUR_PASSWORD_HERE' with your actual password.\n"
-            f"After editing, use get_server_configuration_tool to validate the configuration."
-        )
-
-
-# ==============================================================================================================
-# Experiment Configuration - Template creation and incremental editing
-# ==============================================================================================================
-
-
-@mcp.tool()
-def create_experiment_from_template_tool(
+def mesoscope_create_experiment_from_template_tool(
     project: str,
     experiment: str,
     template_name: str,
-    acquisition_system: str,
     default_reward_size_ul: float = 5.0,
     default_reward_tone_duration_ms: int = 300,
     default_puff_duration_ms: int = 100,
     default_occupancy_duration_ms: int = 1000,
 ) -> str:
-    """Creates a new experiment configuration from a task template for the specified acquisition system.
+    """Creates a new mesoscope experiment configuration from a task template.
 
     The template provides all VR structure (cues, segments, trial zones). Only experiment-specific parameters
     like reward sizes, puff durations, and experiment states can be customized after creation.
@@ -1054,7 +803,6 @@ def create_experiment_from_template_tool(
         project: The name of the project.
         experiment: The name of the experiment.
         template_name: The name of the task template to use (without .yaml extension).
-        acquisition_system: The data acquisition system for which to create the configuration (e.g., 'mesoscope').
         default_reward_size_ul: Default water reward volume in microliters for lick-type trials.
         default_reward_tone_duration_ms: Default reward tone duration in milliseconds for lick-type trials.
         default_puff_duration_ms: Default gas puff duration in milliseconds for occupancy-type trials.
@@ -1068,7 +816,7 @@ def create_experiment_from_template_tool(
         system_config = get_system_configuration_data()
         project_path = system_config.filesystem.root_directory.joinpath(project)
         if not project_path.exists():
-            return f"Error: Project '{project}' does not exist. Create it first with create_project_tool."
+            return f"Error: Project '{project}' does not exist. Create it first with mesoscope_create_project_tool."
 
         # Loads the task template.
         templates_dir = get_task_templates_directory()
@@ -1079,10 +827,10 @@ def create_experiment_from_template_tool(
 
         task_template = TaskTemplate.from_yaml(file_path=template_path)
 
-        # Creates experiment configuration from template for the specified acquisition system.
+        # Creates experiment configuration from template for mesoscope system.
         config = create_experiment_configuration(
             template=task_template,
-            system=acquisition_system,
+            system="mesoscope",
             unity_scene_name=template_name,
             default_reward_size_ul=default_reward_size_ul,
             default_reward_tone_duration_ms=default_reward_tone_duration_ms,
@@ -1100,21 +848,21 @@ def create_experiment_from_template_tool(
         return f"Error: {e}"
     else:
         return (
-            f"Experiment created for '{acquisition_system}' system from template '{template_name}' at: {config_path}\n"
+            f"Experiment created for 'mesoscope' system from template '{template_name}' at: {config_path}\n"
             f"Trials: {trial_count} ({water_count} water reward, {puff_count} gas puff)\n"
-            f"Next: Use add_experiment_state_tool to add experiment states."
+            f"Next: Use mesoscope_add_experiment_state_tool to add experiment states."
         )
 
 
 @mcp.tool()
-def update_water_reward_trial_tool(
+def mesoscope_update_water_reward_trial_tool(
     project: str,
     experiment: str,
     trial_name: str,
     reward_size_ul: float | None = None,
     reward_tone_duration_ms: int | None = None,
 ) -> str:
-    """Updates the parameters of a water reward trial.
+    """Updates the parameters of a water reward trial in a mesoscope experiment.
 
     Only provided parameters are updated; others remain unchanged.
 
@@ -1153,14 +901,14 @@ def update_water_reward_trial_tool(
 
 
 @mcp.tool()
-def update_gas_puff_trial_tool(
+def mesoscope_update_gas_puff_trial_tool(
     project: str,
     experiment: str,
     trial_name: str,
     puff_duration_ms: int | None = None,
     occupancy_duration_ms: int | None = None,
 ) -> str:
-    """Updates the parameters of a gas puff trial.
+    """Updates the parameters of a gas puff trial in a mesoscope experiment.
 
     Only provided parameters are updated; others remain unchanged.
 
@@ -1199,7 +947,7 @@ def update_gas_puff_trial_tool(
 
 
 @mcp.tool()
-def add_experiment_state_tool(
+def mesoscope_add_experiment_state_tool(
     project: str,
     experiment: str,
     name: str,
@@ -1215,7 +963,7 @@ def add_experiment_state_tool(
     aversive_recovery_failed_threshold: int = 0,
     aversive_recovery_guided_trials: int = 0,
 ) -> str:
-    """Adds an experiment state (phase) to an experiment configuration.
+    """Adds an experiment state (phase) to a mesoscope experiment configuration.
 
     Args:
         project: The name of the project.
@@ -1243,7 +991,7 @@ def add_experiment_state_tool(
             return f"Error: State '{name}' already exists."
 
         # Adds new state
-        new_state = MesoscopeExperimentState(
+        new_state = ExperimentState(
             experiment_state_code=experiment_state_code,
             system_state_code=system_state_code,
             state_duration_s=state_duration_s,
@@ -1265,7 +1013,7 @@ def add_experiment_state_tool(
 
 
 @mcp.tool()
-def update_experiment_state_tool(
+def mesoscope_update_experiment_state_tool(
     project: str,
     experiment: str,
     name: str,
@@ -1281,7 +1029,7 @@ def update_experiment_state_tool(
     aversive_recovery_failed_threshold: int | None = None,
     aversive_recovery_guided_trials: int | None = None,
 ) -> str:
-    """Updates an existing experiment state with new values.
+    """Updates an existing experiment state in a mesoscope experiment with new values.
 
     Only provided parameters are updated; others remain unchanged.
 
@@ -1341,8 +1089,8 @@ def update_experiment_state_tool(
 
 
 @mcp.tool()
-def remove_experiment_state_tool(project: str, experiment: str, name: str) -> str:
-    """Removes an experiment state from an experiment configuration.
+def mesoscope_remove_experiment_state_tool(project: str, experiment: str, name: str) -> str:
+    """Removes an experiment state from a mesoscope experiment configuration.
 
     Args:
         project: The name of the project.
@@ -1368,8 +1116,8 @@ def remove_experiment_state_tool(project: str, experiment: str, name: str) -> st
 
 
 @mcp.tool()
-def validate_experiment_configuration_tool(project: str, experiment: str) -> str:
-    """Validates an experiment configuration for completeness and correctness.
+def mesoscope_validate_experiment_configuration_tool(project: str, experiment: str) -> str:
+    """Validates a mesoscope experiment configuration for completeness and correctness.
 
     Checks that all required components are present and properly configured.
 
@@ -1433,8 +1181,8 @@ def validate_experiment_configuration_tool(project: str, experiment: str) -> str
 
 
 @mcp.tool()
-def list_experiment_cues_tool(project: str, experiment: str) -> str:
-    """Lists all cues defined in an experiment configuration.
+def mesoscope_list_experiment_cues_tool(project: str, experiment: str) -> str:
+    """Lists all cues defined in a mesoscope experiment configuration.
 
     Args:
         project: The name of the project.
@@ -1455,8 +1203,8 @@ def list_experiment_cues_tool(project: str, experiment: str) -> str:
 
 
 @mcp.tool()
-def list_experiment_segments_tool(project: str, experiment: str) -> str:
-    """Lists all segments defined in an experiment configuration.
+def mesoscope_list_experiment_segments_tool(project: str, experiment: str) -> str:
+    """Lists all segments defined in a mesoscope experiment configuration.
 
     Args:
         project: The name of the project.
@@ -1477,8 +1225,8 @@ def list_experiment_segments_tool(project: str, experiment: str) -> str:
 
 
 @mcp.tool()
-def list_experiment_trials_tool(project: str, experiment: str) -> str:
-    """Lists all trial structures defined in an experiment configuration.
+def mesoscope_list_experiment_trials_tool(project: str, experiment: str) -> str:
+    """Lists all trial structures defined in a mesoscope experiment configuration.
 
     Args:
         project: The name of the project.
@@ -1502,8 +1250,8 @@ def list_experiment_trials_tool(project: str, experiment: str) -> str:
 
 
 @mcp.tool()
-def list_experiment_states_tool(project: str, experiment: str) -> str:
-    """Lists all experiment states defined in an experiment configuration.
+def mesoscope_list_experiment_states_tool(project: str, experiment: str) -> str:
+    """Lists all experiment states defined in a mesoscope experiment configuration.
 
     Args:
         project: The name of the project.
@@ -1528,7 +1276,7 @@ def list_experiment_states_tool(project: str, experiment: str) -> str:
 
 
 def run_server(transport: Literal["stdio", "sse", "streamable-http"] = "stdio") -> None:
-    """Starts the MCP server with the specified transport.
+    """Starts the mesoscope MCP server with the specified transport.
 
     Args:
         transport: The transport type to use ('stdio', 'sse', or 'streamable-http').

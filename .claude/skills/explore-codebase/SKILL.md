@@ -62,7 +62,7 @@ Provide a structured summary including:
 
 ### Example Output
 
-```
+```markdown
 ## Project Purpose
 
 Provides shared data acquisition and processing assets for Sun Lab libraries. Decouples sl-experiment
@@ -74,15 +74,14 @@ and sl-forgery by providing common dataclasses and low-level tools.
 |--------------------|---------------------------------------------------|---------------------------------------|
 | Data Classes       | src/sl_shared_assets/data_classes/                | Dataclasses for data and config       |
 | Data Transfer      | src/sl_shared_assets/data_transfer/               | Data transfer and checksum utilities  |
-| CLI Interface      | src/sl_shared_assets/command_line_interfaces/     | Configuration management commands     |
-| MCP Server         | src/sl_shared_assets/mcp_server.py                | Agentic configuration tools           |
+| Interfaces         | src/sl_shared_assets/interfaces/                  | CLI and MCP server interfaces         |
 
 ## Important Files
 
 - `src/sl_shared_assets/data_classes/configuration_data.py` - Experiment configuration dataclasses
 - `src/sl_shared_assets/data_classes/session_data.py` - Session data structures
 - `src/sl_shared_assets/data_classes/task_template_data.py` - Task template schema definitions
-- `src/sl_shared_assets/mcp_server.py` - MCP server for agentic configuration
+- `src/sl_shared_assets/interfaces/mcp_server.py` - MCP server for agentic configuration
 
 ## Notable Patterns
 

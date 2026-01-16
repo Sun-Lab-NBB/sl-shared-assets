@@ -1,7 +1,7 @@
-"""Provides base configuration assets and utilities shared across all data acquisition systems.
+"""Provides configuration utilities shared across all data acquisition systems.
 
-This module contains the acquisition systems enum, server configuration, path utilities, and the factory function
-for creating experiment configurations.
+This module contains the acquisition systems enumeration, server configuration, path utilities, system configuration
+management functions, and experiment configuration factory.
 """
 
 from copy import deepcopy
@@ -15,11 +15,10 @@ from ataraxis_data_structures import YamlConfig
 
 from .vr_configuration import TaskTemplate  # noqa: TC001 (used at runtime)
 from .mesoscope_configuration import (
-    GasPuffTrial,
-    WaterRewardTrial,
     MesoscopeSystemConfiguration,
     MesoscopeExperimentConfiguration,
 )
+from .experiment_configuration import GasPuffTrial, WaterRewardTrial
 
 
 class AcquisitionSystems(StrEnum):
@@ -30,7 +29,7 @@ class AcquisitionSystems(StrEnum):
     engine to conduct experiments."""
 
 
-@dataclass()
+@dataclass
 class ServerConfiguration(YamlConfig):
     """Defines the access credentials and the filesystem layout of the Sun lab's remote compute server."""
 
@@ -428,7 +427,7 @@ def get_system_configuration_data() -> MesoscopeSystemConfiguration:
 def create_server_configuration_file(
     username: str,
     password: str,
-    host: str = "cbsuwsun.biopic.cornell.edu",
+    host: str = "cbsuwsun.biohpc.cornell.edu",
     storage_root: str = "/local/workdir",
     working_root: str = "/local/storage",
     shared_directory_name: str = "sun_data",

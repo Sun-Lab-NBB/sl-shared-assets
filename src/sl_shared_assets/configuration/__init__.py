@@ -7,7 +7,7 @@ from .vr_configuration import (
     VREnvironment,
     TrialStructure,
 )
-from .base_configuration import (
+from .configuration_utilities import (
     AcquisitionSystems,
     ServerConfiguration,
     get_working_directory,
@@ -23,25 +23,29 @@ from .base_configuration import (
     create_system_configuration_file,
 )
 from .mesoscope_configuration import (
-    GasPuffTrial,
     MesoscopeCameras,
-    WaterRewardTrial,
     MesoscopeFileSystem,
     MesoscopeGoogleSheets,
     MesoscopeExternalAssets,
-    MesoscopeExperimentState,
     MesoscopeMicroControllers,
     MesoscopeSystemConfiguration,
     MesoscopeExperimentConfiguration,
 )
+from .experiment_configuration import (
+    BaseTrial,
+    GasPuffTrial,
+    ExperimentState,
+    WaterRewardTrial,
+)
 
 __all__ = [
     "AcquisitionSystems",
+    "BaseTrial",
     "Cue",
+    "ExperimentState",
     "GasPuffTrial",
     "MesoscopeCameras",
     "MesoscopeExperimentConfiguration",
-    "MesoscopeExperimentState",
     "MesoscopeExternalAssets",
     "MesoscopeFileSystem",
     "MesoscopeGoogleSheets",

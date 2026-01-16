@@ -5,7 +5,7 @@ from dataclasses import dataclass  # pragma: no cover
 from ataraxis_data_structures import YamlConfig  # pragma: no cover
 
 
-@dataclass()
+@dataclass
 class MesoscopeHardwareState(YamlConfig):  # pragma: no cover
     """Stores configuration parameters (states) of the Mesoscope-VR system hardware modules used during training or
     experiment runtimes.
@@ -46,7 +46,7 @@ class MesoscopeHardwareState(YamlConfig):  # pragma: no cover
     human-readable state names."""
 
 
-@dataclass()
+@dataclass
 class LickTrainingDescriptor(YamlConfig):  # pragma: no cover
     """Stores the task and outcome information specific to lick training sessions that use the Mesoscope-VR system."""
 
@@ -88,7 +88,7 @@ class LickTrainingDescriptor(YamlConfig):  # pragma: no cover
     """Stores the experimenter's notes made during runtime."""
 
 
-@dataclass()
+@dataclass
 class RunTrainingDescriptor(YamlConfig):  # pragma: no cover
     """Stores the task and outcome information specific to run training sessions that use the Mesoscope-VR system."""
 
@@ -147,7 +147,7 @@ class RunTrainingDescriptor(YamlConfig):  # pragma: no cover
     """Stores the experimenter's notes made during runtime."""
 
 
-@dataclass()
+@dataclass
 class MesoscopeExperimentDescriptor(YamlConfig):  # pragma: no cover
     """Stores the task and outcome information specific to experiment sessions that use the Mesoscope-VR system."""
 
@@ -176,7 +176,7 @@ class MesoscopeExperimentDescriptor(YamlConfig):  # pragma: no cover
     """Stores the experimenter's notes made during runtime."""
 
 
-@dataclass()
+@dataclass
 class WindowCheckingDescriptor(YamlConfig):  # pragma: no cover
     """Stores the outcome information specific to window checking sessions that use the Mesoscope-VR system."""
 
@@ -191,7 +191,7 @@ class WindowCheckingDescriptor(YamlConfig):  # pragma: no cover
     """Stores the experimenter's notes made during runtime."""
 
 
-@dataclass()
+@dataclass
 class ZaberPositions(YamlConfig):  # pragma: no cover
     """Stores Zaber motor positions reused between data acquisition sessions that use the Mesoscope-VR system."""
 
@@ -211,7 +211,7 @@ class ZaberPositions(YamlConfig):  # pragma: no cover
     """The absolute position, in native motor units, of the running wheel platform x-axis motor."""
 
 
-@dataclass()
+@dataclass
 class MesoscopePositions(YamlConfig):  # pragma: no cover
     """Stores the positions of real and virtual Mesoscope imaging axes reused between experiment sessions that use the
     Mesoscope-VR system.

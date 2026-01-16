@@ -103,7 +103,7 @@ class JobState:
     """The SLURM-assigned job ID, if running on a SLURM cluster."""
 
 
-@dataclass()
+@dataclass
 class ProcessingTracker(YamlConfig):
     """Tracks the state of a data processing pipeline and provides tools for communicating this state between multiple
     processes and host-machines.

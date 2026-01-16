@@ -30,6 +30,7 @@ ___
 - [Dependencies](#dependencies)
 - [Installation](#installation)
 - [Usage](#usage)
+  - [MCP Server](#mcp-server)
 - [API Documentation](#api-documentation)
 - [Versioning](#versioning)
 - [Authors](#authors)
@@ -75,6 +76,87 @@ library. For details on using shared assets for data processing and dataset form
 ***Warning!*** End users should not use any component of this library directly or install this library into any Python
 environment. All assets from this library are intended to be used exclusively by developers working on other Sun lab
 libraries.
+
+### MCP Server
+
+This library provides MCP servers that expose configuration management tools for AI agent integration. The servers
+enable agents to interactively build experiment and system configurations through a template-then-edit workflow.
+
+#### Server Architecture
+
+The library provides two MCP servers:
+
+- **Base Server** (`sl-shared-assets`) — Exposes shared tools that work across all data acquisition systems.
+- **Mesoscope Server** (`sl-mesoscope-vr`) — Exposes tools specific to the mesoscope-VR data acquisition system.
+
+#### Starting the Server
+
+Start the mesoscope MCP server (default) using the CLI:
+
+```bash
+sl-configure mcp
+```
+
+Start the base MCP server for shared tools only:
+
+```bash
+sl-configure mcp --server base
+```
+
+#### Available Tools
+
+**Base Server (10 tools):**
+
+- **Setup** — Configures the shared working environment.
+  - `set_working_directory_tool`, `set_google_credentials_tool`, `set_task_templates_directory_tool`
+- **Read** — Queries shared configuration state.
+  - `get_working_directory_tool`, `get_server_configuration_tool`, `get_google_credentials_tool`,
+    `get_task_templates_directory_tool`, `list_available_templates_tool`, `get_template_info_tool`
+- **Server Config** — Creates server configuration templates with secure password handling.
+  - `create_server_configuration_template_tool`
+
+**Mesoscope Server (32 tools):**
+
+- **Setup** — Configures the mesoscope acquisition system.
+  - `mesoscope_create_system_configuration_tool`, `mesoscope_create_project_tool`
+- **Read** — Queries mesoscope system state.
+  - `mesoscope_get_system_configuration_tool`, `mesoscope_read_experiment_configuration_tool`
+- **System Config** — Reads and updates mesoscope system configuration sections.
+  - `mesoscope_list_system_configuration_sections_tool`, `mesoscope_get_*_configuration_tool`,
+    `mesoscope_update_*_configuration_tool`
+- **Experiment** — Creates and modifies mesoscope experiment configurations.
+  - `mesoscope_create_experiment_from_template_tool`, `mesoscope_update_water_reward_trial_tool`,
+    `mesoscope_update_gas_puff_trial_tool`, `mesoscope_add_experiment_state_tool`,
+    `mesoscope_update_experiment_state_tool`, `mesoscope_remove_experiment_state_tool`,
+    `mesoscope_validate_experiment_configuration_tool`, `mesoscope_list_experiment_*_tool`
+
+#### Claude Desktop Configuration
+
+Add the following to the Claude Desktop configuration file to enable the mesoscope MCP server:
+
+```json
+{
+  "mcpServers": {
+    "sl-mesoscope-vr": {
+      "command": "sl-configure",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+For the base server with shared tools only:
+
+```json
+{
+  "mcpServers": {
+    "sl-shared-assets": {
+      "command": "sl-configure",
+      "args": ["mcp", "--server", "base"]
+    }
+  }
+}
+```
 
 ___
 

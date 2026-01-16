@@ -5,13 +5,14 @@ from pathlib import Path  # pragma: no cover
 import click  # pragma: no cover
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists  # pragma: no cover
 
-from ..mcp_server import run_server  # pragma: no cover
+from .mcp_server import run_server as run_base_server  # pragma: no cover
+from .mesoscope_mcp_server import run_server as run_mesoscope_server  # pragma: no cover
 from ..configuration import (
     GasPuffTrial,
     TaskTemplate,
+    ExperimentState,
     WaterRewardTrial,
     AcquisitionSystems,
-    MesoscopeExperimentState,
     set_working_directory,
     set_google_credentials_path,
     get_task_templates_directory,
@@ -301,7 +302,7 @@ def generate_experiment_configuration_file(
     # Generates experiment states with guidance parameters.
     for state_num in range(state_count):
         state_name = f"state_{state_num + 1}"
-        experiment_configuration.experiment_states[state_name] = MesoscopeExperimentState(
+        experiment_configuration.experiment_states[state_name] = ExperimentState(
             experiment_state_code=state_num + 1,
             system_state_code=0,
             state_duration_s=60,
@@ -323,6 +324,14 @@ def generate_experiment_configuration_file(
 
 @configure.command("mcp")
 @click.option(
+    "-s",
+    "--server",
+    type=click.Choice(["base", "mesoscope"], case_sensitive=False),
+    default="mesoscope",
+    show_default=True,
+    help="The MCP server to start ('base' for shared tools, 'mesoscope' for mesoscope-VR system tools).",
+)
+@click.option(
     "-t",
     "--transport",
     type=str,
@@ -330,6 +339,9 @@ def generate_experiment_configuration_file(
     show_default=True,
     help="The MCP transport type to use ('stdio', 'sse', or 'streamable-http').",
 )
-def start_mcp_server(transport: str) -> None:  # pragma: no cover
+def start_mcp_server(server: str, transport: str) -> None:  # pragma: no cover
     """Starts the MCP server for agentic configuration management."""
-    run_server(transport=transport)  # type: ignore[arg-type]
+    if server.lower() == "base":
+        run_base_server(transport=transport)  # type: ignore[arg-type]
+    else:
+        run_mesoscope_server(transport=transport)  # type: ignore[arg-type]

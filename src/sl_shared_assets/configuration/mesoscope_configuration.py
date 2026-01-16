@@ -11,142 +11,16 @@ from dataclasses import field, dataclass
 from ataraxis_base_utilities import console
 from ataraxis_data_structures import YamlConfig
 
-from .vr_configuration import Cue, Segment, VREnvironment, TrialStructure
-
-
-@dataclass()
-class MesoscopeExperimentState:
-    """Defines the structure and runtime parameters of an experiment state (phase)."""
-
-    experiment_state_code: int
-    """The unique identifier code of the experiment state."""
-    system_state_code: int
-    """The data acquisition system's state (configuration snapshot) code associated with the experiment state."""
-    state_duration_s: float
-    """The time, in seconds, to maintain the experiment state while executing the experiment."""
-    supports_trials: bool = True
-    """Determines whether trials are executed during this experiment state. When False, no trial-related processing
-    occurs during this phase."""
-    # Reinforcing (water reward) trial guidance parameters
-    reinforcing_initial_guided_trials: int = 0
-    """The number of reinforcing trials after the onset of the experiment state that use the guidance mode."""
-    reinforcing_recovery_failed_threshold: int = 0
-    """The number of sequentially failed reinforcing trials after which to enable the recovery guidance mode."""
-    reinforcing_recovery_guided_trials: int = 0
-    """The number of guided reinforcing trials to use in the recovery guidance mode."""
-    # Aversive (gas puff) trial guidance parameters
-    aversive_initial_guided_trials: int = 0
-    """The number of aversive trials after the onset of the experiment state that use the guidance mode."""
-    aversive_recovery_failed_threshold: int = 0
-    """The number of sequentially failed aversive trials after which to enable the recovery guidance mode."""
-    aversive_recovery_guided_trials: int = 0
-    """The number of guided aversive trials to use in the recovery guidance mode."""
-
-
-@dataclass()
-class _MesoscopeBaseTrial(TrialStructure):
-    """Extends TrialStructure with experiment runtime fields common to all supported experiment trial types.
-
-    Notes:
-        Inherits spatial configuration fields from TrialStructure, including segment mapping and zone positions.
-
-        The trigger_type field is inherited but not used at runtime. Trial behavior is determined by the concrete
-        class type (WaterRewardTrial or GasPuffTrial), not the trigger_type value. The field exists only to maintain
-        schema compatibility with task templates.
-    """
-
-    trigger_type: str = ""
-    """Inherited from TrialStructure but not used at runtime. Trial behavior is determined by concrete class type."""
-    cue_sequence: list[int] = field(default_factory=list)
-    """The sequence of segment wall cue identifiers experienced by the animal when participating in this type of
-    trials. This field is populated by MesoscopeExperimentConfiguration.__post_init__."""
-    trial_length_cm: float = 0.0
-    """The total length of the trial environment in centimeters. This field is populated by
-    MesoscopeExperimentConfiguration.__post_init__."""
-
-    def validate_zones(self) -> None:
-        """Validates stimulus zone positions.
-
-        Notes:
-            This method must be called after trial_length_cm is populated by MesoscopeExperimentConfiguration.
-        """
-        if self.trial_length_cm <= 0:
-            message = "Cannot validate zones: trial_length_cm must be populated first."
-            console.error(message=message, error=ValueError)
-
-        if self.stimulus_trigger_zone_end_cm < self.stimulus_trigger_zone_start_cm:
-            message = (
-                f"The 'stimulus_trigger_zone_end_cm' ({self.stimulus_trigger_zone_end_cm}) must be greater than or "
-                f"equal to 'stimulus_trigger_zone_start_cm' ({self.stimulus_trigger_zone_start_cm})."
-            )
-            console.error(message=message, error=ValueError)
-
-        if not 0 <= self.stimulus_trigger_zone_start_cm <= self.trial_length_cm:
-            message = (
-                f"The 'stimulus_trigger_zone_start_cm' ({self.stimulus_trigger_zone_start_cm}) must be within the "
-                f"trial length (0 to {self.trial_length_cm} cm)."
-            )
-            console.error(message=message, error=ValueError)
-
-        if not 0 <= self.stimulus_trigger_zone_end_cm <= self.trial_length_cm:
-            message = (
-                f"The 'stimulus_trigger_zone_end_cm' ({self.stimulus_trigger_zone_end_cm}) must be within the "
-                f"trial length (0 to {self.trial_length_cm} cm)."
-            )
-            console.error(message=message, error=ValueError)
-
-        if not 0 <= self.stimulus_location_cm <= self.trial_length_cm:
-            message = (
-                f"The 'stimulus_location_cm' ({self.stimulus_location_cm}) must be within the "
-                f"trial length (0 to {self.trial_length_cm} cm)."
-            )
-            console.error(message=message, error=ValueError)
-
-        if self.stimulus_location_cm < self.stimulus_trigger_zone_start_cm:
-            message = (
-                f"The 'stimulus_location_cm' ({self.stimulus_location_cm}) cannot precede the "
-                f"'stimulus_trigger_zone_start_cm' ({self.stimulus_trigger_zone_start_cm}). The stimulus location must "
-                f"be at or after the start of the trigger zone."
-            )
-            console.error(message=message, error=ValueError)
-
-
-@dataclass()
-class WaterRewardTrial(_MesoscopeBaseTrial):
-    """Defines a trial that delivers water rewards (reinforcing stimuli) when the animal licks in the trigger zone.
-
-    Notes:
-        Trigger mode: The animal must lick while inside the stimulus trigger zone to receive the water reward.
-        Guidance mode: The animal receives the reward upon colliding with the stimulus boundary (no lick required).
-    """
-
-    reward_size_ul: float = 5.0
-    """The volume of water, in microliters, to deliver when the animal successfully completes the trial."""
-    reward_tone_duration_ms: int = 300
-    """The duration, in milliseconds, to sound the auditory tone when delivering the water reward."""
-
-
-@dataclass()
-class GasPuffTrial(_MesoscopeBaseTrial):
-    """Defines a trial that delivers N2 gas puffs (aversive stimuli) when the animal fails to meet occupancy duration.
-
-    Notes:
-        Trigger mode: The animal must occupy the stimulus trigger zone for the specified duration to disarm the
-        stimulus boundary and avoid the gas puff. If the animal exits the zone early or collides with the boundary
-        before meeting the occupancy threshold, the gas puff is delivered.
-        Guidance mode: When the animal exits the zone early, an OccupancyFailed message is emitted, allowing
-        sl-experiment to block movement and prevent the animal from reaching the armed boundary.
-    """
-
-    puff_duration_ms: int = 100
-    """The duration, in milliseconds, for which to deliver the N2 gas puff when the animal fails the trial."""
-    occupancy_duration_ms: int = 1000
-    """The time, in milliseconds, the animal must occupy the trigger zone to disarm the stimulus boundary and avoid
-    the gas puff."""
+from .vr_configuration import Cue, Segment, VREnvironment  # noqa: TC001 (used in dataclass fields)
+from .experiment_configuration import (  # noqa: TC001 (used in dataclass fields)
+    GasPuffTrial,
+    ExperimentState,
+    WaterRewardTrial,
+)
 
 
 # noinspection PyArgumentList
-@dataclass()
+@dataclass
 class MesoscopeExperimentConfiguration(YamlConfig):
     """Defines an experiment session that uses the Mesoscope_VR data acquisition system.
 
@@ -164,7 +38,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     trial_structures: dict[str, WaterRewardTrial | GasPuffTrial]
     """Defines experiment's structure by specifying the types of trials used by the phases (states) of the
     experiment."""
-    experiment_states: dict[str, MesoscopeExperimentState]
+    experiment_states: dict[str, ExperimentState]
     """Defines the experiment's flow by specifying the sequence of experiment and data acquisition system states
     executed during runtime."""
 
@@ -259,7 +133,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
             trial.validate_zones()
 
 
-@dataclass()
+@dataclass
 class MesoscopeFileSystem:
     """Stores the filesystem configuration of the Mesoscope-VR data acquisition system."""
 
@@ -276,7 +150,7 @@ class MesoscopeFileSystem:
     during acquisition by the PC that manages the Mesoscope during runtime."""
 
 
-@dataclass()
+@dataclass
 class MesoscopeGoogleSheets:
     """Stores the identifiers for the Google Sheets used by the Mesoscope-VR data acquisition system."""
 
@@ -288,7 +162,7 @@ class MesoscopeGoogleSheets:
     animals that participate in data acquisition sessions."""
 
 
-@dataclass()
+@dataclass
 class MesoscopeCameras:
     """Stores the video camera configuration of the Mesoscope-VR data acquisition system."""
 
@@ -308,7 +182,7 @@ class MesoscopeCameras:
     valid members of the EncoderSpeedPresets enumeration from the ataraxis-video-system library."""
 
 
-@dataclass()
+@dataclass
 class MesoscopeMicroControllers:
     """Stores the microcontroller configuration of the Mesoscope-VR data acquisition system."""
 
@@ -389,7 +263,7 @@ class MesoscopeMicroControllers:
     microliters."""
 
 
-@dataclass()
+@dataclass
 class MesoscopeExternalAssets:
     """Stores the third-party asset configuration of the Mesoscope-VR data acquisition system."""
 
@@ -405,7 +279,7 @@ class MesoscopeExternalAssets:
     """The port number of the MQTT broker used to communicate with the Unity game engine."""
 
 
-@dataclass()
+@dataclass
 class MesoscopeSystemConfiguration(YamlConfig):
     """Defines the hardware and software asset configuration for the Mesoscope-VR data acquisition system."""
 

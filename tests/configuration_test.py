@@ -12,7 +12,7 @@ from sl_shared_assets.configuration import (
     VREnvironment,
     GasPuffTrial,
     WaterRewardTrial,
-    MesoscopeExperimentState,
+    ExperimentState,
     MesoscopeExperimentConfiguration,
     MesoscopeFileSystem,
     MesoscopeCameras,
@@ -48,7 +48,7 @@ def sample_mesoscope_config() -> MesoscopeSystemConfiguration:
 @pytest.fixture
 def sample_experiment_config() -> MesoscopeExperimentConfiguration:
     """Creates a sample MesoscopeExperimentConfiguration for testing."""
-    state = MesoscopeExperimentState(
+    state = ExperimentState(
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=600.0,
@@ -66,7 +66,7 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
     ]
 
     segments = [
-        Segment(name="Segment_abc", cue_sequence=["A", "B", "C"]),
+        Segment(name="Segment_abc", cue_sequence=["A", "B", "C"], transition_probabilities=None),
     ]
 
     # Trial references the segment - cue_sequence and trial_length_cm are derived
@@ -75,6 +75,7 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
         stimulus_trigger_zone_start_cm=150.0,
         stimulus_trigger_zone_end_cm=175.0,
         stimulus_location_cm=160.0,
+        show_stimulus_collision_boundary=False,
     )
 
     config = MesoscopeExperimentConfiguration(
@@ -82,7 +83,12 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
         segments=segments,
         trial_structures={"trial1": trial},
         experiment_states={"state1": state},
-        vr_environment=VREnvironment(),
+        vr_environment=VREnvironment(
+            corridor_spacing_cm=100.0,
+            segments_per_corridor=3,
+            padding_prefab_name="Padding",
+            cm_per_unity_unit=10.0,
+        ),
         unity_scene_name="TestScene",
         cue_offset_cm=10.0,
     )
@@ -124,15 +130,15 @@ def test_acquisition_systems_is_string_enum():
     assert isinstance(AcquisitionSystems.MESOSCOPE_VR, str)
 
 
-# Tests for MesoscopeExperimentState dataclass
+# Tests for ExperimentState dataclass
 
 
 def test_mesoscope_experiment_state_initialization():
-    """Verifies basic initialization of MesoscopeExperimentState.
+    """Verifies basic initialization of ExperimentState.
 
     This test ensures all fields are properly assigned during initialization.
     """
-    state = MesoscopeExperimentState(
+    state = ExperimentState(
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=600.0,
@@ -158,11 +164,11 @@ def test_mesoscope_experiment_state_initialization():
 
 
 def test_mesoscope_experiment_state_types():
-    """Verifies the data types of MesoscopeExperimentState fields.
+    """Verifies the data types of ExperimentState fields.
 
     This test ensures each field has the expected type.
     """
-    state = MesoscopeExperimentState(
+    state = ExperimentState(
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=600.0,
@@ -202,8 +208,8 @@ def _create_test_config_with_trial(trial: WaterRewardTrial | GasPuffTrial) -> Me
         Cue(name="C", code=3, length_cm=50.0),
         Cue(name="D", code=4, length_cm=50.0),
     ]
-    segments = [Segment(name="TestSegment", cue_sequence=["A", "B", "C", "D"])]
-    state = MesoscopeExperimentState(
+    segments = [Segment(name="TestSegment", cue_sequence=["A", "B", "C", "D"], transition_probabilities=None)]
+    state = ExperimentState(
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=60.0,
@@ -214,7 +220,12 @@ def _create_test_config_with_trial(trial: WaterRewardTrial | GasPuffTrial) -> Me
         segments=segments,
         trial_structures={"test_trial": trial},
         experiment_states={"state1": state},
-        vr_environment=VREnvironment(),
+        vr_environment=VREnvironment(
+            corridor_spacing_cm=100.0,
+            segments_per_corridor=3,
+            padding_prefab_name="Padding",
+            cm_per_unity_unit=10.0,
+        ),
         unity_scene_name="TestScene",
     )
 
@@ -229,6 +240,7 @@ def test_water_reward_trial_initialization():
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=200.0,
         stimulus_location_cm=190.0,
+        show_stimulus_collision_boundary=False,
     )
 
     # Creates config to populate derived fields
@@ -256,6 +268,7 @@ def test_gas_puff_trial_initialization():
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=200.0,
         stimulus_location_cm=190.0,
+        show_stimulus_collision_boundary=False,
     )
 
     # Creates config to populate derived fields
@@ -283,6 +296,7 @@ def test_trial_types():
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=200.0,
         stimulus_location_cm=190.0,
+        show_stimulus_collision_boundary=False,
     )
 
     # Creates config to populate derived fields
@@ -305,6 +319,7 @@ def test_trial_types():
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=200.0,
         stimulus_location_cm=190.0,
+        show_stimulus_collision_boundary=False,
     )
 
     # Creates config to populate derived fields
@@ -326,6 +341,7 @@ def test_trial_zone_end_less_than_start():
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=170.0,  # Less than start
         stimulus_location_cm=175.0,
+        show_stimulus_collision_boundary=False,
     )
     with pytest.raises(ValueError, match="must be greater than or equal to"):
         _create_test_config_with_trial(trial)
@@ -338,6 +354,7 @@ def test_trial_zone_start_outside_trial_length():
         stimulus_trigger_zone_start_cm=250.0,  # Outside trial length (200)
         stimulus_trigger_zone_end_cm=260.0,
         stimulus_location_cm=255.0,
+        show_stimulus_collision_boundary=False,
     )
     with pytest.raises(ValueError, match="stimulus_trigger_zone_start_cm.*must be within"):
         _create_test_config_with_trial(trial)
@@ -350,6 +367,7 @@ def test_trial_zone_end_outside_trial_length():
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=250.0,  # Outside trial length (200)
         stimulus_location_cm=190.0,
+        show_stimulus_collision_boundary=False,
     )
     with pytest.raises(ValueError, match="stimulus_trigger_zone_end_cm.*must be within"):
         _create_test_config_with_trial(trial)
@@ -362,6 +380,7 @@ def test_trial_stimulus_location_outside_trial_length():
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=200.0,
         stimulus_location_cm=250.0,  # Outside trial length (200)
+        show_stimulus_collision_boundary=False,
     )
     with pytest.raises(ValueError, match="stimulus_location_cm.*must be within"):
         _create_test_config_with_trial(trial)
@@ -374,6 +393,7 @@ def test_trial_stimulus_location_precedes_trigger_zone():
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=200.0,
         stimulus_location_cm=170.0,  # Before trigger zone start (180)
+        show_stimulus_collision_boundary=False,
     )
     with pytest.raises(ValueError, match="stimulus_location_cm.*cannot precede"):
         _create_test_config_with_trial(trial)
@@ -384,7 +404,7 @@ def test_trial_stimulus_location_precedes_trigger_zone():
 
 def test_experiment_config_invalid_segment_reference():
     """Verifies that a trial referencing an unknown segment raises ValueError."""
-    state = MesoscopeExperimentState(
+    state = ExperimentState(
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=600.0,
@@ -395,13 +415,14 @@ def test_experiment_config_invalid_segment_reference():
         Cue(name="A", code=1, length_cm=50.0),
         Cue(name="B", code=2, length_cm=75.0),
     ]
-    segments = [Segment(name="Segment_ab", cue_sequence=["A", "B"])]
+    segments = [Segment(name="Segment_ab", cue_sequence=["A", "B"], transition_probabilities=None)]
 
     trial = WaterRewardTrial(
         segment_name="NonexistentSegment",  # Does not exist
         stimulus_trigger_zone_start_cm=100.0,
         stimulus_trigger_zone_end_cm=125.0,
         stimulus_location_cm=110.0,
+        show_stimulus_collision_boundary=False,
     )
 
     with pytest.raises(ValueError, match="references unknown segment.*NonexistentSegment"):
@@ -410,14 +431,19 @@ def test_experiment_config_invalid_segment_reference():
             segments=segments,
             trial_structures={"trial1": trial},
             experiment_states={"state1": state},
-            vr_environment=VREnvironment(),
+            vr_environment=VREnvironment(
+                corridor_spacing_cm=100.0,
+                segments_per_corridor=3,
+                padding_prefab_name="Padding",
+                cm_per_unity_unit=10.0,
+            ),
             unity_scene_name="TestScene",
         )
 
 
 def test_experiment_config_invalid_cue_in_segment():
     """Verifies that a segment referencing an unknown cue raises ValueError."""
-    state = MesoscopeExperimentState(
+    state = ExperimentState(
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=600.0,
@@ -429,13 +455,14 @@ def test_experiment_config_invalid_cue_in_segment():
         Cue(name="B", code=2, length_cm=75.0),
     ]
     # Segment references cue "C" which doesn't exist
-    segments = [Segment(name="Segment_abc", cue_sequence=["A", "B", "C"])]
+    segments = [Segment(name="Segment_abc", cue_sequence=["A", "B", "C"], transition_probabilities=None)]
 
     trial = WaterRewardTrial(
         segment_name="Segment_abc",
         stimulus_trigger_zone_start_cm=100.0,
         stimulus_trigger_zone_end_cm=125.0,
         stimulus_location_cm=110.0,
+        show_stimulus_collision_boundary=False,
     )
 
     with pytest.raises(ValueError, match="references unknown cue.*C"):
@@ -444,14 +471,19 @@ def test_experiment_config_invalid_cue_in_segment():
             segments=segments,
             trial_structures={"trial1": trial},
             experiment_states={"state1": state},
-            vr_environment=VREnvironment(),
+            vr_environment=VREnvironment(
+                corridor_spacing_cm=100.0,
+                segments_per_corridor=3,
+                padding_prefab_name="Padding",
+                cm_per_unity_unit=10.0,
+            ),
             unity_scene_name="TestScene",
         )
 
 
 def test_experiment_config_derives_trial_fields():
     """Verifies that trial cue_sequence and trial_length_cm are derived from segment."""
-    state = MesoscopeExperimentState(
+    state = ExperimentState(
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=600.0,
@@ -464,13 +496,14 @@ def test_experiment_config_derives_trial_fields():
         Cue(name="B", code=2, length_cm=75.0),
         Cue(name="C", code=3, length_cm=50.0),
     ]
-    segments = [Segment(name="Segment_abc", cue_sequence=["A", "B", "C"])]
+    segments = [Segment(name="Segment_abc", cue_sequence=["A", "B", "C"], transition_probabilities=None)]
 
     trial = WaterRewardTrial(
         segment_name="Segment_abc",
         stimulus_trigger_zone_start_cm=150.0,
         stimulus_trigger_zone_end_cm=175.0,
         stimulus_location_cm=160.0,
+        show_stimulus_collision_boundary=False,
     )
 
     config = MesoscopeExperimentConfiguration(
@@ -478,7 +511,12 @@ def test_experiment_config_derives_trial_fields():
         segments=segments,
         trial_structures={"trial1": trial},
         experiment_states={"state1": state},
-        vr_environment=VREnvironment(),
+        vr_environment=VREnvironment(
+            corridor_spacing_cm=100.0,
+            segments_per_corridor=3,
+            padding_prefab_name="Padding",
+            cm_per_unity_unit=10.0,
+        ),
         unity_scene_name="TestScene",
         cue_offset_cm=10.0,
     )
@@ -853,7 +891,7 @@ def test_mesoscope_experiment_configuration_nested_structures(sample_experiment_
     This test ensures nested experiment states and trials are properly initialized.
     """
     state = sample_experiment_config.experiment_states["state1"]
-    assert isinstance(state, MesoscopeExperimentState)
+    assert isinstance(state, ExperimentState)
     assert state.experiment_state_code == 1
 
     trial = sample_experiment_config.trial_structures["trial1"]
@@ -1494,10 +1532,6 @@ def test_get_server_configuration_raises_error_if_missing(clean_working_director
 
 def test_get_server_configuration_raises_error_if_unconfigured(clean_working_directory, monkeypatch):
     """Verifies that get_server_configuration raises an error for placeholder credentials.
-
-    Args:
-        clean_working_directory: Fixture providing a temporary working directory.
-        monkeypatch: Pytest fixture for modifying environment variables.
 
     This test ensures unconfigured files are detected.
     """

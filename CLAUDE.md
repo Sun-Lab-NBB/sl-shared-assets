@@ -60,32 +60,38 @@ actual library state to prevent integration errors.
 
 - `/explore-codebase` - Perform in-depth codebase exploration
 - `/sun-lab-style` - Apply Sun Lab coding and documentation conventions (REQUIRED for all code and documentation changes)
-- `/experiment-design` - Interactive guidance for building experiment configurations via MCP tools
 
 **Skills in downstream libraries (use MCP tools from this library):**
 - `/machine-setup` - Located in sl-forgery (configures working directory, server credentials)
 - `/acquisition-system-setup` - Located in sl-experiment (configures acquisition system parameters)
+- `/experiment-design` - Located in sl-experiment (interactive guidance for building experiment configurations)
 
 ## MCP Server
 
-This library exposes an MCP server for agentic configuration management. Start with: `sl-configure mcp`
+This library exposes two MCP servers for agentic configuration management:
 
-The MCP server provides tools for:
+- **Base server** (`sl-shared-assets`): Shared tools that work across all acquisition systems. Start with:
+  `sl-configure mcp --server base`
+- **Mesoscope server** (`sl-mesoscope-vr`): Mesoscope-VR specific tools. Start with: `sl-configure mcp`
+
+The servers provide tools for:
 - **Setup**: Set working directory, create projects, configure system and server
 - **Experiment Design**: Create templates, add cues/segments/trials/states incrementally
 - **Query**: Read configurations, list components, validate completeness
 
-See the `/experiment-design` skill for interactive configuration building guidance.
+Mesoscope-specific tools are prefixed with `mesoscope_` (e.g., `mesoscope_create_project_tool`).
+
+See the `/experiment-design` skill in sl-experiment for interactive configuration building guidance.
 
 ## Downstream Library Integration
 
 This library provides shared assets consumed by multiple Sun lab libraries. Two libraries may require coordinated
 changes to this codebase:
 
-| Library | Relationship | Common Change Triggers |
-|---------|--------------|------------------------|
+| Library           | Relationship     | Common Change Triggers                                             |
+|-------------------|------------------|--------------------------------------------------------------------|
 | **sl-experiment** | Data acquisition | New session types, acquisition system configs, raw data structures |
-| **sl-forgery** | Data processing | New processing pipelines, trackers, processed data structures |
+| **sl-forgery**    | Data processing  | New processing pipelines, trackers, processed data structures      |
 
 **When working on sl-experiment or sl-forgery**, changes to the following often require modifications here first:
 - `SessionTypes`, `AcquisitionSystems` enums
