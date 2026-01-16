@@ -15,10 +15,10 @@ from ataraxis_base_utilities import ensure_directory_exists
 from .configuration import (
     GasPuffTrial,
     TaskTemplate,
+    ExperimentState,
     WaterRewardTrial,
     AcquisitionSystems,
     ServerConfiguration,
-    MesoscopeExperimentState,
     MesoscopeSystemConfiguration,
     MesoscopeExperimentConfiguration,
     get_working_directory,
@@ -878,7 +878,11 @@ def update_valve_calibration_tool(
 
         # Parses the JSON string into calibration data.
         data = json.loads(calibration_points)
-        if not isinstance(data, list) or not all(isinstance(point, list) and len(point) == 2 for point in data):  # noqa: PLR2004
+        is_valid = isinstance(data, list) and all(
+            isinstance(point, list) and len(point) == 2
+            for point in data
+        )
+        if not is_valid:
             return "Error: calibration_points must be a JSON list of [time_us, volume_ul] pairs."
 
         # Converts to tuple of tuples.
@@ -1243,7 +1247,7 @@ def add_experiment_state_tool(
             return f"Error: State '{name}' already exists."
 
         # Adds new state
-        new_state = MesoscopeExperimentState(
+        new_state = ExperimentState(
             experiment_state_code=experiment_state_code,
             system_state_code=system_state_code,
             state_duration_s=state_duration_s,

@@ -1,7 +1,7 @@
 """Provides VR environment configuration classes for Unity task templates and experiment configurations.
 
 These classes define the schema for task template YAML files that Unity uses for prefab generation and runtime.
-Experiment configuration classes in mesoscope_configuration.py inherit from these base classes to add
+System-agnostic and system-specific configuration classes in this library inherit from these base classes to add
 experiment-specific parameters.
 """
 
@@ -17,7 +17,7 @@ _PROBABILITY_SUM_TOLERANCE = 0.001
 """Tolerance for validating probability sums to 1.0."""
 
 
-@dataclass()
+@dataclass
 class Cue:
     """Defines a single visual cue used in the experiment task's Virtual Reality (VR) environment.
 
@@ -44,7 +44,7 @@ class Cue:
             console.error(message=message, error=ValueError)
 
 
-@dataclass()
+@dataclass
 class Segment:
     """Defines a visual segment (sequence of cues) used in the experiment task's Virtual Reality (VR) environment.
 
@@ -74,9 +74,9 @@ class Segment:
                 console.error(message=message, error=ValueError)
 
 
-@dataclass()
+@dataclass
 class VREnvironment:
-    """Defines the Unity VR corridor system configuration.
+    """Defines the Unity Virtual Reality (VR) corridor system configuration.
 
     Notes:
         This class is primarily used by Unity to configure the task environment. Python parses these values
@@ -93,7 +93,7 @@ class VREnvironment:
     """The conversion factor from centimeters to Unity units."""
 
 
-@dataclass()
+@dataclass
 class TrialStructure:
     """Defines the spatial configuration of a trial structure for Unity prefabs.
 
@@ -122,14 +122,14 @@ class TrialStructure:
     'occupancy' (OccupancyZone, used for gas puffs)."""
 
 
-@dataclass()
+@dataclass
 class TaskTemplate(YamlConfig):
     """Defines a VR task template used by Unity for prefab generation and runtime configuration.
 
     Notes:
         Task templates contain ONLY the data Unity needs for prefab generation and runtime. Experiment-specific
-        parameters (rewards, guidance, experiment states) are NOT included here - those are added by
-        MesoscopeExperimentConfiguration which uses the full trial structure classes that inherit from TrialStructure.
+        parameters (rewards, guidance, experiment states) are NOT included here - those are added by system-specific
+        experiment configuration classes that use the full trial structure classes inheriting from TrialStructure.
 
         This dataclass can parse any valid task configuration (template) .yaml file from the sl-unity-tasks project.
     """

@@ -27,7 +27,7 @@ class SessionMetadata:
     """The unique identifier of the animal that participated in the session."""
 
 
-@dataclass()
+@dataclass
 class DatasetTrackingData:
     """Provides the path to the directory that stores the .yaml and .lock files used by ProcessingTracker instances to
     track the runtime status of the dataset forging and multi-day processing pipelines.
@@ -49,7 +49,7 @@ class DatasetTrackingData:
         ensure_directory_exists(self.tracking_data_path)
 
 
-@dataclass()
+@dataclass
 class DatasetSessionData:
     """Provides the paths and access to the assembled data files for a single session within the dataset.
 

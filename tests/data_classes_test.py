@@ -20,7 +20,7 @@ from sl_shared_assets.configuration import (
     Segment,
     VREnvironment,
     WaterRewardTrial,
-    MesoscopeExperimentState,
+    ExperimentState,
     MesoscopeExperimentConfiguration,
     MesoscopeSystemConfiguration,
     set_working_directory,
@@ -43,7 +43,7 @@ def sample_mesoscope_config() -> MesoscopeSystemConfiguration:
 @pytest.fixture
 def sample_experiment_config() -> MesoscopeExperimentConfiguration:
     """Creates a sample MesoscopeExperimentConfiguration for testing."""
-    state = MesoscopeExperimentState(
+    state = ExperimentState(
         experiment_state_code=1,
         system_state_code=0,
         state_duration_s=600.0,
@@ -61,7 +61,7 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
     ]
 
     segments = [
-        Segment(name="Segment_abc", cue_sequence=["A", "B", "C"]),
+        Segment(name="Segment_abc", cue_sequence=["A", "B", "C"], transition_probabilities=None),
     ]
 
     # Trial references the segment - cue_sequence and trial_length_cm are derived
@@ -70,6 +70,7 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
         stimulus_trigger_zone_start_cm=150.0,
         stimulus_trigger_zone_end_cm=175.0,
         stimulus_location_cm=160.0,
+        show_stimulus_collision_boundary=False,
     )
 
     config = MesoscopeExperimentConfiguration(
@@ -77,7 +78,12 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
         segments=segments,
         trial_structures={"trial1": trial},
         experiment_states={"state1": state},
-        vr_environment=VREnvironment(),
+        vr_environment=VREnvironment(
+            corridor_spacing_cm=100.0,
+            segments_per_corridor=3,
+            padding_prefab_name="Padding",
+            cm_per_unity_unit=10.0,
+        ),
         unity_scene_name="TestScene",
         cue_offset_cm=10.0,
     )
@@ -679,10 +685,10 @@ def test_session_data_create_copies_experiment_configuration(
     # Creates project directory and experiment configuration
     project_path = clean_working_directory / "test_project"
     project_path.mkdir()
-    experiments_path = project_path / "experiments"
-    experiments_path.mkdir()
+    configuration_path = project_path / "configuration"
+    configuration_path.mkdir()
 
-    experiment_config_path = experiments_path / "test_experiment.yaml"
+    experiment_config_path = configuration_path / "test_experiment.yaml"
     sample_experiment_config.to_yaml(file_path=experiment_config_path)
 
     session_data = SessionData.create(

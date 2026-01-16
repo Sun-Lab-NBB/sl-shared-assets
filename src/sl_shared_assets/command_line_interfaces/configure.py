@@ -9,9 +9,9 @@ from ..mcp_server import run_server  # pragma: no cover
 from ..configuration import (
     GasPuffTrial,
     TaskTemplate,
+    ExperimentState,
     WaterRewardTrial,
     AcquisitionSystems,
-    MesoscopeExperimentState,
     set_working_directory,
     set_google_credentials_path,
     get_task_templates_directory,
@@ -301,7 +301,7 @@ def generate_experiment_configuration_file(
     # Generates experiment states with guidance parameters.
     for state_num in range(state_count):
         state_name = f"state_{state_num + 1}"
-        experiment_configuration.experiment_states[state_name] = MesoscopeExperimentState(
+        experiment_configuration.experiment_states[state_name] = ExperimentState(
             experiment_state_code=state_num + 1,
             system_state_code=0,
             state_duration_s=60,

@@ -5,7 +5,7 @@ from dataclasses import dataclass  # pragma: no cover
 from ataraxis_data_structures import YamlConfig  # pragma: no cover
 
 
-@dataclass()
+@dataclass
 class SubjectData:  # pragma: no cover
     """Stores information about the subject of the surgical intervention."""
 
@@ -29,7 +29,7 @@ class SubjectData:  # pragma: no cover
     """The current subject's status (alive / deceased)."""
 
 
-@dataclass()
+@dataclass
 class ProcedureData:  # pragma: no cover
     """Stores general information about the surgical intervention."""
 
