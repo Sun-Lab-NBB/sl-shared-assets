@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import os
-import time
 from typing import TYPE_CHECKING
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -279,28 +277,20 @@ def test_filter_sessions_drops_malformed_session_names() -> None:
 
 
 def test_filter_sessions_local_timezone_handling() -> None:
-    """Verifies that utc_timezone=False compares session timestamps in the host machine's local time.
+    """Verifies that utc_timezone=False compares session timestamps against the host machine's local day boundary.
 
-    The host is pinned to America/New_York for determinism. A session name of ``2026-03-02-03-30-00-000000`` is 03:30
-    UTC on March 2, which is 22:30 EST on March 1, so it falls within the March 1 end-of-day boundary when
-    ``utc_timezone=False`` but not when ``utc_timezone=True``.
+    Session names encode UTC, so the March 1 end-of-day boundary is expressed here as the UTC instant that local
+    23:59:59.999999 falls on. The session acquired at that instant is the last one the boundary keeps, and the next
+    microsecond falls outside it, which pins the cutoff to the local end of March 1 rather than to 23:59:59.999999 UTC.
     """
-    original_timezone = os.environ.get("TZ")
-    os.environ["TZ"] = "America/New_York"
-    time.tzset()
-    try:
-        keys = {("2026-03-02-03-30-00-000000", "1")}
-        included = filter_sessions(sessions=keys, end_date="2026-03-01", utc_timezone=False)
-        excluded = filter_sessions(sessions=keys, end_date="2026-03-01", utc_timezone=True)
-    finally:
-        if original_timezone is None:
-            os.environ.pop("TZ", None)
-        else:
-            os.environ["TZ"] = original_timezone
-        time.tzset()
+    session_name_format = "%Y-%m-%d-%H-%M-%S-%f"
+    local_end_of_day = datetime(2026, 3, 1, 23, 59, 59, 999999).astimezone(ZoneInfo("UTC"))
+    included = (local_end_of_day.strftime(session_name_format), "1")
+    excluded = ((local_end_of_day + timedelta(microseconds=1)).strftime(session_name_format), "1")
 
-    assert included == keys
-    assert excluded == set()
+    result = filter_sessions(sessions={included, excluded}, end_date="2026-03-01", utc_timezone=False)
+
+    assert result == {included}
 
 
 def test_parse_session_timestamp_valid_utc() -> None:
